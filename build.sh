@@ -36,13 +36,13 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.suriclean.app</string>
   <key>CFBundleExecutable</key><string>SuriClean</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
+  <key>CFBundleVersion</key><string>2</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSAppleEventsUsageDescription</key><string>SuriClean chiede al Finder di svuotare il Cestino quando non riesce a farlo da sola.</string>
+  <key>NSAppleEventsUsageDescription</key><string>SuriClean chiede al Finder di spostare nel Cestino le app protette (con la tua password) e di svuotare il Cestino.</string>
   <key>NSHumanReadableCopyright</key><string>Fatto con amore da una suricata 🐾</string>
 </dict>
 </plist>

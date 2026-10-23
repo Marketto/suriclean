@@ -54,5 +54,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view v1.0 >/dev/null 2>&1 || gh release create v1.0 --title "SuriClean 1.0 🐾" --notes "Apri il DMG e trascina SuriClean nelle Applicazioni. Al primo avvio: tasto destro sull'app › Apri."
-          gh release upload v1.0 dist/SuriClean.dmg --clobber
+          gh release view v1.1 >/dev/null 2>&1 || gh release create v1.1 --title "SuriClean 1.1 🐾" --notes "Apri il DMG e trascina SuriClean nelle Applicazioni. Al primo avvio: tasto destro sull'app › Apri."
+          gh release upload v1.1 dist/SuriClean.dmg --clobber

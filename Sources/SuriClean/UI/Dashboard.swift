@@ -203,7 +203,7 @@ struct CategoryCard: View {
             Spacer(minLength: 0)
             if let items = items {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    AnimatedBytes(value: items.totalSize)
+                    AnimatedBytes(value: model.displayTotal(category))
                         .font(Theme.font(22, .heavy))
                         .foregroundColor(category.color.darker)
                     Text(items.isEmpty ? "pika-pika ✨" : "· \(items.count) elementi").font(Theme.font(11.5, .semibold)).opacity(0.55)

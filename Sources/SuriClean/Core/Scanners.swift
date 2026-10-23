@@ -79,17 +79,37 @@ enum Targets {
         Target(path: ".cache/uv", name: "uv · cache Python"),
         Target(path: ".cache/pre-commit", name: "pre-commit · ambienti"),
         Target(path: ".cache/puppeteer", name: "Puppeteer · browser"),
-        Target(path: "Library/Containers/com.docker.docker/Data/vms", name: "Docker · disco della VM", risk: .careful, recommended: false)
+        Target(path: "Library/Containers/com.docker.docker/Data/vms", name: "Docker · disco della VM", risk: .careful, recommended: false),
+        Target(path: "Library/Developer/CoreSimulator/Devices", name: "Simulatori iOS · dispositivi", risk: .review, recommended: false),
+        Target(path: "Library/Developer/Xcode/UserData/Previews", name: "Xcode · anteprime SwiftUI"),
+        Target(path: "Library/Developer/XCPGDevices", name: "Xcode · dispositivi dei Playground"),
+        Target(path: "Library/Developer/Xcode/Products", name: "Xcode · prodotti delle build"),
+        Target(path: "miniconda3/pkgs", name: "Conda · pacchetti scaricati"),
+        Target(path: "anaconda3/pkgs", name: "Anaconda · pacchetti scaricati"),
+        Target(path: "miniforge3/pkgs", name: "Miniforge · pacchetti scaricati"),
+        Target(path: "mambaforge/pkgs", name: "Mamba · pacchetti scaricati"),
+        Target(path: "opt/miniconda3/pkgs", name: "Conda · pacchetti scaricati"),
+        Target(path: "opt/anaconda3/pkgs", name: "Anaconda · pacchetti scaricati"),
+        Target(path: ".conda/pkgs", name: "Conda · pacchetti scaricati"),
+        Target(path: ".pyenv/cache", name: "pyenv · download"),
+        Target(path: ".gem/specs", name: "RubyGems · cache"),
+        Target(path: ".cache/pip", name: "Python pip · cache"),
+        Target(path: ".vagrant.d/boxes", name: "Vagrant · box", risk: .review, recommended: false),
+        Target(path: ".minikube/cache", name: "Minikube · cache"),
+        Target(path: ".colima", name: "Colima · VM", risk: .careful, recommended: false),
+        Target(path: ".orbstack", name: "OrbStack · dati", risk: .careful, recommended: false)
     ]
 }
 
 enum Scanners {
     static func scan(_ c: CleanCategory, index: HomeIndex?, reporter: Reporter) -> [CleanItem] {
         switch c {
+        case .diskMap: return diskMap(reporter)
+        case .appData: return appData(reporter)
         case .caches: return caches(reporter)
         case .logsTemp: return logsTemp(reporter)
         case .aiTools: return fixed(Targets.ai, reporter)
-        case .devCaches: return fixed(Targets.dev, reporter)
+        case .devCaches: return fixed(Targets.dev, reporter) + homebrewOld(reporter)
         case .buildDeps: return buildDeps(index, reporter)
         case .gitRepos: return gitRepos(index, reporter)
         case .duplicates: return Duplicates.find(index, reporter)
@@ -147,6 +167,123 @@ enum Scanners {
                     }
                 }
             } else if let it = makeItem(url, name: t.name, risk: t.risk, recommended: t.recommended, rep: rep) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    // MARK: Homebrew
+
+    /// Old formula versions `brew cleanup` would remove.
+    static func homebrewOld(_ rep: Reporter) -> [CleanItem] {
+        guard let brew = ["/usr/local/bin/brew", "/opt/homebrew/bin/brew"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return [] }
+        rep.report("brew cleanup --dry-run…", force: true)
+        let r = Shell.run(brew, ["cleanup", "-n"], env: ["HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ENV_HINTS": "1"])
+        var out: [CleanItem] = []
+        for line in r.output.split(separator: "\n") where line.hasPrefix("Would remove: ") {
+            var path = String(line.dropFirst("Would remove: ".count))
+            if let paren = path.range(of: " (", options: .backwards) { path = String(path[..<paren.lowerBound]) }
+            let url = URL(fileURLWithPath: path)
+            guard FS.exists(url), !url.path.contains("/Caches/") else { continue }
+            let parent = url.deletingLastPathComponent().lastPathComponent
+            if let it = makeItem(url, name: "Homebrew · \(parent) \(url.lastPathComponent) (vecchia)", risk: .safe, recommended: true, rep: rep, minSize: 1_048_576, badges: ["🍺 brew cleanup"]) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    // MARK: disk map
+
+    /// Every folder >= 300 MB down to 4 levels below Home, plus Applications. View-only.
+    static func diskMap(_ rep: Reporter) -> [CleanItem] {
+        let fm = FileManager.default
+        let home = FS.home
+        let homeDepth = home.pathComponents.count
+        var sizes: [String: Int64] = [:]
+        var total: Int64 = 0
+        let keys: [URLResourceKey] = [.isRegularFileKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+        let keySet = Set(keys)
+        var n = 0
+        if let en = fm.enumerator(at: home, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true }) {
+            while let obj = en.nextObject() {
+                guard let url = obj as? URL else { continue }
+                n += 1
+                if n % 500 == 0 {
+                    if rep.isCancelled { return [] }
+                    rep.report("\(n) elementi misurati · \(FS.pretty(url))")
+                }
+                guard let v = try? url.resourceValues(forKeys: keySet), v.isRegularFile == true else { continue }
+                let sz = Int64(v.totalFileAllocatedSize ?? v.fileAllocatedSize ?? 0)
+                if sz == 0 { continue }
+                total += sz
+                let comps = url.pathComponents
+                var path = home.path
+                let maxDepth = min(comps.count - 1, homeDepth + 4)
+                if homeDepth < maxDepth {
+                    for i in homeDepth..<maxDepth {
+                        path += "/" + comps[i]
+                        sizes[path, default: 0] += sz
+                    }
+                }
+            }
+        }
+        var out: [CleanItem] = []
+        out.append(CleanItem(url: home, name: "La tua cartella Inizio", detail: "~", size: total, date: nil,
+                             risk: .careful, recommended: false, badges: ["🏡 la tana"]))
+        for (path, size) in sizes {
+            let depth = URL(fileURLWithPath: path).pathComponents.count - homeDepth
+            let threshold: Int64 = depth == 1 ? 50 * 1_048_576 : 300 * 1_048_576
+            guard size >= threshold else { continue }
+            let url = URL(fileURLWithPath: path)
+            out.append(CleanItem(url: url, name: url.lastPathComponent, detail: FS.pretty(url), size: size, date: nil,
+                                 risk: .careful, recommended: false))
+        }
+        rep.report("Misuro le Applicazioni…", progress: 0.95, force: true)
+        let apps = URL(fileURLWithPath: "/Applications")
+        var appsTotal: Int64 = 0
+        var appItems: [CleanItem] = []
+        for a in FS.children(apps) {
+            if rep.isCancelled { break }
+            let s = FS.allocatedSize(a, reporter: rep)
+            appsTotal += s
+            if s >= 300 * 1_048_576 {
+                appItems.append(CleanItem(url: a, name: a.deletingPathExtension().lastPathComponent, detail: a.path, size: s, date: nil, risk: .careful, recommended: false))
+            }
+        }
+        out.append(CleanItem(url: apps, name: "Applicazioni", detail: "/Applications", size: appsTotal, date: nil, risk: .careful, recommended: false, badges: ["📱 app"]))
+        out += appItems
+        return out
+    }
+
+    // MARK: app data
+
+    static func appData(_ rep: Reporter) -> [CleanItem] {
+        var out: [CleanItem] = []
+        let L = FS.library
+        let skipSupport: Set<String> = ["MobileSync", "Claude", "Cursor", "Code", "Windsurf", "CrashReporter", "AddressBook", "CallHistoryDB", "Knowledge", "com.apple.TCC"]
+        var candidates: [(URL, String)] = []
+        for d in FS.children(L.appendingPathComponent("Application Support")) where FS.isDir(d) && !skipSupport.contains(d.lastPathComponent) {
+            candidates.append((d, FS.friendlyName(d.lastPathComponent)))
+        }
+        for c in FS.children(L.appendingPathComponent("Containers")) where !c.lastPathComponent.hasPrefix("com.apple.") || c.lastPathComponent == "com.apple.mail" {
+            candidates.append((c.appendingPathComponent("Data"), FS.friendlyName(c.lastPathComponent) + " (sandbox)"))
+        }
+        for g in FS.children(L.appendingPathComponent("Group Containers")) {
+            let name = g.lastPathComponent
+            var label = name
+            if name.lowercased().contains("whatsapp") { label = "WhatsApp" }
+            else if name.lowercased().contains("telegram") { label = "Telegram" }
+            else if name.contains("com.apple.podcasts") || name.contains("UBF8T346G9.Office") || name.lowercased().contains("office") { label = name.contains("podcasts") ? "Podcast" : "Microsoft Office" }
+            candidates.append((g, label + " (gruppo)"))
+        }
+        candidates.append((L.appendingPathComponent("Mail"), "Mail · messaggi e allegati"))
+        candidates.append((FS.home.appendingPathComponent("Library/Messages"), "Messaggi · chat e allegati"))
+        for (i, c) in candidates.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(FS.pretty(c.0), progress: Double(i) / Double(max(candidates.count, 1)))
+            if let it = makeItem(c.0, name: c.1, risk: .careful, recommended: false, rep: rep, minSize: 500 * 1_048_576, badges: ["🍰 app golosa"]) {
                 out.append(it)
             }
         }
@@ -397,7 +534,8 @@ enum Scanners {
             rep.report(app.lastPathComponent, progress: Double(i) / Double(max(appURLs.count, 1)))
             let bundle = Bundle(url: app)
             let id = bundle?.bundleIdentifier ?? ""
-            if id.hasPrefix("com.apple.") || id == FS.ownBundleID { continue }
+            let isInstaller = id.hasPrefix("com.apple.InstallAssistant") || app.lastPathComponent.hasPrefix("Install macOS") || app.lastPathComponent.hasPrefix("Installa macOS")
+            if (id.hasPrefix("com.apple.") && !isInstaller) || id == FS.ownBundleID { continue }
             let name = app.deletingPathExtension().lastPathComponent
             let last = FS.lastUsedDate(app)
             let size = FS.allocatedSize(app, reporter: rep)
@@ -412,6 +550,11 @@ enum Scanners {
             if extraSize > 0 { badges.append("🧩 +\(Fmt.bytes(extraSize)) di dati") }
             let version = (bundle?.infoDictionary?["CFBundleShortVersionString"] as? String).map { " · v\($0)" } ?? ""
             let detail = (last.map { "Ultimo uso \(Fmt.relative($0))" } ?? "Nessun uso registrato da Spotlight") + version
+            if isInstaller {
+                out.append(CleanItem(url: app, name: name, detail: "Installer di macOS: si riscarica dall'App Store quando serve", size: size, date: last,
+                                     risk: .safe, recommended: true, badges: ["💿 installer di macOS"]))
+                continue
+            }
             out.append(CleanItem(url: app, name: name, detail: detail, size: size + extraSize, date: last,
                                  risk: .careful, recommended: false, badges: badges, extraURLs: extras))
         }

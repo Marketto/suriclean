@@ -117,7 +117,7 @@ struct Sidebar: View {
                     ForEach(CleanCategory.allCases) { cat in
                         SidebarRow(icon: cat.icon, title: cat.title, color: cat.color,
                                    selected: model.selectedCategory == cat,
-                                   trailing: model.results[cat].map { Fmt.bytes($0.totalSize) }) { model.open(cat) }
+                                   trailing: model.results[cat].map { _ in Fmt.bytes(model.displayTotal(cat)) }) { model.open(cat) }
                     }
                 }
             }

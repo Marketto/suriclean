@@ -40,6 +40,12 @@ final class AppModel: ObservableObject {
         hasFDA = FS.hasFullDiskAccess()
         refreshTrash()
         refreshSnapshots()
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.pruneMissing()
+                self?.refreshDisk()
+            }
+        }
     }
 
     func refreshDisk() { disk = DiskInfo.current() }
@@ -83,10 +89,17 @@ final class AppModel: ObservableObject {
     // MARK: derived
 
     func items(_ c: CleanCategory) -> [CleanItem] { results[c] ?? [] }
+    /// Size to show for a zone (the disk map's entries are nested, so use the biggest one).
+    func displayTotal(_ c: CleanCategory) -> Int64 {
+        let l = items(c)
+        return c == .diskMap ? (l.map { $0.size }.max() ?? 0) : l.totalSize
+    }
     func selectedItems(_ c: CleanCategory) -> [CleanItem] { items(c).filter { selection.contains($0.id) } }
-    var foundTotal: Int64 { results.values.reduce(Int64(0)) { $0 + $1.totalSize } }
+    var foundTotal: Int64 {
+        results.filter { $0.key != .diskMap }.values.reduce(Int64(0)) { $0 + $1.totalSize }
+    }
     var recommendedTotal: Int64 {
-        results.values.reduce(Int64(0)) { acc, list in acc + list.filter { $0.recommended }.totalSize }
+        results.filter { $0.key != .diskMap }.values.reduce(Int64(0)) { acc, list in acc + list.filter { $0.recommended }.totalSize }
     }
 
     var greeting: String {
@@ -130,6 +143,11 @@ final class AppModel: ObservableObject {
         Chiptune.shared.sfx(.coin)
     }
 
+    func setSelection(_ ids: [UUID], on: Bool) {
+        if on { selection.formUnion(ids) } else { selection.subtract(ids) }
+        Chiptune.shared.sfx(on ? .coin : .pop)
+    }
+
     func selectAll(_ c: CleanCategory) { selection.formUnion(items(c).map { $0.id }); Chiptune.shared.sfx(.pop) }
     func selectNone(_ c: CleanCategory) { selection.subtract(items(c).map { $0.id }); Chiptune.shared.sfx(.pop) }
 
@@ -138,7 +156,28 @@ final class AppModel: ObservableObject {
     func open(_ c: CleanCategory?) {
         Chiptune.shared.sfx(.pop)
         selectedCategory = c
+        pruneMissing()
         if let c = c, results[c] == nil, busy == nil { runScan([c]) }
+    }
+
+    /// Drops items that no longer exist (deleted in Finder, by another app, or by an earlier clean).
+    func pruneMissing() {
+        guard busy == nil else { return }
+        var gone: [URL] = []
+        for key in Array(results.keys) {
+            guard let list = results[key] else { continue }
+            let kept = list.filter { FileManager.default.fileExists(atPath: $0.url.path) }
+            if kept.count != list.count {
+                let keptIDs = Set(kept.map { $0.id })
+                for it in list where !keptIDs.contains(it.id) { selection.remove(it.id); gone.append(it.url) }
+                results[key] = kept
+            }
+        }
+        if !gone.isEmpty {
+            homeIndex?.prune(removed: gone)
+            refreshDisk()
+            refreshTrash()
+        }
     }
 
     func scanAll() { runScan(CleanCategory.allCases) }

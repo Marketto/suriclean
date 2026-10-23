@@ -48,13 +48,15 @@ extension Array where Element == CleanItem {
 }
 
 enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
-    case caches, logsTemp, aiTools, devCaches, buildDeps, gitRepos, duplicates
+    case diskMap, caches, logsTemp, aiTools, devCaches, buildDeps, gitRepos, duplicates, appData
     case bigFiles, installers, oldDownloads, apps, leftovers, appleExtras
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .diskMap: return "Mappa del disco"
+        case .appData: return "Dati delle app"
         case .caches: return "Cache delle app"
         case .logsTemp: return "Log e temporanei"
         case .aiTools: return "Claude, Codex & AI"
@@ -73,6 +75,8 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var subtitle: String {
         switch self {
+        case .diskMap: return "Dove sono finiti tutti i GB? Scopriamolo ☆"
+        case .appData: return "Le app più golose di spazio, nyam~"
         case .caches: return "Briciole magiche che ricrescono da sole ✧"
         case .logsTemp: return "Diari di bordo e roba usa-e-getta"
         case .aiTools: return "Le briciole dei tuoi amici robot 🤖"
@@ -91,6 +95,10 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var explain: String {
         switch self {
+        case .diskMap:
+            return "Tutto quello che occupa spazio nella tua cartella Inizio e in Applicazioni, cartella per cartella (da 300 MB in su). Qui non si cancella niente: guarda, scopri i bestioni e aprili nel Finder. Il resto del disco usato è macOS stesso, la memoria virtuale e gli altri utenti."
+        case .appData:
+            return "Le cartelle di dati più grosse delle app: WhatsApp, Telegram, Steam, Spotify, Adobe, Mail… Contengono dati veri (chat, giochi, musica offline): niente è preselezionato. Spesso conviene svuotarle dall'app stessa."
         case .caches:
             return "Le cache servono solo a velocizzare: se le togli, le app le ricreano quando servono. Meglio chiudere le app prima di pulire."
         case .logsTemp:
@@ -122,6 +130,8 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var icon: String {
         switch self {
+        case .diskMap: return "chart.pie.fill"
+        case .appData: return "tray.full.fill"
         case .caches: return "wind"
         case .logsTemp: return "clock.arrow.circlepath"
         case .aiTools: return "brain.head.profile"
@@ -140,6 +150,8 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var color: Color {
         switch self {
+        case .diskMap: return Theme.lemon
+        case .appData: return Theme.coral
         case .caches: return Theme.sky
         case .logsTemp: return Theme.lilac
         case .aiTools: return Theme.pink
@@ -158,6 +170,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var risk: Risk {
         switch self {
+        case .diskMap, .appData: return .careful
         case .caches, .logsTemp, .devCaches, .buildDeps, .installers: return .safe
         case .aiTools, .gitRepos, .duplicates, .oldDownloads, .leftovers: return .review
         case .bigFiles, .apps, .appleExtras: return .careful
@@ -166,7 +179,8 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var activity: MeerkatActivity {
         switch self {
-        case .caches, .leftovers: return .sniffing
+        case .diskMap: return .digging
+        case .caches, .leftovers, .appData: return .sniffing
         case .logsTemp: return .reading
         case .aiTools, .devCaches: return .hacking
         case .buildDeps, .bigFiles: return .digging
@@ -179,6 +193,8 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var scanTitle: String {
         switch self {
+        case .diskMap: return "Misuro tutta la tana, cm per cm! 📏"
+        case .appData: return "Chi è l'app più golosa? Nyam~ 🍰"
         case .caches: return "Snif snif! Caccia alle cache~ ☆"
         case .logsTemp: return "Sfoglio i log, piku-piku! 📜"
         case .aiTools: return "Bip-bup! Missione robot AI ☆"

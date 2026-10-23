@@ -191,22 +191,34 @@ enum Cleaner {
                 o.removed.append(item.id)        // already gone (e.g. inside a repo removed earlier)
                 continue
             }
-            do {
-                try fm.trashItem(at: item.url, resultingItemURL: nil)
+            var ok = (try? fm.trashItem(at: item.url, resultingItemURL: nil)) != nil
+            if !ok {
+                // Admin-owned items (App Store apps, pkg installs): let Finder do it, it asks for the password.
+                reporter.report("Il Finder potrebbe chiederti la password per \(item.name)…", force: true)
+                ok = finderTrash(item.url) && !fm.fileExists(atPath: item.url.path)
+            }
+            if ok {
                 for extra in item.extraURLs where fm.fileExists(atPath: extra.path) {
-                    try? fm.trashItem(at: extra, resultingItemURL: nil)
+                    if (try? fm.trashItem(at: extra, resultingItemURL: nil)) == nil { _ = finderTrash(extra) }
                 }
                 o.removed.append(item.id)
                 o.removedURLs.append(item.url)
                 o.bytes += item.size
                 if let c = item.copyText { repoLog.append("# \(item.url.path)  (rimosso \(stamp))\n\(c)") }
-            } catch {
+            } else {
                 o.failed.append(item.name)
             }
         }
         FS.appendToRepoLog(repoLog)
         reporter.report("Fatto!", progress: 1, force: true)
         return o
+    }
+
+    /// Moves an item to the Trash through Finder (same as dragging it there, password prompt included).
+    static func finderTrash(_ url: URL) -> Bool {
+        let escaped = url.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let r = Shell.run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"])
+        return r.status == 0
     }
 
     @discardableResult

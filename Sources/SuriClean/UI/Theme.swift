@@ -146,10 +146,14 @@ struct RiskTag: View {
 struct KawaiiCheckbox: View {
     let on: Bool
     let color: Color
+    var partial: Bool = false
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(on ? color : Color.white)
-            RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(on ? color.darker : Theme.cocoa.opacity(0.25), lineWidth: 2)
+            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(on ? color : (partial ? color.opacity(0.35) : Color.white))
+            RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(on || partial ? color.darker : Theme.cocoa.opacity(0.25), lineWidth: 2)
+            if partial && !on {
+                Capsule().fill(Color.white).frame(width: 11, height: 3.5)
+            }
             if on {
                 Image(systemName: "pawprint.fill")
                     .font(.system(size: 11, weight: .bold))

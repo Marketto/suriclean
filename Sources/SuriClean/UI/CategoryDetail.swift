@@ -13,6 +13,7 @@ struct CategoryDetailView: View {
     @State private var sort: SortMode
     @State private var query = ""
     @State private var confirm = false
+    @AppStorage("suri.treeView") private var treeView = false
 
     init(category: CleanCategory) {
         self.category = category
@@ -54,7 +55,9 @@ struct CategoryDetailView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        if category == .duplicates {
+                        if treeView || category == .diskMap {
+                            TreeListView(items: l, sort: sort, color: category.color, selectable: category != .diskMap)
+                        } else if category == .duplicates {
                             ForEach(groups(l)) { g in
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack {
@@ -75,7 +78,7 @@ struct CategoryDetailView: View {
                     .padding(.vertical, 12)
                 }
             }
-            footer(selected: selected)
+            if category == .diskMap { mapFooter } else { footer(selected: selected) }
         }
         .alert("Spostare nel Cestino?", isPresented: $confirm) {
             Button("Annulla", role: .cancel) {}
@@ -102,6 +105,16 @@ struct CategoryDetailView: View {
                 MeerkatView(activity: category.activity, size: 96)
             }
             HStack(spacing: 10) {
+                if category != .diskMap {
+                Picker("", selection: $treeView) {
+                    Label("Lista", systemImage: "list.bullet").tag(false)
+                    Label("Albero", systemImage: "list.bullet.indent").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 170)
+                .labelsHidden()
+                .onChange(of: treeView) { _ in Chiptune.shared.sfx(.pop) }
+                }
                 Picker("", selection: $sort) {
                     ForEach(SortMode.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -117,7 +130,7 @@ struct CategoryDetailView: View {
                 .frame(maxWidth: 260)
                 Spacer()
                 if model.results[category] != nil {
-                    Text("\(count) elementi · \(Fmt.bytes(model.items(category).totalSize))").font(Theme.font(12.5, .bold)).opacity(0.6)
+                    Text("\(count) elementi · \(Fmt.bytes(model.displayTotal(category)))").font(Theme.font(12.5, .bold)).opacity(0.6)
                 }
                 Button(action: { model.rescan(category) }) {
                     Label("Riscansiona", systemImage: "arrow.clockwise")
@@ -144,6 +157,19 @@ struct CategoryDetailView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var mapFooter: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "info.circle.fill").foregroundColor(category.color.darker)
+            Text("La mappa serve solo a guardare ☆ Per liberare spazio usa le altre zone, oppure apri la cartella nel Finder con 📁")
+                .font(Theme.font(12.5, .semibold)).opacity(0.7)
+            Spacer()
+            Text("Disco usato: \(Fmt.bytes(model.disk.used))").font(Theme.font(13, .heavy))
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
+        .background(Color.white.opacity(0.7))
     }
 
     private func footer(selected: [CleanItem]) -> some View {
