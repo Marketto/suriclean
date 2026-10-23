@@ -1,0 +1,58 @@
+name: Build DMG
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build app and DMG
+        run: |
+          chmod +x build.sh scripts/make-dmg.sh
+          scripts/make-dmg.sh
+
+      - name: Smoke test (launch and screenshot)
+        continue-on-error: true
+        run: |
+          open dist/SuriClean.app
+          sleep 15
+          if pgrep -x SuriClean >/dev/null; then echo "✅ SuriClean is running"; else echo "❌ SuriClean is not running"; fi
+          screencapture -x dist/screenshot.png || true
+          pkill -x SuriClean || true
+          log show --last 2m --predicate 'process == "SuriClean"' --style compact 2>/dev/null | tail -40 || true
+
+      - name: Mount test
+        run: |
+          hdiutil attach dist/SuriClean.dmg -nobrowse -mountpoint /tmp/suri
+          ls -la /tmp/suri
+          hdiutil detach /tmp/suri
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SuriClean-dmg
+          path: dist/SuriClean.dmg
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshot
+          path: dist/screenshot.png
+          if-no-files-found: ignore
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view v1.0 >/dev/null 2>&1 || gh release create v1.0 --title "SuriClean 1.0 🐾" --notes "Apri il DMG e trascina SuriClean nelle Applicazioni. Al primo avvio: tasto destro sull'app › Apri."
+          gh release upload v1.0 dist/SuriClean.dmg --clobber

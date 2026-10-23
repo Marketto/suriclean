@@ -1,0 +1,335 @@
+import SwiftUI
+import AppKit
+
+@MainActor
+final class AppModel: ObservableObject {
+    @Published var results: [CleanCategory: [CleanItem]] = [:]
+    @Published var selection: Set<UUID> = []
+    @Published var busy: BusyState?
+    @Published var celebration: Celebration?
+    @Published var disk = DiskInfo.current()
+    @Published var selectedCategory: CleanCategory?
+    @Published var hasFDA = true
+    @Published var trashSize: Int64 = 0
+    @Published var askEmptyTrash = false
+    @Published var snapshotCount: Int?
+    @Published var toast: String?
+    @Published var muted: Bool = UserDefaults.standard.bool(forKey: "suri.muted") {
+        didSet {
+            UserDefaults.standard.set(muted, forKey: "suri.muted")
+            Chiptune.shared.muted = muted
+        }
+    }
+    @Published var totalFreed: Int64 = Int64(UserDefaults.standard.double(forKey: "suri.totalFreed")) {
+        didSet { UserDefaults.standard.set(Double(totalFreed), forKey: "suri.totalFreed") }
+    }
+
+    private var homeIndex: HomeIndex?
+    private var reporter: Reporter?
+    private var started = false
+
+    // MARK: lifecycle
+
+    func start() {
+        guard !started else { return }
+        started = true
+        Chiptune.shared.start()
+        Chiptune.shared.muted = muted
+        Chiptune.shared.mood = .menu
+        refreshDisk()
+        hasFDA = FS.hasFullDiskAccess()
+        refreshTrash()
+        refreshSnapshots()
+    }
+
+    func refreshDisk() { disk = DiskInfo.current() }
+
+    func refreshTrash() {
+        Task {
+            let s = await Task.detached(priority: .utility) { FS.allocatedSize(FS.trashURL) }.value
+            self.trashSize = s
+        }
+    }
+
+    func refreshSnapshots() {
+        Task {
+            let n = await Task.detached(priority: .utility) { () -> Int in
+                let r = Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"])
+                return r.output.components(separatedBy: "\n").filter { $0.contains("com.apple.TimeMachine") }.count
+            }.value
+            self.snapshotCount = n
+        }
+    }
+
+    func recheckFDA() {
+        hasFDA = FS.hasFullDiskAccess()
+        showToast(hasFDA ? "Yatta! Ora vedo tutte le stanze ✨" : "Ancora niente accesso completo: dopo averlo concesso riapri l'app")
+    }
+
+    func openFDASettings() {
+        if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(u)
+        }
+    }
+
+    func showToast(_ s: String) {
+        toast = s
+        Task {
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            if self.toast == s { self.toast = nil }
+        }
+    }
+
+    // MARK: derived
+
+    func items(_ c: CleanCategory) -> [CleanItem] { results[c] ?? [] }
+    func selectedItems(_ c: CleanCategory) -> [CleanItem] { items(c).filter { selection.contains($0.id) } }
+    var foundTotal: Int64 { results.values.reduce(Int64(0)) { $0 + $1.totalSize } }
+    var recommendedTotal: Int64 {
+        results.values.reduce(Int64(0)) { acc, list in acc + list.filter { $0.recommended }.totalSize }
+    }
+
+    var greeting: String {
+        let pct = Int(disk.usedFraction * 100)
+        if results.isEmpty {
+            if pct >= 90 {
+                return "Kyaa~! Sono Suri-chan 🐾 Il tuo disco è pieno al \(pct)%… è un'emergenza kawaii!! Premi il bottone e lo faccio tornare pika-pika ✨"
+            } else if pct >= 70 {
+                return "Konnichiwa~! Sono Suri-chan 🐾 Il disco è al \(pct)%. Andiamo a caccia di spazio insieme? Ganbarō! ☆"
+            }
+            return "Yahoo~! Sono Suri-chan 🐾 Il disco sta benino (\(pct)%), ma un po' di brillantezza in più non guasta mai ✧"
+        }
+        return "Sugoi!! Ho scovato \(Fmt.bytes(foundTotal)) di roba ✨ e \(Fmt.bytes(recommendedTotal)) puoi buttarli senza pensieri! Tocca una zona e diamo un'occhiatina~ ♡"
+    }
+
+    var level: (title: String, emoji: String, progress: Double, next: String) {
+        let gb = Double(totalFreed) / 1_000_000_000
+        let steps: [(Double, String, String)] = [
+            (1, "Cucciola curiosa", "🐣"), (5, "Scavatrice in erba", "🌱"),
+            (20, "Sentinella del disco", "👀"), (50, "Regina delle dune", "👑")
+        ]
+        var prev = 0.0
+        for s in steps {
+            if gb < s.0 { return (s.1, s.2, (gb - prev) / (s.0 - prev), "prossimo livello a \(Int(s.0)) GB") }
+            prev = s.0
+        }
+        return ("Leggenda del deserto", "🌟", 1, "livello MAX!! Sugoi~")
+    }
+
+    // MARK: selection
+
+    func toggle(_ item: CleanItem) {
+        if selection.contains(item.id) { selection.remove(item.id) } else { selection.insert(item.id) }
+        Chiptune.shared.sfx(.pop)
+    }
+
+    func selectRecommended(_ c: CleanCategory) {
+        let list = items(c)
+        selection.subtract(list.map { $0.id })
+        selection.formUnion(list.filter { $0.recommended }.map { $0.id })
+        Chiptune.shared.sfx(.coin)
+    }
+
+    func selectAll(_ c: CleanCategory) { selection.formUnion(items(c).map { $0.id }); Chiptune.shared.sfx(.pop) }
+    func selectNone(_ c: CleanCategory) { selection.subtract(items(c).map { $0.id }); Chiptune.shared.sfx(.pop) }
+
+    // MARK: navigation & scanning
+
+    func open(_ c: CleanCategory?) {
+        Chiptune.shared.sfx(.pop)
+        selectedCategory = c
+        if let c = c, results[c] == nil, busy == nil { runScan([c]) }
+    }
+
+    func scanAll() { runScan(CleanCategory.allCases) }
+
+    func rescan(_ c: CleanCategory) {
+        if c.needsIndex { homeIndex = nil }
+        runScan([c])
+    }
+
+    func cancel() {
+        reporter?.cancel()
+        updateBusy { $0.title = "Okke~ mi fermo! ✋" }
+        Chiptune.shared.sfx(.error)
+    }
+
+    private func updateBusy(_ f: (inout BusyState) -> Void) {
+        if var b = busy { f(&b); busy = b }
+    }
+
+    private func setResults(_ c: CleanCategory, _ items: [CleanItem]) {
+        if let old = results[c] { selection.subtract(old.map { $0.id }) }
+        results[c] = items
+        selection.formUnion(items.filter { $0.recommended }.map { $0.id })
+    }
+
+    private func runScan(_ cats: [CleanCategory]) {
+        guard busy == nil, !cats.isEmpty else { return }
+        let rep = Reporter()
+        reporter = rep
+        busy = BusyState(activity: cats[0].activity, title: cats[0].scanTitle, progress: 0, steps: cats.count)
+        rep.onUpdate = { [weak self] text, p in
+            guard let self = self, var b = self.busy else { return }
+            b.detail = text
+            if let p = p {
+                b.progress = (Double(b.step) + min(max(p, 0), 1)) / Double(max(b.steps, 1))
+            }
+            self.busy = b
+        }
+        Chiptune.shared.sfx(.whoosh)
+        Task {
+            for (i, cat) in cats.enumerated() {
+                if rep.isCancelled { break }
+                Chiptune.shared.mood = (cat == .duplicates) ? .detective : .scanning
+                Chiptune.shared.intensity = Double(i) / Double(cats.count)
+                if cat.needsIndex && (homeIndex == nil || homeIndex?.isStale == true) {
+                    updateBusy {
+                        $0.step = i
+                        $0.activity = .digging
+                        $0.title = "Esplorazione della tana, tan-tan! 🏡"
+                        $0.progress = cats.count > 1 ? Double(i) / Double(cats.count) : nil
+                    }
+                    let idx = await Task.detached(priority: .userInitiated) { HomeIndex.build(reporter: rep) }.value
+                    if rep.isCancelled { break }
+                    homeIndex = idx
+                }
+                updateBusy {
+                    $0.step = i
+                    $0.activity = cat.activity
+                    $0.title = cat.scanTitle
+                    if $0.progress == nil { $0.progress = Double(i) / Double(cats.count) }
+                }
+                let index = homeIndex
+                let found = await Task.detached(priority: .userInitiated) { Scanners.scan(cat, index: index, reporter: rep) }.value
+                if rep.isCancelled { break }
+                setResults(cat, found)
+                let bytes = found.totalSize
+                updateBusy { $0.foundCount += found.count; $0.foundBytes += bytes }
+                Chiptune.shared.sfx(.coin)
+            }
+            let cancelled = rep.isCancelled
+            busy = nil
+            reporter = nil
+            Chiptune.shared.intensity = 0
+            Chiptune.shared.mood = cancelled ? .menu : .results
+            refreshDisk()
+            if !cancelled && cats.count > 1 { showToast("Missione compiuta!! Bottino: \(Fmt.bytes(foundTotal)) ☆ Sugoi~!") }
+        }
+    }
+
+    // MARK: cleaning
+
+    func clean(_ c: CleanCategory) {
+        guard busy == nil else { return }
+        var items = selectedItems(c)
+        if c == .duplicates {
+            // Always keep at least one copy per group, and only if that copy still exists.
+            let groups = Dictionary(grouping: self.items(c), by: { $0.group ?? -1 })
+            var safe: [CleanItem] = []
+            for (_, g) in groups {
+                let keepers = g.filter { !selection.contains($0.id) && FileManager.default.fileExists(atPath: $0.url.path) }
+                if keepers.isEmpty {
+                    // whole group selected: spare the 💎 one (or the first)
+                    let spare = g.first(where: { !$0.recommended }) ?? g[0]
+                    guard FileManager.default.fileExists(atPath: spare.url.path) else { continue }
+                    safe += g.filter { selection.contains($0.id) && $0.id != spare.id }
+                } else {
+                    safe += g.filter { selection.contains($0.id) }
+                }
+            }
+            if safe.count < items.count { showToast("Tranquillo~ ho tenuto almeno un gemellino di ogni file 💎") }
+            items = safe
+        }
+        guard !items.isEmpty else { return }
+        let toTrash = items
+        let rep = Reporter()
+        reporter = rep
+        busy = BusyState(activity: .sweeping, title: "Suri spazza via \(items.count) \(items.count == 1 ? "elemento" : "elementi")…", progress: 0)
+        rep.onUpdate = { [weak self] text, p in
+            guard let self = self, var b = self.busy else { return }
+            b.detail = text
+            if let p = p { b.progress = p }
+            self.busy = b
+            Chiptune.shared.sfx(.coin)
+        }
+        Chiptune.shared.mood = .cleaning
+        Chiptune.shared.sfx(.whoosh)
+        Task {
+            let o = await Task.detached(priority: .userInitiated) { Cleaner.trash(toTrash, reporter: rep) }.value
+            let removed = Set(o.removed)
+            for key in Array(results.keys) {
+                results[key]?.removeAll { removed.contains($0.id) || !FileManager.default.fileExists(atPath: $0.url.path) }
+            }
+            selection.subtract(removed)
+            homeIndex?.prune(removed: o.removedURLs)
+            busy = nil
+            reporter = nil
+            totalFreed += o.bytes
+            refreshDisk()
+            refreshTrash()
+            var msg = ""
+            if !o.failed.isEmpty {
+                msg = "\(o.failed.count) elementi non si sono lasciati spostare (in uso, protetti o di proprietà del sistema): \(o.failed.prefix(3).joined(separator: ", "))\(o.failed.count > 3 ? "…" : "")"
+            }
+            if toTrash.contains(where: { $0.copyText != nil }) && o.bytes > 0 {
+                msg += (msg.isEmpty ? "" : "\n") + "I comandi per riclonare i repo sono in Documenti › «SuriClean - repo rimossi.txt»."
+            }
+            celebrate(Celebration(kind: .trashed, bytes: o.bytes, failed: o.failed.count, message: msg))
+        }
+    }
+
+    func emptyTrash() {
+        guard busy == nil else { return }
+        celebration = nil
+        busy = BusyState(activity: .sweeping, title: "Pulizia finale, pika-pika! 🗑️✨", progress: nil)
+        Chiptune.shared.mood = .cleaning
+        Chiptune.shared.sfx(.whoosh)
+        let before = DiskInfo.current().availableImportant
+        let trashBefore = trashSize
+        Task {
+            _ = await Task.detached(priority: .userInitiated) { Cleaner.emptyTrash() }.value
+            let after = await Task.detached(priority: .utility) { FS.allocatedSize(FS.trashURL) }.value
+            busy = nil
+            trashSize = after
+            refreshDisk()
+            let freed = max(trashBefore - after, max(0, disk.availableImportant - before))
+            celebrate(Celebration(kind: .emptied, bytes: freed,
+                                  message: after > 0 ? "Qualcosa è rimasto: forse serve l'Accesso completo al disco o un file è in uso." : ""))
+        }
+    }
+
+    func thinSnapshots() {
+        guard busy == nil else { return }
+        busy = BusyState(activity: .sweeping, title: "Dieta per Time Machine! ⏳", progress: nil)
+        Chiptune.shared.mood = .cleaning
+        let before = DiskInfo.current().availableImportant
+        Task {
+            let r = await Task.detached { Shell.run("/usr/bin/tmutil", ["thinlocalsnapshots", "/", "999999999999", "4"], mergeStderr: true) }.value
+            busy = nil
+            refreshDisk()
+            refreshSnapshots()
+            if r.status == 0 {
+                celebrate(Celebration(kind: .info, bytes: max(0, disk.availableImportant - before),
+                                      message: "Istantanee locali di Time Machine assottigliate."))
+            } else {
+                Chiptune.shared.mood = .menu
+                showToast("tmutil non ha potuto procedere: \(r.output.prefix(120))")
+            }
+        }
+    }
+
+    private func celebrate(_ c: Celebration) {
+        celebration = c
+        Chiptune.shared.mood = .victory
+        Task {
+            try? await Task.sleep(nanoseconds: 3_800_000_000)
+            if Chiptune.shared.mood == .victory { Chiptune.shared.mood = .results }
+        }
+    }
+
+    func dismissCelebration() {
+        celebration = nil
+        Chiptune.shared.sfx(.pop)
+    }
+}

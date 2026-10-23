@@ -1,0 +1,505 @@
+import Foundation
+import AppKit
+
+struct Target {
+    let path: String           // relative to home
+    let name: String
+    var risk: Risk = .safe
+    var recommended: Bool = true
+    var perChild: Bool = false
+    var olderThanDays: Int? = nil
+}
+
+enum Targets {
+    static func electron(_ app: String, _ label: String) -> [Target] {
+        ["Cache", "CachedData", "Code Cache", "GPUCache", "CachedExtensionVSIXs", "DawnCache", "DawnGraphiteCache", "logs", "Crashpad/completed"]
+            .map { Target(path: "Library/Application Support/\(app)/\($0)", name: "\(label) · \($0)") }
+    }
+
+    static let ai: [Target] = [
+        Target(path: ".claude/projects", name: "Claude Code · sessioni", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".claude/file-history", name: "Claude Code · storico file modificati"),
+        Target(path: ".claude/shell-snapshots", name: "Claude Code · snapshot della shell"),
+        Target(path: ".claude/todos", name: "Claude Code · liste todo vecchie"),
+        Target(path: ".claude/debug", name: "Claude Code · log di debug"),
+        Target(path: ".claude/statsig", name: "Claude Code · cache telemetria"),
+        Target(path: ".claude/paste-cache", name: "Claude Code · cache incolla"),
+        Target(path: "Library/Caches/claude-cli-nodejs", name: "Claude Code · log MCP e cache"),
+        Target(path: ".codex/sessions", name: "Codex · sessioni", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".codex/archived_sessions", name: "Codex · sessioni archiviate", risk: .review, recommended: false),
+        Target(path: ".codex/log", name: "Codex · log"),
+        Target(path: ".gemini/tmp", name: "Gemini CLI · temporanei"),
+        Target(path: "Library/Caches/com.anthropic.claudefordesktop", name: "Claude Desktop · cache"),
+        Target(path: "Library/Caches/com.anthropic.claudefordesktop.ShipIt", name: "Claude Desktop · aggiornamenti scaricati"),
+        Target(path: "Library/Application Support/Claude/vm_bundles", name: "Claude Desktop · immagini VM", risk: .review, recommended: false),
+        Target(path: "Library/Logs/Claude", name: "Claude Desktop · log"),
+        Target(path: "Library/Caches/com.openai.chat", name: "ChatGPT · cache"),
+        Target(path: "Library/Caches/com.todesktop.230313mzl4w4u92", name: "Cursor · cache"),
+        Target(path: "Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt", name: "Cursor · aggiornamenti scaricati"),
+        Target(path: ".cache/huggingface", name: "Hugging Face · modelli scaricati", risk: .review, recommended: false),
+        Target(path: ".ollama/models", name: "Ollama · modelli", risk: .review, recommended: false),
+        Target(path: ".lmstudio/models", name: "LM Studio · modelli", risk: .review, recommended: false),
+        Target(path: ".cache/lm-studio", name: "LM Studio · cache", risk: .review, recommended: false),
+        Target(path: ".cache/whisper", name: "Whisper · modelli", risk: .review, recommended: false),
+        Target(path: ".cache/torch", name: "PyTorch · cache modelli", risk: .review, recommended: false)
+    ]
+    + electron("Claude", "Claude Desktop")
+    + electron("Cursor", "Cursor")
+    + electron("Code", "VS Code")
+    + electron("Windsurf", "Windsurf")
+
+    static let dev: [Target] = [
+        Target(path: "Library/Developer/Xcode/DerivedData", name: "Xcode · DerivedData"),
+        Target(path: "Library/Developer/Xcode/iOS DeviceSupport", name: "Xcode · iOS DeviceSupport"),
+        Target(path: "Library/Developer/Xcode/watchOS DeviceSupport", name: "Xcode · watchOS DeviceSupport"),
+        Target(path: "Library/Developer/Xcode/Archives", name: "Xcode · archivi delle build", risk: .review, recommended: false),
+        Target(path: "Library/Developer/CoreSimulator/Caches", name: "Simulatori · cache"),
+        Target(path: ".npm/_cacache", name: "npm · cache"),
+        Target(path: ".npm/_npx", name: "npx · pacchetti temporanei"),
+        Target(path: ".npm/_logs", name: "npm · log"),
+        Target(path: ".yarn/berry/cache", name: "Yarn Berry · cache"),
+        Target(path: ".cache/yarn", name: "Yarn · cache"),
+        Target(path: "Library/pnpm/store", name: "pnpm · store"),
+        Target(path: ".pnpm-store", name: "pnpm · store"),
+        Target(path: ".bun/install/cache", name: "Bun · cache"),
+        Target(path: ".nvm/.cache", name: "nvm · download di Node"),
+        Target(path: ".cache/node-gyp", name: "node-gyp · header"),
+        Target(path: ".electron-gyp", name: "electron-gyp · header"),
+        Target(path: ".gradle/caches", name: "Gradle · cache"),
+        Target(path: ".gradle/wrapper/dists", name: "Gradle · distribuzioni"),
+        Target(path: ".m2/repository", name: "Maven · repository locale"),
+        Target(path: ".cargo/registry", name: "Cargo · registry"),
+        Target(path: ".cargo/git", name: "Cargo · dipendenze git"),
+        Target(path: ".rustup/toolchains", name: "Rust · toolchain installate", risk: .review, recommended: false),
+        Target(path: "go/pkg/mod", name: "Go · moduli"),
+        Target(path: ".cocoapods/repos", name: "CocoaPods · repo delle spec"),
+        Target(path: ".pub-cache", name: "Dart/Flutter · pub cache"),
+        Target(path: ".android/cache", name: "Android · cache"),
+        Target(path: ".android/avd", name: "Android · emulatori", risk: .review, recommended: false),
+        Target(path: ".cache/uv", name: "uv · cache Python"),
+        Target(path: ".cache/pre-commit", name: "pre-commit · ambienti"),
+        Target(path: ".cache/puppeteer", name: "Puppeteer · browser"),
+        Target(path: "Library/Containers/com.docker.docker/Data/vms", name: "Docker · disco della VM", risk: .careful, recommended: false)
+    ]
+}
+
+enum Scanners {
+    static func scan(_ c: CleanCategory, index: HomeIndex?, reporter: Reporter) -> [CleanItem] {
+        switch c {
+        case .caches: return caches(reporter)
+        case .logsTemp: return logsTemp(reporter)
+        case .aiTools: return fixed(Targets.ai, reporter)
+        case .devCaches: return fixed(Targets.dev, reporter)
+        case .buildDeps: return buildDeps(index, reporter)
+        case .gitRepos: return gitRepos(index, reporter)
+        case .duplicates: return Duplicates.find(index, reporter)
+        case .bigFiles: return bigFiles(index, reporter)
+        case .installers: return installers(index, reporter)
+        case .oldDownloads: return oldDownloads(reporter)
+        case .apps: return apps(reporter)
+        case .leftovers: return leftovers(reporter)
+        case .appleExtras: return appleExtras(reporter)
+        }
+    }
+
+    // MARK: helpers
+
+    static func makeItem(_ url: URL, name: String, detail: String? = nil, risk: Risk, recommended: Bool,
+                         rep: Reporter, minSize: Int64 = 512 * 1024, badges: [String] = [], date: Date? = nil) -> CleanItem? {
+        guard FS.exists(url) else { return nil }
+        rep.report(FS.pretty(url))
+        let size = FS.allocatedSize(url, reporter: rep)
+        guard size >= minSize else { return nil }
+        return CleanItem(url: url, name: name, detail: detail ?? FS.pretty(url), size: size,
+                         date: date ?? FS.modDate(url), risk: risk, recommended: recommended, badges: badges)
+    }
+
+    static func prettyChild(_ s: String) -> String {
+        // Claude Code encodes project paths as "-Users-name-dev-project"
+        if s.hasPrefix("-") {
+            let parts = s.split(separator: "-").map(String.init).filter { !$0.isEmpty }
+            return parts.suffix(2).joined(separator: "/")
+        }
+        return s
+    }
+
+    static func fixed(_ list: [Target], _ rep: Reporter) -> [CleanItem] {
+        var out: [CleanItem] = []
+        for (i, t) in list.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(t.name, progress: Double(i) / Double(max(list.count, 1)))
+            let url = FS.home.appendingPathComponent(t.path)
+            guard FS.exists(url) else { continue }
+            if t.perChild {
+                for child in FS.children(url) {
+                    if rep.isCancelled { break }
+                    let d = FS.newestModDate(child)
+                    var rec = t.recommended
+                    var badges: [String] = []
+                    if let days = t.olderThanDays {
+                        rec = FS.daysSince(d) > days
+                        badges = rec ? ["💤 vecchia"] : ["🔥 recente"]
+                    }
+                    if let it = makeItem(child, name: "\(t.name) · \(prettyChild(child.lastPathComponent))",
+                                         detail: "\(FS.pretty(child)) · ultima modifica \(Fmt.relative(d))",
+                                         risk: t.risk, recommended: rec, rep: rep, minSize: 100 * 1024, badges: badges, date: d) {
+                        out.append(it)
+                    }
+                }
+            } else if let it = makeItem(url, name: t.name, risk: t.risk, recommended: t.recommended, rep: rep) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    // MARK: caches
+
+    static let cacheSkip: Set<String> = [
+        FS.ownBundleID, "claude-cli-nodejs", "com.anthropic.claudefordesktop", "com.anthropic.claudefordesktop.ShipIt",
+        "com.openai.chat", "com.todesktop.230313mzl4w4u92", "com.todesktop.230313mzl4w4u92.ShipIt"
+    ]
+    static let electronSkip: Set<String> = ["Claude", "Cursor", "Code", "Code - Insiders", "Windsurf"]
+    static let electronSubs = ["Cache", "Code Cache", "GPUCache", "CachedData", "DawnCache", "DawnGraphiteCache",
+                               "Service Worker/CacheStorage", "Crashpad/completed", "ShaderCache", "GrShaderCache"]
+
+    static func caches(_ rep: Reporter) -> [CleanItem] {
+        var out: [CleanItem] = []
+        let kids = FS.children(FS.library.appendingPathComponent("Caches"))
+        for (i, k) in kids.enumerated() {
+            if rep.isCancelled { return out }
+            if cacheSkip.contains(k.lastPathComponent) { continue }
+            rep.report(FS.pretty(k), progress: Double(i) / Double(max(kids.count, 1)) * 0.6)
+            if let it = makeItem(k, name: FS.friendlyName(k.lastPathComponent), risk: .safe, recommended: true, rep: rep, minSize: 1_048_576) {
+                out.append(it)
+            }
+        }
+        // Electron / Chromium caches in Application Support
+        let support = FS.library.appendingPathComponent("Application Support")
+        for app in FS.children(support) where FS.isDir(app) && !electronSkip.contains(app.lastPathComponent) {
+            if rep.isCancelled { return out }
+            for s in electronSubs {
+                let u = app.appendingPathComponent(s)
+                if let it = makeItem(u, name: "\(app.lastPathComponent) · \(s)", risk: .safe, recommended: true, rep: rep, minSize: 1_048_576) {
+                    out.append(it)
+                }
+            }
+        }
+        rep.report("Browser…", progress: 0.75)
+        for browser in ["Google/Chrome", "BraveSoftware/Brave-Browser", "Microsoft Edge", "Vivaldi", "Arc/User Data"] {
+            let base = support.appendingPathComponent(browser)
+            for profile in FS.children(base) where FS.isDir(profile) {
+                for s in ["Service Worker/CacheStorage", "Code Cache", "GPUCache"] {
+                    let u = profile.appendingPathComponent(s)
+                    if let it = makeItem(u, name: "\(browser.split(separator: "/").last ?? "") (\(profile.lastPathComponent)) · \(s)",
+                                         risk: .safe, recommended: true, rep: rep, minSize: 1_048_576) {
+                        out.append(it)
+                    }
+                }
+            }
+        }
+        // Caches inside sandboxed app containers
+        rep.report("Container delle app…", progress: 0.85)
+        for c in FS.children(FS.library.appendingPathComponent("Containers")) {
+            if rep.isCancelled { return out }
+            let u = c.appendingPathComponent("Data/Library/Caches")
+            if let it = makeItem(u, name: "\(FS.friendlyName(c.lastPathComponent)) · cache (sandbox)", risk: .safe,
+                                 recommended: true, rep: rep, minSize: 5 * 1_048_576) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    static func logsTemp(_ rep: Reporter) -> [CleanItem] {
+        var out: [CleanItem] = []
+        let logs = FS.library.appendingPathComponent("Logs")
+        for k in FS.children(logs) where k.lastPathComponent != "Claude" {
+            if rep.isCancelled { return out }
+            if let it = makeItem(k, name: "Log · \(FS.friendlyName(k.lastPathComponent))", risk: .safe, recommended: true, rep: rep, minSize: 256 * 1024) {
+                out.append(it)
+            }
+        }
+        if let it = makeItem(FS.library.appendingPathComponent("Saved Application State"), name: "Stati delle finestre salvati",
+                             risk: .safe, recommended: true, rep: rep) { out.append(it) }
+        if let it = makeItem(FS.library.appendingPathComponent("Application Support/CrashReporter"), name: "Report dei crash",
+                             risk: .safe, recommended: true, rep: rep) { out.append(it) }
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+        for k in FS.children(tmp) {
+            if rep.isCancelled { return out }
+            let d = FS.newestModDate(k)
+            guard FS.daysSince(d) >= 3 else { continue }
+            if let it = makeItem(k, name: "Temporaneo · \(k.lastPathComponent)", detail: "File temporaneo · \(Fmt.relative(d))",
+                                 risk: .safe, recommended: true, rep: rep, minSize: 256 * 1024) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    // MARK: index-based
+
+    static func projectActivity(_ project: URL, excluding: String) -> Date? {
+        var best = FS.newestModDate(project, excluding: [excluding, ".git", ".DS_Store"])
+        if let d = FS.modDate(project.appendingPathComponent(".git/index")), d > (best ?? .distantPast) { best = d }
+        return best
+    }
+
+    static func buildDeps(_ index: HomeIndex?, _ rep: Reporter) -> [CleanItem] {
+        guard let index = index else { return [] }
+        var out: [CleanItem] = []
+        for (i, d) in index.deps.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(FS.pretty(d.url), progress: Double(i) / Double(max(index.deps.count, 1)))
+            let project = d.url.deletingLastPathComponent()
+            let active = projectActivity(project, excluding: d.url.lastPathComponent)
+            let days = FS.daysSince(active)
+            let old = days > 60
+            if let it = makeItem(d.url, name: "\(project.lastPathComponent) · \(d.url.lastPathComponent)",
+                                 detail: "\(d.kind) · \(FS.pretty(project)) · progetto toccato \(Fmt.relative(active))",
+                                 risk: .safe, recommended: old, rep: rep, minSize: 1_048_576,
+                                 badges: [old ? "💤 progetto fermo" : "🔥 progetto attivo"], date: active) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    static func gitRepos(_ index: HomeIndex?, _ rep: Reporter) -> [CleanItem] {
+        guard let index = index, GitInspector.available else { return [] }
+        var out: [CleanItem] = []
+        for (i, repo) in index.repos.enumerated() {
+            if rep.isCancelled { break }
+            rep.report("git status · \(FS.pretty(repo))", progress: Double(i) / Double(max(index.repos.count, 1)))
+            let info = GitInspector.inspect(repo)
+            let size = FS.allocatedSize(repo, reporter: rep)
+            guard size >= 1_048_576 else { continue }
+            let days = FS.daysSince(info.lastActivity)
+            var badges: [String] = []
+            if info.safe { badges.append("☁️ al sicuro sul remote") }
+            if info.remote == nil { badges.append("🏠 solo locale") }
+            if info.dirty { badges.append("✏️ modifiche non salvate") }
+            if info.unpushed > 0 { badges.append("⬆️ \(info.unpushed) commit non pushati") }
+            if info.stashed { badges.append("📦 stash") }
+            if days > 365 { badges.append("🦕 fermo da 1+ anno") }
+            let risk: Risk = info.safe ? .safe : (info.remote != nil ? .review : .careful)
+            var detail = "\(FS.pretty(repo)) · ultima attività \(Fmt.relative(info.lastActivity))"
+            if let r = info.remote { detail += " · \(GitInspector.shortRemote(r))" }
+            out.append(CleanItem(url: repo, name: repo.lastPathComponent, detail: detail, size: size,
+                                 date: info.lastActivity, risk: risk, recommended: info.safe && days > 180,
+                                 badges: badges,
+                                 copyText: info.remote.map { "git clone \($0) \"\(repo.path)\"" }))
+        }
+        return out
+    }
+
+    static func badge(forExt ext: String) -> String? {
+        switch ext {
+        case "mov", "mp4", "mkv", "avi", "m4v", "webm": return "🎬 video"
+        case "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz": return "📦 archivio"
+        case "dmg", "iso", "img", "sparseimage": return "💿 immagine disco"
+        case "vmdk", "vdi", "qcow2", "utm", "pvm", "vmwarevm", "hdd": return "🖥️ macchina virtuale"
+        case "psd", "ai", "sketch", "fig": return "🎨 grafica"
+        case "wav", "aif", "aiff", "flac": return "🎵 audio"
+        case "photoslibrary", "musiclibrary", "tvlibrary", "imovielibrary", "fcpbundle", "aplibrary": return "📚 libreria"
+        default: return nil
+        }
+    }
+
+    static func bigFiles(_ index: HomeIndex?, _ rep: Reporter) -> [CleanItem] {
+        guard let index = index else { return [] }
+        var out: [CleanItem] = []
+        let big = index.files.filter { $0.size >= 100 * 1_048_576 }.sorted { $0.size > $1.size }.prefix(250)
+        for f in big {
+            let ext = f.url.pathExtension.lowercased()
+            out.append(CleanItem(url: f.url, name: f.url.lastPathComponent,
+                                 detail: "\(FS.pretty(f.url.deletingLastPathComponent())) · modificato \(Fmt.relative(f.modified))",
+                                 size: f.size, date: f.modified, risk: .careful, recommended: false,
+                                 badges: badge(forExt: ext).map { [$0] } ?? []))
+        }
+        for (i, p) in index.packages.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(FS.pretty(p), progress: Double(i) / Double(max(index.packages.count, 1)))
+            if let it = makeItem(p, name: p.lastPathComponent, detail: FS.pretty(p.deletingLastPathComponent()),
+                                 risk: .careful, recommended: false, rep: rep, minSize: 200 * 1_048_576,
+                                 badges: [badge(forExt: p.pathExtension.lowercased()) ?? "📚 pacchetto"]) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    static func installers(_ index: HomeIndex?, _ rep: Reporter) -> [CleanItem] {
+        guard let index = index else { return [] }
+        let exts: Set<String> = ["dmg", "pkg", "mpkg", "xip", "iso"]
+        let dl = FS.home.appendingPathComponent("Downloads").path + "/"
+        let desk = FS.home.appendingPathComponent("Desktop").path + "/"
+        var out: [CleanItem] = []
+        for f in index.files where exts.contains(f.url.pathExtension.lowercased()) {
+            let ext = f.url.pathExtension.lowercased()
+            let inDownloads = f.url.path.hasPrefix(dl)
+            let inDesktop = f.url.path.hasPrefix(desk)
+            // Disk images can be personal (encrypted) storage: only suggest old ones sitting in Downloads.
+            let isImage = ext == "dmg" || ext == "iso"
+            let rec = isImage ? (inDownloads && FS.daysSince(f.modified) > 30) : (inDownloads || inDesktop)
+            out.append(CleanItem(url: f.url, name: f.url.lastPathComponent,
+                                 detail: "\(FS.pretty(f.url.deletingLastPathComponent())) · \(Fmt.relative(f.modified))",
+                                 size: f.size, date: f.modified, risk: rec ? .safe : .review,
+                                 recommended: rec, badges: [isImage ? "💿 immagine disco" : "📦 installer"]))
+        }
+        for app in index.downloadApps {
+            if let it = makeItem(app, name: app.lastPathComponent, detail: "App lasciata nei Download (non in Applicazioni)",
+                                 risk: .review, recommended: false, rep: rep, badges: ["📲 app nei Download"]) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    // MARK: downloads
+
+    static func oldDownloads(_ rep: Reporter) -> [CleanItem] {
+        let dl = FS.home.appendingPathComponent("Downloads")
+        let kids = FS.children(dl).filter { $0.lastPathComponent != ".DS_Store" && $0.lastPathComponent != ".localized" }
+        var out: [CleanItem] = []
+        for (i, k) in kids.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(FS.pretty(k), progress: Double(i) / Double(max(kids.count, 1)))
+            let v = try? k.resourceValues(forKeys: [.addedToDirectoryDateKey, .contentModificationDateKey])
+            let d = v?.addedToDirectoryDate ?? v?.contentModificationDate
+            let days = FS.daysSince(d)
+            guard days >= 90 else { continue }
+            if let it = makeItem(k, name: k.lastPathComponent, detail: "Scaricato \(Fmt.relative(d))", risk: .review,
+                                 recommended: false, rep: rep, minSize: 100 * 1024,
+                                 badges: days > 365 ? ["🦕 più di un anno"] : [], date: d) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    // MARK: apps
+
+    static func apps(_ rep: Reporter) -> [CleanItem] {
+        var appURLs: [URL] = []
+        for dir in [URL(fileURLWithPath: "/Applications"), FS.home.appendingPathComponent("Applications")] {
+            for c in FS.children(dir) {
+                if c.pathExtension == "app" { appURLs.append(c) }
+                else if FS.isDir(c) {
+                    for cc in FS.children(c) where cc.pathExtension == "app" { appURLs.append(cc) }
+                }
+            }
+        }
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
+        var out: [CleanItem] = []
+        for (i, app) in appURLs.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(app.lastPathComponent, progress: Double(i) / Double(max(appURLs.count, 1)))
+            let bundle = Bundle(url: app)
+            let id = bundle?.bundleIdentifier ?? ""
+            if id.hasPrefix("com.apple.") || id == FS.ownBundleID { continue }
+            let name = app.deletingPathExtension().lastPathComponent
+            let last = FS.lastUsedDate(app)
+            let size = FS.allocatedSize(app, reporter: rep)
+            let extras = FS.leftovers(bundleID: id, name: name)
+            let extraSize = extras.reduce(Int64(0)) { $0 + FS.allocatedSize($1) }
+            let days = FS.daysSince(last)
+            var badges: [String] = []
+            if running.contains(id) { badges.append("▶️ aperta ora") }
+            if last == nil { badges.append("👻 mai aperta?") }
+            else if days > 365 { badges.append("😴 dorme da 1+ anno") }
+            else if days > 90 { badges.append("💤 dorme da mesi") }
+            if extraSize > 0 { badges.append("🧩 +\(Fmt.bytes(extraSize)) di dati") }
+            let version = (bundle?.infoDictionary?["CFBundleShortVersionString"] as? String).map { " · v\($0)" } ?? ""
+            let detail = (last.map { "Ultimo uso \(Fmt.relative($0))" } ?? "Nessun uso registrato da Spotlight") + version
+            out.append(CleanItem(url: app, name: name, detail: detail, size: size + extraSize, date: last,
+                                 risk: .careful, recommended: false, badges: badges, extraURLs: extras))
+        }
+        return out
+    }
+
+    static let tlds: Set<String> = ["com", "org", "net", "io", "de", "it", "co", "app", "dev", "me", "us", "uk",
+                                     "fr", "ru", "jp", "ch", "at", "nl", "se", "info", "tv", "cc", "ai", "es", "ca", "eu"]
+
+    static func looksLikeBundleID(_ s: String) -> Bool {
+        let parts = s.split(separator: ".")
+        guard parts.count >= 3, let first = parts.first, tlds.contains(first.lowercased()) else { return false }
+        return s.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_" }
+    }
+
+    static func appInstalled(_ id: String) -> Bool {
+        if NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil { return true }
+        var parts = id.split(separator: ".").map(String.init)
+        while parts.count > 3 {
+            parts.removeLast()
+            if NSWorkspace.shared.urlForApplication(withBundleIdentifier: parts.joined(separator: ".")) != nil { return true }
+        }
+        return false
+    }
+
+    static func leftovers(_ rep: Reporter) -> [CleanItem] {
+        let dirs = ["Containers", "Caches", "Application Support", "Saved Application State", "HTTPStorages", "WebKit", "Preferences", "Application Scripts"]
+        var byID: [String: [URL]] = [:]
+        for d in dirs {
+            for c in FS.children(FS.library.appendingPathComponent(d)) {
+                var n = c.lastPathComponent
+                for suf in [".savedState", ".plist", ".binarycookies", ".ShipIt"] where n.hasSuffix(suf) {
+                    n = String(n.dropLast(suf.count))
+                }
+                guard looksLikeBundleID(n), !n.hasPrefix("com.apple."), n != FS.ownBundleID else { continue }
+                byID[n, default: []].append(c)
+            }
+        }
+        var out: [CleanItem] = []
+        let ids = byID.keys.sorted()
+        for (i, id) in ids.enumerated() {
+            if rep.isCancelled { break }
+            rep.report(id, progress: Double(i) / Double(max(ids.count, 1)))
+            guard let urls = byID[id], !appInstalled(id) else { continue }
+            let size = urls.reduce(Int64(0)) { $0 + FS.allocatedSize($1) }
+            guard size >= 200 * 1024 else { continue }
+            let onlyCaches = urls.allSatisfy { $0.path.contains("/Library/Caches/") }
+            let name = String(id.split(separator: ".").last ?? Substring(id))
+            out.append(CleanItem(url: urls[0], name: name.capitalized,
+                                 detail: "\(id) · \(urls.count) \(urls.count == 1 ? "cartella" : "cartelle")",
+                                 size: size, date: urls.compactMap { FS.modDate($0) }.max(),
+                                 risk: onlyCaches ? .safe : .review, recommended: onlyCaches,
+                                 badges: ["🧩 app non trovata"], extraURLs: Array(urls.dropFirst())))
+        }
+        return out
+    }
+
+    // MARK: apple extras
+
+    static func appleExtras(_ rep: Reporter) -> [CleanItem] {
+        var out: [CleanItem] = []
+        let backups = FS.library.appendingPathComponent("Application Support/MobileSync/Backup")
+        for b in FS.children(backups) where FS.isDir(b) {
+            if rep.isCancelled { return out }
+            let info = NSDictionary(contentsOf: b.appendingPathComponent("Info.plist"))
+            let device = info?["Device Name"] as? String ?? "dispositivo"
+            let date = info?["Last Backup Date"] as? Date ?? FS.modDate(b)
+            if let it = makeItem(b, name: "Backup di \(device)", detail: "Ultimo backup \(Fmt.relative(date))",
+                                 risk: .careful, recommended: false, rep: rep, badges: ["📱 backup locale"], date: date) {
+                out.append(it)
+            }
+        }
+        let simple: [(String, String, Risk, Bool)] = [
+            ("Library/iTunes/iPhone Software Updates", "Aggiornamenti iOS scaricati", .safe, true),
+            ("Library/iTunes/iPad Software Updates", "Aggiornamenti iPadOS scaricati", .safe, true),
+            ("Library/iTunes/iPod Software Updates", "Aggiornamenti iPod scaricati", .safe, true),
+            ("Library/Containers/com.apple.mail/Data/Library/Mail Downloads", "Allegati di Mail già aperti", .safe, true),
+            ("Music/iTunes/iTunes Media/Mobile Applications", "Vecchie app iOS (.ipa)", .safe, true),
+            ("Library/Messages/Attachments", "Allegati di Messaggi", .careful, false),
+            ("Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache", "Podcast scaricati", .review, false)
+        ]
+        for (i, s) in simple.enumerated() {
+            if rep.isCancelled { return out }
+            rep.report(s.1, progress: Double(i) / Double(simple.count))
+            if let it = makeItem(FS.home.appendingPathComponent(s.0), name: s.1, risk: s.2, recommended: s.3, rep: rep) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+}
