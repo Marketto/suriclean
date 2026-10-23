@@ -41,9 +41,10 @@ final class AppModel: ObservableObject {
         refreshTrash()
         refreshSnapshots()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let model = self else { return }
             Task { @MainActor in
-                self?.pruneMissing()
-                self?.refreshDisk()
+                model.pruneMissing()
+                model.refreshDisk()
             }
         }
     }
