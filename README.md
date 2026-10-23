@@ -2,7 +2,21 @@
 
 La suricata spazzina per il tuo Mac. App nativa SwiftUI per macOS 12 Monterey (l'ultima versione disponibile sul MacBook Air 2015).
 
-## Installazione facile (DMG)
+## Download
+
+🌸 **Sito:** https://marketto.github.io/suriclean/ · 📦 **[Ultima versione](../../releases/latest)**
+
+| Sistema | File |
+|---|---|
+| macOS 12+ (Intel e Apple Silicon) | `SuriClean.dmg` |
+| Windows 10/11 | `SuriClean-Windows-Setup.exe` |
+| Ubuntu 22.04+ | `SuriClean-Linux.deb` oppure `SuriClean-Linux.AppImage` |
+
+L'app controlla da sola se è uscita una versione nuova e si aggiorna (si può spegnere con l'interruttore «auto» nella barra laterale).
+
+La versione Mac è nativa (SwiftUI). Quella per Windows e Ubuntu è fatta con [Tauri](https://tauri.app) (Rust + interfaccia web) e ha le stesse zone principali, Suri e la musica; le zone «App dormienti», «Avanzi di app» e «Backup iPhone» esistono solo su Mac.
+
+## Installazione facile su Mac (DMG)
 
 1. Scarica **SuriClean.dmg** dalla pagina [Releases](../../releases/latest).
 2. Aprilo e trascina Suri nella cartella **Applicazioni**.

@@ -24,6 +24,20 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(Double(totalFreed), forKey: "suri.totalFreed") }
     }
 
+    enum UpdateState: Equatable {
+        case idle, checking, downloading, ready, failed(String), upToDate
+    }
+    @Published var update: UpdateInfo?
+    @Published var updateState: UpdateState = .idle
+    @Published var autoUpdate: Bool = UserDefaults.standard.object(forKey: "suri.autoUpdate") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(autoUpdate, forKey: "suri.autoUpdate") }
+    }
+    private var stagedUpdate: URL?
+
+    @Published var expandedRepos: Set<UUID> = []
+    @Published var gitDetails: [URL: GitDetails] = [:]
+    @Published var gitWorking: Set<URL> = []
+
     private var homeIndex: HomeIndex?
     private var reporter: Reporter?
     private var started = false
@@ -40,6 +54,13 @@ final class AppModel: ObservableObject {
         hasFDA = FS.hasFullDiskAccess()
         refreshTrash()
         refreshSnapshots()
+        Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            while true {
+                await self.checkForUpdates(manual: false)
+                try? await Task.sleep(nanoseconds: 6 * 3600 * 1_000_000_000)
+            }
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             guard let model = self else { return }
             Task { @MainActor in
@@ -50,6 +71,107 @@ final class AppModel: ObservableObject {
     }
 
     func refreshDisk() { disk = DiskInfo.current() }
+
+    // MARK: git repo details
+
+    func toggleRepo(_ item: CleanItem) {
+        Chiptune.shared.sfx(.blip)
+        if expandedRepos.contains(item.id) { expandedRepos.remove(item.id); return }
+        expandedRepos.insert(item.id)
+        if gitDetails[item.url] == nil { reloadGit(item.url) }
+    }
+
+    func reloadGit(_ repo: URL) {
+        gitWorking.insert(repo)
+        Task {
+            let d = await Task.detached(priority: .userInitiated) { GitTools.details(repo) }.value
+            gitDetails[repo] = d
+            gitWorking.remove(repo)
+        }
+    }
+
+    enum GitAction { case deleteBranch(GitBranch), dropStash(GitStash), compact }
+
+    func runGit(_ action: GitAction, on repo: URL) {
+        gitWorking.insert(repo)
+        Chiptune.shared.sfx(.whoosh)
+        Task {
+            let message: String
+            switch action {
+            case .deleteBranch(let b):
+                let r = await Task.detached { GitTools.deleteBranch(repo, b) }.value
+                message = (try? r.get()) ?? "Ehh… \((r.failureMessage))"
+            case .dropStash(let s):
+                let r = await Task.detached { GitTools.dropStash(repo, s) }.value
+                message = (try? r.get()) ?? "Ehh… \((r.failureMessage))"
+            case .compact:
+                let r = await Task.detached { GitTools.compact(repo) }.value
+                if let saved = try? r.get() {
+                    totalFreed += saved
+                    message = saved > 0 ? "Repo compattato! Risparmiati \(Fmt.bytes(saved)) ✨" : "Il repo era già bello compatto ☆"
+                } else { message = "Ehh… \((r.failureMessage))" }
+            }
+            // refresh the row (badges, size, recommendation) and the details
+            let updated = await Task.detached { Scanners.repoItem(repo, rep: nil) }.value
+            if let idx = results[.gitRepos]?.firstIndex(where: { $0.url == repo }) {
+                if var u = updated {
+                    let old = results[.gitRepos]![idx]
+                    u = CleanItem(url: u.url, name: u.name, detail: u.detail, size: u.size, date: u.date, risk: u.risk,
+                                  recommended: u.recommended, badges: u.badges, copyText: u.copyText)
+                    u.isGitRepo = true
+                    let wasExpanded = expandedRepos.contains(old.id)
+                    let wasSelected = selection.contains(old.id)
+                    results[.gitRepos]![idx] = u
+                    if wasExpanded { expandedRepos.remove(old.id); expandedRepos.insert(u.id) }
+                    if wasSelected { selection.remove(old.id); selection.insert(u.id) }
+                }
+            }
+            let d = await Task.detached { GitTools.details(repo) }.value
+            gitDetails[repo] = d
+            gitWorking.remove(repo)
+            Chiptune.shared.sfx(message.hasPrefix("Ehh") ? .error : .coin)
+            showToast(message)
+        }
+    }
+
+    // MARK: updates
+
+    func checkForUpdates(manual: Bool) async {
+        if case .downloading = updateState { return }
+        if updateState == .ready { return }
+        updateState = .checking
+        guard let info = await Updater.check() else {
+            updateState = manual ? .upToDate : .idle
+            if manual { showToast("Sei già all'ultima versione (\(Updater.currentVersion)) ✨") }
+            return
+        }
+        update = info
+        updateState = .idle
+        if autoUpdate || manual { await downloadUpdate() }
+    }
+
+    func downloadUpdate() async {
+        guard let info = update else { return }
+        updateState = .downloading
+        do {
+            let staged = try await Task.detached(priority: .utility) { try await Updater.stage(info) }.value
+            stagedUpdate = staged
+            updateState = .ready
+            Updater.pendingApply = { Updater.apply(staged: staged, relaunch: false) }
+            Chiptune.shared.sfx(.coin)
+            showToast("Kyaa~! SuriClean \(info.version) è pronta ✨ Si installa quando chiudi l'app")
+        } catch {
+            updateState = .failed(error.localizedDescription)
+        }
+    }
+
+    func installUpdateNow() {
+        guard let staged = stagedUpdate else { return }
+        Updater.pendingApply = nil
+        Chiptune.shared.sfx(.whoosh)
+        Updater.apply(staged: staged, relaunch: true)
+        NSApp.terminate(nil)
+    }
 
     func refreshTrash() {
         Task {
@@ -371,5 +493,13 @@ final class AppModel: ObservableObject {
     func dismissCelebration() {
         celebration = nil
         Chiptune.shared.sfx(.pop)
+    }
+}
+
+
+extension Result {
+    var failureMessage: String {
+        if case .failure(let e) = self { return (e as NSError).localizedDescription }
+        return ""
     }
 }

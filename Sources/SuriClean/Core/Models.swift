@@ -41,6 +41,7 @@ struct CleanItem: Identifiable, Hashable {
     var copyText: String? = nil
     var group: Int? = nil
     var groupLabel: String? = nil
+    var isGitRepo = false
 }
 
 extension Array where Element == CleanItem {

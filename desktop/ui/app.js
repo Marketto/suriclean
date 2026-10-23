@@ -120,8 +120,54 @@
       <div class="side-list">${CATS.map(c => row(c.id, c.icon, c.title, c.color, S.results[c.id] ? bytes(displayTotal(c.id)) : "")).join("")}</div>
       <div class="card level" style="--c:${C.mint}"><div class="t">${lv.e} ${lv.t}</div><div class="s">Liberati in totale: ${bytes(S.freed)}</div>
         <div class="progress" style="width:100%;height:9px;margin:6px 0"><i style="width:${Math.max(4, lv.p * 100)}%"></i></div><div class="s">${lv.next}</div></div>
+      ${updatePill()}
       <button class="music-toggle" data-act="mute">${S.muted ? "🔇 Musica in pausa~" : "🎵 Musica pikopiko ♪"}</button>`;
     Suri.setActivity($("#suri-side"), S.busy ? S.busy.act : "idle");
+  }
+
+  // ───────── updates ─────────
+  const ASSET = { windows: "SuriClean-Windows-Setup.exe", appimage: "SuriClean-Linux.AppImage", deb: "SuriClean-Linux.deb" };
+  S.update = null; S.version = "0"; S.kind = "deb";
+  S.autoUpdate = localStorage.getItem("suri.autoUpdate") !== "0";
+
+  function newer(a, b) {
+    const p = s => String(s).replace(/^v/i, "").split(".").map(x => parseInt(x, 10) || 0);
+    const x = p(a), y = p(b);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) { const l = x[i] || 0, r = y[i] || 0; if (l !== r) return l > r; }
+    return false;
+  }
+
+  async function checkUpdate(manual) {
+    try {
+      const r = await fetch("https://api.github.com/repos/Marketto/suriclean/releases/latest", { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const j = await r.json();
+      const v = (j.tag_name || "").replace(/^v/i, "");
+      const asset = (j.assets || []).find(a => a.name === ASSET[S.kind]);
+      if (newer(v, S.version) && asset) {
+        S.update = { version: v, url: asset.browser_download_url };
+        renderSidebar();
+        if (S.autoUpdate && S.kind !== "deb" && !S.busy && !Object.keys(S.results).length) return installUpdate();
+        toast(`Kyaa~! È uscita SuriClean ${v} ✨ Premi «Aggiorna» nella barra a sinistra`);
+      } else if (manual) toast(`Sei già all'ultima versione (${S.version}) ✨`);
+    } catch (e) { if (manual) toast("Non riesco a contattare GitHub, riprova più tardi~"); }
+  }
+
+  async function installUpdate() {
+    if (!S.update || S.busy) return;
+    S.steps = 1;
+    S.busy = { act: "digging", title: `Scarico SuriClean ${S.update.version}… ✨`, detail: S.kind === "deb" ? "Poi si apre l'installer dei pacchetti" : "L'app si riavvia da sola", progress: null, step: 0, found: 0 };
+    Chiptune.setMood("cleaning"); showBusy();
+    try {
+      await invoke("install_update", { url: S.update.url, kind: S.kind });
+      if (S.kind === "deb") { S.busy = null; showBusy(); toast("Pacchetto scaricato nei Download: conferma l'installazione e riapri Suri ♡"); }
+    } catch (e) { S.busy = null; showBusy(); toast(`Aggiornamento non riuscito: ${e}`); }
+  }
+
+  function updatePill() {
+    if (S.update) return `<button class="btn" style="--c:${C.pink};text-align:left" data-act="update">✨ Nuova versione ${S.update.version}! Aggiorna ☆</button>`;
+    return `<div style="display:flex;align-items:center;gap:6px;padding:0 8px"><button class="music-toggle" style="padding:0;opacity:.5;font-size:10.5px" data-act="checkUpdate">v${S.version} · controlla aggiornamenti</button>
+      <label style="margin-left:auto;font-size:10px;font-weight:800;opacity:.6"><input type="checkbox" data-act="autoUpdate" ${S.autoUpdate ? "checked" : ""}> auto</label></div>`;
   }
 
   // ───────── dashboard ─────────
@@ -565,6 +611,9 @@
       }
       case "expandAll": { const walk = ns => ns.forEach(n => { if (n.children.length) { S.expanded.add(n.id); walk(n.children); } }); walk(buildTree(items(cat.id))); sfx("pop"); renderList(); break; }
       case "collapseAll": S.expanded = new Set(["__none__"]); sfx("pop"); renderList(); break;
+      case "update": installUpdate(); break;
+      case "checkUpdate": checkUpdate(true); break;
+      case "autoUpdate": S.autoUpdate = t.checked; localStorage.setItem("suri.autoUpdate", S.autoUpdate ? "1" : "0"); break;
       case "cleanmgr": invoke("open_folder", { path: "cleanmgr.exe" }); break;
     }
   });
@@ -579,7 +628,7 @@
   // ───────── start ─────────
   async function start() {
     background();
-    try { S.platform = await invoke("platform"); } catch (e) { console.error(e); }
+    try { S.platform = await invoke("platform"); S.version = await invoke("app_version"); S.kind = await invoke("install_kind"); } catch (e) { console.error(e); }
     await refreshDisk();
     render();
     T.event.listen("suri-progress", ev => {
@@ -589,8 +638,9 @@
       if (p != null) S.busy.progress = S.steps > 1 ? (S.busy.step + Math.min(1, Math.max(0, p))) / S.steps : p;
       showBusy();
     });
-    const hint = document.createElement("div");
     setTimeout(() => toast("Tocca ovunque per accendere la musica pikopiko ♪"), 1200);
+    setTimeout(() => checkUpdate(false), 4000);
+    setInterval(() => checkUpdate(false), 6 * 3600 * 1000);
   }
   start();
 })();

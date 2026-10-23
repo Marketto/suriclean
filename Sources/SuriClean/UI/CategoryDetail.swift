@@ -202,8 +202,31 @@ struct ItemRow: View {
     @State private var hover = false
 
     var body: some View {
+        VStack(spacing: 6) {
+            row
+            if item.isGitRepo && model.expandedRepos.contains(item.id) {
+                GitRepoPanel(item: item, color: color)
+                    .padding(.leading, 34)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var row: some View {
         let selected = model.selection.contains(item.id)
-        HStack(spacing: 12) {
+        let expanded = model.expandedRepos.contains(item.id)
+        return HStack(spacing: 12) {
+            if item.isGitRepo {
+                Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.toggleRepo(item) } }) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(color.darker)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .help("Mostra rami e stash")
+            }
             KawaiiCheckbox(on: selected, color: color)
             FileIcon(url: item.url).frame(width: 32, height: 32)
             VStack(alignment: .leading, spacing: 3) {

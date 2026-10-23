@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SuriClean · la suricata spazzina ☆</title>
+<meta name="description" content="SuriClean: la suricata kawaii che libera spazio sul tuo computer. Per Mac, Windows e Ubuntu. Gratis e open source.">
+<meta property="og:title" content="SuriClean · la suricata spazzina ☆">
+<meta property="og:description" content="Cache, duplicati, repo git dimenticati, dati di Claude e Codex… Suri li trova, tu decidi. Gratis per Mac, Windows e Ubuntu.">
+<meta property="og:image" content="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --cream:#FFF7E8; --peach:#FFCCAD; --pink:#FF80A8; --hot:#FF5A82; --coral:#FF786E; --orange:#FFA85C; --lemon:#FFD14D; --mint:#61D6AD; --sky:#6CB2FF; --lilac:#A88FFA; --cocoa:#54382B; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: "M PLUS Rounded 1c", "Nunito", system-ui, sans-serif; color: var(--cocoa); background: linear-gradient(180deg, #FFF3E2 0%, #FFE3EA 45%, #E6F7F0 100%); overflow-x: hidden; }
+  a { color: inherit; }
+  .bg span { position: fixed; z-index: -1; border-radius: 50%; opacity: .25; animation: float linear infinite; pointer-events: none; }
+  .bg span.star { border-radius: 0; background: none !important; font-size: 30px; }
+  @keyframes float { from { transform: translateY(110vh) rotate(0); } to { transform: translateY(-20vh) rotate(180deg); } }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+  .ribbon { text-align: center; padding: 10px; background: var(--hot); color: #fff; font-weight: 900; letter-spacing: .04em; font-size: 14px; }
+  .ribbon b { background: var(--lemon); color: var(--cocoa); padding: 2px 10px; border-radius: 99px; margin: 0 6px; }
+
+  header.hero { display: grid; grid-template-columns: 1.05fr .95fr; align-items: center; gap: 20px; padding: 40px 0 10px; }
+  .burst { position: relative; display: inline-grid; place-items: center; width: 108px; height: 108px; margin-bottom: 6px; animation: wobble 2.4s ease-in-out infinite; }
+  .burst svg { position: absolute; inset: 0; }
+  .burst span { position: relative; color: #fff; font-weight: 900; text-align: center; line-height: 1.05; font-size: 19px; }
+  .burst small { display: block; color: var(--lemon); font-size: 12px; }
+  @keyframes wobble { 0%,100% { transform: rotate(-8deg) scale(1); } 50% { transform: rotate(6deg) scale(1.06); } }
+  .kicker { display: inline-block; background: var(--pink); color: #fff; font-weight: 900; padding: 6px 16px; border-radius: 99px; font-size: 15px; }
+  h1 { font-size: clamp(46px, 7vw, 82px); line-height: .95; margin: 14px 0 6px; font-weight: 900; color: var(--hot); -webkit-text-stroke: 0; text-shadow: 4px 4px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 6px 8px 0 rgba(255,90,130,.25); }
+  h1 .jp { display: block; font-size: .42em; color: var(--cocoa); text-shadow: 3px 3px 0 #fff; margin-top: 10px; letter-spacing: .06em; }
+  .tagline { font-size: 20px; font-weight: 800; line-height: 1.45; margin: 14px 0 22px; }
+  .tagline mark { background: linear-gradient(transparent 55%, rgba(255,209,77,.8) 55%); color: inherit; padding: 0 2px; }
+
+  .suri-stage { position: relative; height: 430px; display: grid; place-items: center; }
+  .suri-stage .halo { position: absolute; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, #fff 0 48%, rgba(255,255,255,0) 70%); animation: pulse 3s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
+  #suri { position: relative; width: 300px; height: 355px; cursor: pointer; transition: transform .2s; }
+  #suri:hover { transform: scale(1.04) rotate(-2deg); }
+  .speech { position: absolute; top: 18px; right: 0; background: #fff; border: 3px solid var(--pink); border-radius: 22px; padding: 12px 16px; font-weight: 900; font-size: 16px; max-width: 230px; box-shadow: 0 5px 0 rgba(255,128,168,.4); animation: bob 2.6s ease-in-out infinite; }
+  .speech::after { content: ""; position: absolute; left: 30px; bottom: -14px; border: 10px solid transparent; border-top-color: var(--pink); }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  .hint-click { position: absolute; bottom: 8px; font-size: 13px; font-weight: 800; opacity: .55; }
+
+  .downloads { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .dl { --c: var(--pink); display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: #fff; background: var(--c); padding: 14px 22px; border-radius: 22px; font-weight: 900; box-shadow: 0 6px 0 color-mix(in srgb, var(--c) 70%, #000); transition: transform .2s cubic-bezier(.3,1.7,.5,1); position: relative; }
+  .dl::after { content: ""; position: absolute; left: 14px; right: 14px; top: 4px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.3); }
+  .dl:hover { transform: translateY(-3px) scale(1.05) rotate(-1deg); }
+  .dl:active { transform: translateY(4px); box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 70%, #000); }
+  .dl .os { font-size: 30px; }
+  .dl small { display: block; font-size: 12px; opacity: .9; font-weight: 800; }
+  .dl.main { --c: var(--hot); font-size: 21px; padding: 18px 28px; }
+  .dl.sec { --c: #fff; color: var(--cocoa); box-shadow: 0 5px 0 rgba(84,56,43,.15); }
+  .dl.sec::after { background: none; }
+  .tiny { font-size: 13px; font-weight: 700; opacity: .65; margin-top: 12px; }
+
+  .music { position: fixed; right: 18px; bottom: 18px; z-index: 5; border: 0; font-family: inherit; font-weight: 900; font-size: 15px; background: #fff; color: var(--cocoa); padding: 12px 18px; border-radius: 99px; box-shadow: 0 5px 0 rgba(255,128,168,.45); cursor: pointer; display: flex; gap: 8px; align-items: center; transition: transform .2s cubic-bezier(.3,1.7,.5,1); }
+  .music:hover { transform: scale(1.07) rotate(-2deg); }
+  .music .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
+  .music .eq i { width: 4px; background: var(--pink); border-radius: 2px; height: 30%; }
+  .music.on .eq i { animation: eq .5s ease-in-out infinite alternate; }
+  .music.on .eq i:nth-child(2) { animation-delay: .15s; } .music.on .eq i:nth-child(3) { animation-delay: .3s; }
+  @keyframes eq { to { height: 100%; } }
+
+  section { padding: 50px 0; }
+  h2 { font-size: 36px; font-weight: 900; text-align: center; margin: 0 0 8px; }
+  h2 .jp { font-size: 15px; display: block; color: var(--hot); letter-spacing: .2em; }
+  .sub { text-align: center; font-weight: 700; opacity: .7; margin: 0 0 30px; }
+
+  .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+  .feat { --c: var(--pink); background: #fff; border-radius: 26px; padding: 20px; border: 3px solid color-mix(in srgb, var(--c) 45%, transparent); box-shadow: 0 6px 0 color-mix(in srgb, var(--c) 55%, transparent); transition: transform .25s cubic-bezier(.3,1.7,.5,1); }
+  .feat:hover { transform: translateY(-4px) rotate(-1deg) scale(1.02); }
+  .feat .ic { width: 52px; height: 52px; border-radius: 18px; display: grid; place-items: center; font-size: 28px; background: color-mix(in srgb, var(--c) 22%, transparent); margin-bottom: 10px; }
+  .feat h3 { margin: 0 0 6px; font-size: 18px; font-weight: 900; }
+  .feat p { margin: 0; font-weight: 600; font-size: 14px; opacity: .75; line-height: 1.5; }
+
+  .shot { display: block; max-width: 920px; width: 100%; margin: 0 auto; border-radius: 22px; border: 6px solid #fff; box-shadow: 0 12px 0 rgba(255,128,168,.35), 0 20px 50px rgba(84,56,43,.18); transform: rotate(-1deg); }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .step { background: #fff; border-radius: 26px; padding: 22px; text-align: center; box-shadow: 0 6px 0 rgba(97,214,173,.5); }
+  .step .n { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: var(--mint); color: #fff; font-weight: 900; font-size: 22px; margin-bottom: 8px; }
+  .step h3 { margin: 4px 0; font-weight: 900; }
+  .step p { margin: 0; font-weight: 600; opacity: .75; }
+  .safe { --c: var(--mint); background: #fff; border-radius: 30px; padding: 26px; display: grid; grid-template-columns: 140px 1fr; gap: 20px; align-items: center; box-shadow: 0 6px 0 rgba(97,214,173,.5); }
+  .safe ul { margin: 0; padding-left: 18px; font-weight: 700; line-height: 1.8; }
+  #suri-safe { width: 130px; height: 154px; }
+  footer { text-align: center; padding: 40px 0 70px; font-weight: 700; opacity: .7; }
+  .marquee { overflow: hidden; white-space: nowrap; background: var(--lemon); font-weight: 900; padding: 10px 0; transform: rotate(-1.5deg); margin: 10px -20px; }
+  .marquee div { display: inline-block; animation: marquee 22s linear infinite; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  @media (max-width: 860px) { header.hero { grid-template-columns: 1fr; } .steps, .safe { grid-template-columns: 1fr; } .suri-stage { height: 380px; } }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+<div class="ribbon">☆ NUOVO <b>新発売</b> Gratis per Mac · Windows · Ubuntu ☆</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <div class="burst"><svg viewBox="0 0 108 108"><polygon fill="#FF5A82" points="54,0 62,16 79,7 80,26 99,24 92,42 108,54 92,66 99,84 80,82 79,101 62,92 54,108 46,92 29,101 28,82 9,84 16,66 0,54 16,42 9,24 28,26 29,7 46,16"/></svg><span>GRATIS<small>無料!</small></span></div>
+      <div class="kicker">スリちゃんの おそうじ大作戦 ✧</div>
+      <h1>SuriClean<span class="jp">スリクリーン ♡ pika-pika!</span></h1>
+      <p class="tagline">La suricata kawaii che <mark>scava nel tuo disco</mark> e trova i GB sprecati: cache, duplicati, repo git dimenticati, dati di Claude e Codex… <mark>Tu decidi, lei spazza!</mark> 🧹✨</p>
+      <div class="downloads" id="downloads"></div>
+      <div class="tiny" id="version-note">Versione più recente da GitHub · open source · nessun abbonamento, nessuna pubblicità</div>
+    </div>
+    <div class="suri-stage">
+      <div class="halo"></div>
+      <div class="speech" id="speech">Kyaa~! Scarica e scaviamo insieme ♡</div>
+      <div id="suri"></div>
+      <div class="hint-click">↑ toccami! ☆</div>
+    </div>
+  </header>
+</div>
+
+<div class="marquee"><div>✦ Cache delle app ✦ Claude & Codex ✦ node_modules dimenticati ✦ Repo git ✦ File gemelli ✦ Mappa del disco ✦ Installer vecchi ✦ App dormienti ✦ Cache delle app ✦ Claude & Codex ✦ node_modules dimenticati ✦ Repo git ✦ File gemelli ✦ Mappa del disco ✦ Installer vecchi ✦ App dormienti ✦</div></div>
+
+<div class="wrap">
+  <section>
+    <h2><span class="jp">ポイント</span>Cosa trova Suri-chan? ☆</h2>
+    <p class="sub">Tredici zone di scavo. Tutto quello che è sicuro è già preselezionato, il resto lo decidi tu.</p>
+    <div class="features" id="features"></div>
+  </section>
+
+  <section>
+    <h2><span class="jp">スクリーンショット</span>Eccola al lavoro! ♡</h2>
+    <p class="sub">Animazioni ovunque e musica 16-bit che cambia ritmo mentre scava.</p>
+    <img class="shot" src="screenshot.png" alt="Schermata di SuriClean" onerror="this.style.display='none'">
+  </section>
+
+  <section>
+    <h2><span class="jp">かんたん</span>Facilissimo, in 3 zampate 🐾</h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Scarica</h3><p>Il DMG per Mac, l'installer per Windows o il pacchetto per Ubuntu.</p></div>
+      <div class="step"><div class="n">2</div><h3>Scansiona</h3><p>Premi «Via allo scavo! ☆» e guarda Suri scavare, indagare e annusare.</p></div>
+      <div class="step"><div class="n">3</div><h3>Spazza via</h3><p>Controlla l'elenco (anche ad albero) e manda nel Cestino solo ciò che vuoi.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="safe">
+      <div id="suri-safe"></div>
+      <div>
+        <h2 style="text-align:left">Anshin! Niente paura ♡ <span class="jp" style="display:inline;margin-left:8px">安心</span></h2>
+        <ul>
+          <li>Tutto finisce nel <b>Cestino</b>: puoi sempre ripensarci.</li>
+          <li>Chiede sempre <b>conferma</b> prima di spostare qualcosa.</li>
+          <li>I repo git vengono toccati solo se sono <b>al sicuro sul remote</b>; il comando per riclonarli viene salvato.</li>
+          <li>Rami e stash eliminati: commit annotato e <b>copia .patch</b> salvata.</li>
+          <li>Si <b>aggiorna da sola</b> quando esce una versione nuova.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Fatto con ♡ da Marco Ricupero e una suricata · <a href="https://github.com/Marketto/suriclean">codice su GitHub</a> ·
+    <a href="https://github.com/Marketto/suriclean/releases">tutte le versioni</a><br>
+    <span style="font-size:13px">Prima apertura su Mac: tasto destro sull'app › Apri. Su Windows: «Ulteriori informazioni» › «Esegui comunque».</span>
+  </footer>
+</div>
+
+<button class="music" id="music"><span class="eq"><i></i><i></i><i></i></span><span id="music-label">♪ Accendi la musica</span></button>
+
+<script src="suri.js"></script>
+<script src="chiptune.js"></script>
+<script>
+(function () {
+  const REL = "https://github.com/Marketto/suriclean/releases/latest/download/";
+  const OS = /Windows/i.test(navigator.userAgent) ? "win" : /Mac/i.test(navigator.platform + navigator.userAgent) ? "mac" : /Linux|X11/i.test(navigator.userAgent) ? "linux" : "mac";
+  const DL = {
+    mac: { label: "Scarica per Mac", file: "SuriClean.dmg", icon: "🍎", note: "macOS 12 o successivi · Intel e Apple Silicon", c: "#FF5A82" },
+    win: { label: "Scarica per Windows", file: "SuriClean-Windows-Setup.exe", icon: "🪟", note: "Windows 10 e 11", c: "#6CB2FF" },
+    linux: { label: "Scarica per Ubuntu", file: "SuriClean-Linux.deb", icon: "🐧", note: "Ubuntu 22.04+ · .deb", c: "#A88FFA" },
+    appimage: { label: "Linux AppImage", file: "SuriClean-Linux.AppImage", icon: "📦", note: "Qualsiasi distribuzione", c: "#61D6AD" },
+  };
+  const order = [OS, ...["mac", "win", "linux", "appimage"].filter(k => k !== OS)];
+  document.getElementById("downloads").innerHTML = order.map((k, i) => {
+    const d = DL[k];
+    return `<a class="dl ${i === 0 ? "main" : "sec"}" href="${REL + d.file}" data-dl="${k}" ${i === 0 ? "" : ""} style="${i === 0 ? `--c:${d.c}` : ""}">
+      <span class="os">${d.icon}</span><span>${d.label}<small>${d.note}</small></span></a>`;
+  }).join("");
+
+  const FEATS = [
+    ["🗺️", "Mappa del disco", "Dove sono finiti tutti i GB? Un albero di cartelle con le dimensioni, per scoprire subito i bestioni.", "#FFD14D"],
+    ["🌬️", "Cache e temporanei", "Briciole magiche che ricrescono da sole: cache di app e browser, log, file temporanei.", "#6CB2FF"],
+    ["🤖", "Claude, Codex & AI", "Sessioni vecchie di Claude Code e Codex, cache di Claude Desktop, Cursor e VS Code, modelli scaricati.", "#FF80A8"],
+    ["📦", "Dipendenze ricreabili", "node_modules, venv, target e bin/obj di progetti fermi da mesi. Si rigenerano con un comando.", "#61D6AD"],
+    ["🌿", "Repo Git dimenticati", "Controlla remote, modifiche, stash e commit non pushati. Pulisci rami e stash uno per uno.", "#FF786E"],
+    ["👯", "File gemelli", "Duplicati confermati con SHA-256. Suri tiene sempre almeno una copia 💎.", "#A88FFA"],
+    ["🦖", "File giganti", "I mostroni da 100 MB in su, ordinati dal più ciccione.", "#FF80A8"],
+    ["😴", "App dormienti (Mac)", "App che non apri da secoli, con tutti i loro dati nascosti. E gli installer di macOS da 12 GB!", "#A88FFA"],
+    ["🔄", "Si aggiorna da sola", "Controlla GitHub e installa le nuove versioni senza disturbarti.", "#FFA85C"],
+  ];
+  document.getElementById("features").innerHTML = FEATS.map(([i, t, p, c]) =>
+    `<div class="feat" style="--c:${c}"><div class="ic">${i}</div><h3>${t}</h3><p>${p}</p></div>`).join("");
+
+  // background bubbles
+  const bg = document.querySelector(".bg"), cols = ["#FF80A8", "#6CB2FF", "#FFD14D", "#A88FFA", "#61D6AD"];
+  for (let i = 0; i < 18; i++) {
+    const s = document.createElement("span"), r = 14 + (i % 4) * 12;
+    s.style.left = `${(Math.sin(i * 12.9898) * .5 + .5) * 100}%`;
+    s.style.animationDuration = `${30 + (i % 5) * 10}s`; s.style.animationDelay = `${-i * 5}s`;
+    if (i % 3 === 0) { s.className = "star"; s.textContent = "✦"; s.style.color = cols[i % 5]; }
+    else { s.style.width = s.style.height = `${r}px`; s.style.background = cols[i % 5]; }
+    bg.appendChild(s);
+  }
+
+  // Suri reacts to clicks
+  const suri = document.getElementById("suri"), speech = document.getElementById("speech");
+  Suri.mount(suri, "wave");
+  Suri.mount(document.getElementById("suri-safe"), "sleepy");
+  const SHOW = [
+    ["digging", "Hori-hori! Scavo nel tuo disco ⛏️", "scanning"],
+    ["detective", "Detective Suri trova i gemellini 🔍", "detective"],
+    ["hacking", "Bip-bup! Le briciole di Claude e Codex 🤖", "scanning"],
+    ["reading", "Leggo i diari segreti dei repo 📜", "results"],
+    ["sweeping", "Saa~ spazza spazza! 🧹", "cleaning"],
+    ["sniffing", "Kun-kun! Sento odore di cache 👃", "scanning"],
+    ["lookout", "Sentinella in posizione! 👀", "results"],
+    ["celebrating", "Yatta~! Disco pika-pika ✨", "victory"],
+    ["wave", "Kyaa~! Scarica e scaviamo insieme ♡", "menu"],
+  ];
+  let k = SHOW.length - 1;
+  function next() {
+    k = (k + 1) % SHOW.length;
+    const [act, text, mood] = SHOW[k];
+    Suri.setActivity(suri, act);
+    speech.textContent = text;
+    if (Chiptune.running) { Chiptune.setMood(mood); Chiptune.sfx("pop"); }
+  }
+  suri.addEventListener("click", next);
+
+  // music
+  const btn = document.getElementById("music"), label = document.getElementById("music-label");
+  btn.addEventListener("click", () => {
+    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(false); Chiptune.setMood(SHOW[k][2]); btn.classList.add("on"); label.textContent = "♪ Pikopiko ON"; }
+    else if (Chiptune.muted) { Chiptune.setMuted(false); btn.classList.add("on"); label.textContent = "♪ Pikopiko ON"; }
+    else { Chiptune.setMuted(true); btn.classList.remove("on"); label.textContent = "♪ Accendi la musica"; }
+  });
+  document.querySelectorAll(".dl, .feat").forEach(el => el.addEventListener("mouseenter", () => Chiptune.running && Chiptune.sfx("blip")));
+  document.querySelectorAll(".dl").forEach(el => el.addEventListener("click", () => {
+    if (Chiptune.running) { Chiptune.setMood("victory"); Chiptune.sfx("coin"); }
+    Suri.setActivity(suri, "celebrating"); speech.textContent = "Arigatō!! Ci vediamo nel tuo disco ♡";
+  }));
+
+  // latest version label
+  fetch("https://api.github.com/repos/Marketto/suriclean/releases/latest").then(r => r.ok ? r.json() : null).then(j => {
+    if (j && j.tag_name) document.getElementById("version-note").textContent = `Versione ${j.tag_name.replace(/^v/, "")} · open source · nessun abbonamento, nessuna pubblicità`;
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>

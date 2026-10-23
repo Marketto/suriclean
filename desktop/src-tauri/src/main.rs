@@ -194,11 +194,81 @@ fn open_url(url: String) {
     }
 }
 
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+/// Downloads the new installer from GitHub and starts it.
+/// Windows: runs the NSIS setup in passive mode and relaunches. Linux AppImage: swaps the file in place.
+/// Linux .deb: saves the package in Downloads and opens it with the software installer.
+#[tauri::command]
+async fn install_update(app: AppHandle, url: String, kind: String) -> Result<String, String> {
+    if !(url.starts_with("https://github.com/") || url.starts_with("https://objects.githubusercontent.com/")) {
+        return Err("indirizzo non valido".into());
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<(PathBuf, bool), String> {
+        let resp = ureq::get(&url).set("User-Agent", "SuriClean").call().map_err(|e| e.to_string())?;
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut resp.into_reader(), &mut bytes).map_err(|e| e.to_string())?;
+        match kind.as_str() {
+            "windows" => {
+                let p = std::env::temp_dir().join("SuriClean-Windows-Setup.exe");
+                std::fs::write(&p, &bytes).map_err(|e| e.to_string())?;
+                std::process::Command::new(&p).args(["/P", "/R"]).spawn().map_err(|e| e.to_string())?;
+                Ok((p, true))
+            }
+            "appimage" => {
+                let current = PathBuf::from(std::env::var("APPIMAGE").map_err(|_| "non è un AppImage".to_string())?);
+                let tmp = current.with_extension("new");
+                std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+                }
+                std::fs::rename(&tmp, &current).map_err(|e| e.to_string())?;
+                std::process::Command::new(&current).spawn().map_err(|e| e.to_string())?;
+                Ok((current, true))
+            }
+            _ => {
+                let dir = dirs::download_dir().unwrap_or_else(std::env::temp_dir);
+                let p = dir.join("SuriClean-Linux.deb");
+                std::fs::write(&p, &bytes).map_err(|e| e.to_string())?;
+                scan::open_path(&p);
+                Ok((p, false))
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    if result.1 {
+        let a = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(600));
+            a.exit(0);
+        });
+    }
+    Ok(result.0.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn install_kind() -> &'static str {
+    if cfg!(windows) {
+        "windows"
+    } else if std::env::var("APPIMAGE").is_ok() {
+        "appimage"
+    } else {
+        "deb"
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             platform, disk_info, has_git, scan_category, cancel_scan, invalidate_index,
-            trash_items, trash_size, empty_trash, existing, reveal, open_folder, open_url
+            trash_items, trash_size, empty_trash, existing, reveal, open_folder, open_url,
+            app_version, install_update, install_kind
         ])
         .run(tauri::generate_context!())
         .expect("error while running SuriClean");

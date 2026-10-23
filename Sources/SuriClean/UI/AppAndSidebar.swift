@@ -16,6 +16,7 @@ struct SuriCleanApp: App {
             CommandMenu("Suri") {
                 Button("Scansiona tutto") { model.scanAll() }.keyboardShortcut("r")
                 Button("Torna alla tana") { model.open(nil) }.keyboardShortcut("0")
+                Button("Controlla aggiornamenti…") { Task { await model.checkForUpdates(manual: true) } }
                 Button(model.muted ? "Attiva musica" : "Silenzia musica") { model.muted.toggle() }.keyboardShortcut("m")
                 Divider()
                 Button("Svuota il Cestino…") { model.askEmptyTrash = true }
@@ -30,6 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationWillTerminate(_ notification: Notification) {
+        // a downloaded update is swapped in right after we quit
+        Updater.pendingApply?()
+        Updater.pendingApply = nil
+    }
 }
 
 struct ContentView: View {
@@ -122,6 +128,7 @@ struct Sidebar: View {
                 }
             }
 
+            UpdatePill()
             LevelCard()
 
             HStack {
@@ -210,5 +217,58 @@ struct LevelCard: View {
         .padding(12)
         .kawaiiCard(color: Theme.mint, radius: 16)
         .padding(.vertical, 6)
+    }
+}
+
+
+struct UpdatePill: View {
+    @EnvironmentObject var model: AppModel
+    var body: some View {
+        Group {
+            switch model.updateState {
+            case .ready:
+                Button(action: { model.installUpdateNow() }) {
+                    HStack(spacing: 8) {
+                        Text("✨").font(.system(size: 18))
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("Nuova versione \(model.update?.version ?? "")!").font(Theme.font(12.5, .heavy))
+                            Text("Riavvia e aggiorna ☆").font(Theme.font(10.5, .bold)).opacity(0.75)
+                        }
+                        Spacer()
+                    }
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.pink))
+                }
+                .buttonStyle(.plain)
+            case .downloading:
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.6).frame(width: 16, height: 16)
+                    Text("Scarico la versione \(model.update?.version ?? "")…").font(Theme.font(11.5, .bold)).opacity(0.7)
+                }
+                .padding(.horizontal, 8)
+            case .failed(let msg):
+                Button(action: { Task { await model.downloadUpdate() } }) {
+                    Text("Aggiornamento non riuscito, riprova 🔄").font(Theme.font(11.5, .bold)).foregroundColor(Theme.coral.darker)
+                }
+                .buttonStyle(.plain)
+                .help(msg)
+                .padding(.horizontal, 8)
+            default:
+                HStack(spacing: 6) {
+                    Button(action: { Task { await model.checkForUpdates(manual: true) } }) {
+                        Text(model.updateState == .checking ? "Controllo aggiornamenti…" : "v\(Updater.currentVersion) · controlla aggiornamenti")
+                            .font(Theme.font(10.5, .bold)).opacity(0.5)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                    Toggle("auto", isOn: $model.autoUpdate)
+                        .toggleStyle(.switch).controlSize(.mini)
+                        .font(Theme.font(10, .bold))
+                        .help("Scarica e installa da sola le nuove versioni")
+                }
+                .padding(.horizontal, 8)
+            }
+        }
     }
 }

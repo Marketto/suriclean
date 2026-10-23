@@ -408,26 +408,33 @@ enum Scanners {
         for (i, repo) in index.repos.enumerated() {
             if rep.isCancelled { break }
             rep.report("git status · \(FS.pretty(repo))", progress: Double(i) / Double(max(index.repos.count, 1)))
-            let info = GitInspector.inspect(repo)
-            let size = FS.allocatedSize(repo, reporter: rep)
-            guard size >= 1_048_576 else { continue }
-            let days = FS.daysSince(info.lastActivity)
-            var badges: [String] = []
-            if info.safe { badges.append("☁️ al sicuro sul remote") }
-            if info.remote == nil { badges.append("🏠 solo locale") }
-            if info.dirty { badges.append("✏️ modifiche non salvate") }
-            if info.unpushed > 0 { badges.append("⬆️ \(info.unpushed) commit non pushati") }
-            if info.stashed { badges.append("📦 stash") }
-            if days > 365 { badges.append("🦕 fermo da 1+ anno") }
-            let risk: Risk = info.safe ? .safe : (info.remote != nil ? .review : .careful)
-            var detail = "\(FS.pretty(repo)) · ultima attività \(Fmt.relative(info.lastActivity))"
-            if let r = info.remote { detail += " · \(GitInspector.shortRemote(r))" }
-            out.append(CleanItem(url: repo, name: repo.lastPathComponent, detail: detail, size: size,
-                                 date: info.lastActivity, risk: risk, recommended: info.safe && days > 180,
-                                 badges: badges,
-                                 copyText: info.remote.map { "git clone \($0) \"\(repo.path)\"" }))
+            if let it = repoItem(repo, rep: rep) { out.append(it) }
         }
         return out
+    }
+
+    /// One row for a repository (also used to refresh it after a branch/stash clean-up).
+    static func repoItem(_ repo: URL, rep: Reporter?) -> CleanItem? {
+        let info = GitInspector.inspect(repo)
+        let size = FS.allocatedSize(repo, reporter: rep)
+        guard size >= 1_048_576 else { return nil }
+        let days = FS.daysSince(info.lastActivity)
+        var badges: [String] = []
+        if info.safe { badges.append("☁️ al sicuro sul remote") }
+        if info.remote == nil { badges.append("🏠 solo locale") }
+        if info.dirty { badges.append("✏️ modifiche non salvate") }
+        if info.unpushed > 0 { badges.append("⬆️ \(info.unpushed) commit non pushati") }
+        if info.stashed { badges.append("📦 stash") }
+        if days > 365 { badges.append("🦕 fermo da 1+ anno") }
+        let risk: Risk = info.safe ? .safe : (info.remote != nil ? .review : .careful)
+        var detail = "\(FS.pretty(repo)) · ultima attività \(Fmt.relative(info.lastActivity))"
+        if let r = info.remote { detail += " · \(GitInspector.shortRemote(r))" }
+        var it = CleanItem(url: repo, name: repo.lastPathComponent, detail: detail, size: size,
+                           date: info.lastActivity, risk: risk, recommended: info.safe && days > 180,
+                           badges: badges,
+                           copyText: info.remote.map { "git clone \($0) \"\(repo.path)\"" })
+        it.isGitRepo = true
+        return it
     }
 
     static func badge(forExt ext: String) -> String? {
