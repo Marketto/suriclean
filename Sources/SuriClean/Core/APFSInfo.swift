@@ -8,7 +8,7 @@ struct DiskSlice: Identifiable {
     let size: Int64
     let note: String
     let kind: Kind
-    enum Kind { case measured, system, vm, boot, hidden, purgeable, other }
+    enum Kind { case measured, system, vm, boot, hidden, purgeable, other, free }
 }
 
 enum APFSInfo {

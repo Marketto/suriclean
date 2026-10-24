@@ -317,17 +317,19 @@ struct DiskBreakdownCard: View {
         case .boot: return Theme.mint
         case .hidden: return Theme.coral
         case .purgeable: return Theme.peach
+        case .free: return Theme.mint.opacity(0.35)
         case .other: return Theme.orange
         }
     }
 
     var body: some View {
-        let slices = model.diskBreakdown
+        let free = max(0, model.disk.available)
+        let slices = model.diskBreakdown + (free > 0 ? [DiskSlice(name: "Libero", size: free, note: "spazio davvero disponibile adesso", kind: .free)] : [])
         let total = max(slices.reduce(Int64(0)) { $0 + $1.size }, 1)
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Dove sono tutti i GB? ☆").font(Theme.font(15, .heavy))
-                Text("occupati sul disco: \(Fmt.bytes(model.disk.used))").font(Theme.font(11.5, .bold)).opacity(0.55)
+                Text("disco da \(Fmt.bytes(model.disk.total)) · occupati \(Fmt.bytes(model.disk.used)) · liberi \(Fmt.bytes(free))").font(Theme.font(11.5, .bold)).opacity(0.55)
                 Spacer()
             }
             GeometryReader { g in
