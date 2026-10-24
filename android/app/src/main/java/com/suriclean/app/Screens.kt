@@ -126,6 +126,7 @@ private fun Home(vm: AppVM) {
         }
         if (!vm.hasFiles || !vm.hasUsage) PermissionsCard(vm)
         StorageCard(vm)
+        if (vm.breakdown.isNotEmpty()) BreakdownCard(vm)
         TipsCard(vm) { i -> ctx.startActivity(i) }
         Column {
             KText("Dove scaviamo oggi? ♡", 21.sp)
@@ -215,7 +216,7 @@ private fun TipsCard(vm: AppVM, start: (Intent) -> Unit) {
             if (vm.trashSize > 0) "Svuota" else null, Kawaii.coral) { askEmpty = true }
         TipRow("🧽", "Cache di tutte le app", if (vm.appCache > 0) "Una sola conferma di Android, le app le ricreano" else "Scansiona le «App dormienti» per vedere quanto pesano",
             if (vm.appCache > 0) Fs.bytes(vm.appCache) else "", if (Build.VERSION.SDK_INT >= 25) "Pulisci" else null, Kawaii.mint) {
-            vm.clearAllCaches()?.let { i -> vm.pendingIntent = i }
+            vm.clearAllCaches()
         }
     }
     if (askEmpty) ConfirmDialog("Svuotare il Cestino di Suri?", "Tutto ciò che c'è dentro (${Fs.bytes(vm.trashSize)}) verrà eliminato per sempre.", "Svuota per sempre",
@@ -302,7 +303,7 @@ private fun buildTree(list: List<Item>, sort: Int): List<Node> {
 
 @Composable
 private fun Detail(vm: AppVM, c: Category) {
-    var sort by rememberSaveable(c) { mutableIntStateOf(if (c == Category.DOWNLOADS || c == Category.APPS) 1 else 0) }
+    var sort by rememberSaveable(c) { mutableIntStateOf(if (c == Category.DOWNLOADS) 1 else 0) }
     var tree by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable(c) { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
@@ -327,6 +328,8 @@ private fun Detail(vm: AppVM, c: Category) {
             }
             KText(c.explain, 11.5.sp, bold = false, alpha = 0.68f)
             if (vm.results[c] != null) KText("${all.size} elementi · ${Fs.bytes(vm.displayTotal(c))}", 12.sp, color = c.color.darker())
+            if (c == Category.MAP && vm.breakdown.isNotEmpty()) BreakdownCard(vm)
+            if (c == Category.APPS && !vm.hasUsage) KText("⚠️ Senza l'«Accesso ai dati di utilizzo» Android non mi dice quanto pesano le app: attivalo dalla tana ♡", 11.5.sp, color = Kawaii.coral.darker())
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (!c.viewOnly && c != Category.APPS) SegmentRow(listOf("☰ Lista" to !tree, "🌳 Albero" to tree), c.color) { tree = it == 1; expanded = emptySet() }
                 SegmentRow(listOf("Più grandi" to (sort == 0), "Più vecchi" to (sort == 1), "Nome" to (sort == 2)), c.color) { sort = it }
@@ -448,6 +451,7 @@ private fun ItemRow(vm: AppVM, c: Category, it: Item, max: Long) {
             SizeBar(it.size.toFloat() / max, c.color, Modifier.fillMaxWidth().padding(top = 4.dp).height(6.dp))
         }
         if (it.packageName == null && !it.isDir) KText("👁️", 16.sp, modifier = Modifier.clickable { openItem(ctx, it) }.padding(start = 6.dp))
+        if (it.packageName != null) KText("⚙️", 18.sp, modifier = Modifier.clickable { vm.openAppSettings(it.packageName) }.padding(start = 6.dp))
     }
 }
 
@@ -537,4 +541,34 @@ private fun CelebrationOverlay(vm: AppVM, c: Celebration) {
     }
     if (askEmpty) ConfirmDialog("Svuotare il Cestino di Suri?", "Tutto ciò che c'è dentro (${Fs.bytes(vm.trashSize)}) verrà eliminato per sempre.", "Svuota per sempre",
         onDismiss = { askEmpty = false }) { askEmpty = false; vm.emptyTrash() }
+}
+
+
+@Composable
+private fun BreakdownCard(vm: AppVM) {
+    val slices = vm.breakdown
+    val total = slices.sumOf { it.bytes }.coerceAtLeast(1)
+    Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.lemon).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        KText("Dove sono tutti i GB? ☆", 15.sp)
+        KText("memoria da ${Fs.bytes(vm.storage.first)} · come la conta Android", 11.sp, bold = false, alpha = 0.55f)
+        Row(Modifier.fillMaxWidth().height(16.dp).background(Kawaii.cocoa.copy(alpha = 0.06f), RoundedCornerShape(50))) {
+            slices.forEach { sl ->
+                val w = (sl.bytes.toFloat() / total).coerceAtLeast(0.004f)
+                Box(Modifier.weight(w).fillMaxSize().padding(horizontal = 1.dp).background(sl.color, RoundedCornerShape(4.dp)))
+            }
+        }
+        slices.forEach { sl ->
+            Row(verticalAlignment = Alignment.Top) {
+                Box(Modifier.padding(top = 4.dp).size(10.dp).background(sl.color, RoundedCornerShape(50)))
+                Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                    Row { KText(sl.name, 12.5.sp, modifier = Modifier.weight(1f)); KText(Fs.bytes(sl.bytes), 12.5.sp, color = sl.color.darker()) }
+                    KText(sl.note, 10.5.sp, bold = false, alpha = 0.58f)
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BubblyButton("😴 App pesanti", Kawaii.sky) { vm.open(Category.APPS) }
+            BubblyButton("🧽 Pulisci cache", Kawaii.mint) { vm.clearAllCaches() }
+        }
+    }
 }

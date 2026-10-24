@@ -13,9 +13,9 @@ import androidx.compose.runtime.LaunchedEffect
 class MainActivity : ComponentActivity() {
     private val vm: AppVM by viewModels()
 
-    private val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        // after an uninstall dialog, go on with the next app in the queue
-        if (vm.uninstallQueue.isNotEmpty()) vm.nextUninstall() else vm.refresh()
+    private val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        // cache screen result, or the next app in the uninstall queue
+        vm.onSystemResult(r.resultCode == RESULT_OK)
     }
 
     private val legacyPerms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refresh() }

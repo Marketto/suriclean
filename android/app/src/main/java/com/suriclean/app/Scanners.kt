@@ -279,15 +279,21 @@ object AppsInfo {
             val label = a.loadLabel(pm).toString()
             rep.report(label, i.toFloat() / apps.size.coerceAtLeast(1))
             var size = 0L
+            var appCache = 0L
+            var appBytes = 0L
             try {
                 val st = ssm.queryStatsForPackage(StorageManager.UUID_DEFAULT, a.packageName, Process.myUserHandle())
                 size = st.appBytes + st.dataBytes
+                appBytes = st.appBytes
+                appCache = st.cacheBytes
                 cache += st.cacheBytes
             } catch (e: Exception) { /* no usage access */ }
             val last = usage[a.packageName]?.lastTimeUsed?.takeIf { it > 0 }
             val days = Fs.daysSince(last)
             val badges = buildList {
                 if (last == null) add("👻 mai aperta?") else if (days > 365) add("😴 dorme da 1+ anno") else if (days > 90) add("💤 dorme da mesi")
+                if (size > 0) add("📦 app ${Fs.bytes(appBytes)} · 💾 dati ${Fs.bytes(size - appBytes)}")
+                if (appCache > 20L * 1_048_576) add("🧽 cache ${Fs.bytes(appCache)}")
             }
             val version = try { pm.getPackageInfo(a.packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
             out.add(Item(Fs.nextId(), a.sourceDir ?: a.packageName, label,
@@ -295,6 +301,43 @@ object AppsInfo {
                 size, last, Risk.CAREFUL, false, badges, packageName = a.packageName))
         }
         return out to cache
+    }
+}
+
+object StorageBreakdown {
+    /** Splits the used storage the way Android counts it (needs usage access for the app part). */
+    fun compute(ctx: Context, measuredFiles: Long?): List<Slice> {
+        val ssm = ctx.getSystemService(StorageStatsManager::class.java)
+        val total = try { ssm.getTotalBytes(StorageManager.UUID_DEFAULT) } catch (e: Exception) { Fs.storage().first }
+        val free = try { ssm.getFreeBytes(StorageManager.UUID_DEFAULT) } catch (e: Exception) { Fs.storage().second }
+        val used = (total - free).coerceAtLeast(0)
+        val out = ArrayList<Slice>()
+        var accounted = 0L
+        try {
+            val user = Process.myUserHandle()
+            val ext = ssm.queryExternalStatsForUser(StorageManager.UUID_DEFAULT, user)
+            val media = ext.imageBytes + ext.videoBytes
+            out.add(Slice("Foto e video", media, Kawaii.pink, "DCIM, Pictures, Movies e i media delle chat"))
+            out.add(Slice("Musica e audio", ext.audioBytes, Kawaii.lilac, "brani, vocali, podcast"))
+            val other = (ext.totalBytes - media - ext.audioBytes - ext.appBytes).coerceAtLeast(0)
+            out.add(Slice("Altri file", other, Kawaii.lemon, "Download, documenti, APK e il resto della memoria condivisa"))
+            accounted += media + ext.audioBytes + other
+            if (AppsInfo.hasUsageAccess(ctx)) {
+                val st = ssm.queryStatsForUser(StorageManager.UUID_DEFAULT, user)
+                val data = (st.dataBytes - st.cacheBytes).coerceAtLeast(0)
+                out.add(Slice("App (programmi)", st.appBytes, Kawaii.sky, "le app installate"))
+                out.add(Slice("Dati delle app", data, Kawaii.orange, "chat, giochi, musica offline… dentro ogni app: si svuotano dalla scheda ⚙️ dell'app"))
+                out.add(Slice("Cache delle app", st.cacheBytes, Kawaii.mint, "si ricrea da sola: «Pulisci» o la scheda ⚙️ dell'app"))
+                accounted += st.appBytes + data + st.cacheBytes
+            }
+        } catch (e: Exception) {
+            if (measuredFiles != null) { out.add(Slice("File misurati", measuredFiles, Kawaii.lemon, "la memoria condivisa")); accounted += measuredFiles }
+        }
+        val rest = (used - accounted).coerceAtLeast(0)
+        out.add(Slice(if (AppsInfo.hasUsageAccess(ctx)) "Sistema Android" else "Sistema e app",
+            rest, Kawaii.coral, if (AppsInfo.hasUsageAccess(ctx)) "il sistema operativo e i file nascosti" else "dai a Suri l'«Accesso ai dati di utilizzo» per separare le app dal sistema"))
+        out.add(Slice("Libero", free, Kawaii.mint.copy(alpha = 0.35f), "spazio disponibile adesso"))
+        return out.filter { it.bytes > 0 }
     }
 }
 

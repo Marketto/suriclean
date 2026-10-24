@@ -49,6 +49,9 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     /** Package names waiting for the system uninstall dialog. */
     val uninstallQueue = ArrayDeque<String>()
     var pendingIntent by mutableStateOf<Intent?>(null)
+    var breakdown by mutableStateOf<List<Slice>>(emptyList())
+    /** Set when the «clear all caches» screen is opened, to detect phones that refuse it. */
+    var cacheRequestAt = 0L
 
     private var cancel = AtomicBoolean(false)
     private var index: StorageIndex? = null
@@ -80,7 +83,8 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val s = Fs.storage()
             val t = Trash.size()
-            withContext(Dispatchers.Main) { storage = s; trashSize = t }
+            val b = try { StorageBreakdown.compute(ctx, null) } catch (e: Exception) { emptyList() }
+            withContext(Dispatchers.Main) { storage = s; trashSize = t; breakdown = b }
             // drop what disappeared meanwhile
             val gone = results.values.flatten().filter { it.packageName == null && !File(it.path).exists() }.map { it.id }.toSet()
             if (gone.isNotEmpty()) withContext(Dispatchers.Main) {
@@ -256,8 +260,41 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun clearAllCaches(): Intent? =
-        if (Build.VERSION.SDK_INT >= 25) Intent(android.os.storage.StorageManager.ACTION_CLEAR_APP_CACHE) else null
+    fun clearAllCaches() {
+        if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
+            showToast("Per pulire le cache serve l'«Accesso a tutti i file» ♡"); return
+        }
+        cacheRequestAt = System.currentTimeMillis()
+        pendingIntent = if (Build.VERSION.SDK_INT >= 25) Intent(android.os.storage.StorageManager.ACTION_CLEAR_APP_CACHE)
+            else Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+    }
+
+    /** Called with the result of any system screen we opened. */
+    fun onSystemResult(resultOk: Boolean) {
+        if (cacheRequestAt > 0) {
+            val quick = System.currentTimeMillis() - cacheRequestAt < 1500
+            cacheRequestAt = 0
+            if (resultOk) {
+                Chiptune.sfx(Sfx.COIN); showToast("Pika-pika! Cache di tutte le app svuotate ✨")
+            } else if (quick) {
+                // many phones (Samsung, Xiaomi…) disable this screen: fall back to the system storage settings
+                showToast("Questo telefono non permette la pulizia in un colpo: apro l'archiviazione di Android ♡")
+                pendingIntent = Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+                return
+            }
+            viewModelScope.launch { delay(800); refresh(); if (results[Category.APPS] != null) rescan(Category.APPS) }
+            return
+        }
+        if (uninstallQueue.isNotEmpty()) nextUninstall() else {
+            refresh()
+            if (results[Category.APPS] != null && busy == null) scan(listOf(Category.APPS))
+        }
+    }
+
+    fun openAppSettings(pkg: String) {
+        Chiptune.sfx(Sfx.POP)
+        pendingIntent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
+    }
 
     private fun uninstall(apps: List<Item>) {
         uninstallQueue.clear()

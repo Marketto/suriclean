@@ -42,8 +42,8 @@ enum class Category(
     JUNK("Spazzatura", "Miniature, cartelle vuote, log e cestini dimenticati",
         "Miniature delle foto che Android ricrea da solo, cartelle vuote, file di log e file temporanei. Tutto si può togliere senza pensieri.",
         "🧹", Kawaii.coral, Risk.SAFE, Act.SWEEPING, "Saa~ caccia alla polvere! 🧹"),
-    APPS("App dormienti", "Fanno la nanna da secoli… zzz",
-        "Le app installate con il loro peso e l'ultima volta che le hai aperte. Il pulsante apre la disinstallazione di Android, che chiede conferma app per app.",
+    APPS("App pesanti e dormienti", "Chi si mangia la memoria? Nyam~",
+        "Le app installate dalla più pesante, con programma, dati e cache, e l'ultima volta che le hai aperte. ⚙️ apre la scheda dell'app per svuotarne la cache o i dati; «Disinstalla» chiede conferma app per app.",
         "😴", Kawaii.lilac, Risk.CAREFUL, Act.SLEEPY, "Shh~ cerco le app che fanno la nanna 💤"),
 }
 
@@ -77,3 +77,5 @@ data class Busy(
 data class Celebration(val title: String, val subtitle: String, val message: String = "", val offerEmptyTrash: Boolean = false)
 
 data class AppUpdate(val version: String, val url: String)
+
+data class Slice(val name: String, val bytes: Long, val color: androidx.compose.ui.graphics.Color, val note: String)
