@@ -201,8 +201,8 @@ private fun StorageCard(vm: AppVM) {
 private fun Legend(c: Color, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).background(c, RoundedCornerShape(50)))
-        KText(label, 12.sp, bold = false, alpha = 0.75f, modifier = Modifier.padding(start = 6.dp).weight(1f))
-        KText(value, 12.sp)
+        KText(label, 11.sp, bold = false, alpha = 0.75f, maxLines = 1, modifier = Modifier.padding(start = 6.dp).weight(1f))
+        KText(value, 11.5.sp, maxLines = 1)
     }
 }
 

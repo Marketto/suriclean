@@ -209,9 +209,15 @@ jobs:
             adb shell am start -n com.suriclean.app/.MainActivity
             sleep 20
             adb exec-out screencap -p > dist/screenshot-android.png
-            adb shell input swipe 540 1800 540 600 400
-            sleep 3
+            adb shell wm size
+            adb shell input tap 127 286
+            sleep 45
             adb exec-out screencap -p > dist/screenshot-android-2.png
+            adb shell input tap 160 320
+            sleep 2
+            adb shell input swipe 160 560 160 120 600
+            sleep 2
+            adb exec-out screencap -p > dist/screenshot-android-3.png
             adb logcat -d -s AndroidRuntime:E | tail -40
 
       - uses: actions/upload-artifact@v4

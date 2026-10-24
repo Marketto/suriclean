@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SuriClean · la suricata spazzina ☆</title>
-<meta name="description" content="SuriClean: la suricata kawaii che libera spazio sul tuo computer. Per Mac, Windows e Ubuntu. Gratis e open source.">
+<meta name="description" content="SuriClean: la suricata kawaii che libera spazio sul tuo computer e sul telefono. Per Mac, Windows, Ubuntu e Android. Gratis e open source.">
 <meta property="og:title" content="SuriClean · la suricata spazzina ☆">
 <meta property="og:description" content="Cache, duplicati, repo git dimenticati, dati di Claude e Codex… Suri li trova, tu decidi. Gratis per Mac, Windows e Ubuntu.">
 <meta property="og:image" content="icon.png">
@@ -97,7 +97,7 @@
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
-<div class="ribbon">☆ NUOVO <b>新発売</b> Gratis per Mac · Windows · Ubuntu ☆</div>
+<div class="ribbon">☆ NUOVO <b>新発売</b> Gratis per Mac · Windows · Ubuntu · Android ☆</div>
 
 <div class="wrap">
   <header class="hero">
@@ -172,14 +172,15 @@
 <script>
 (function () {
   const REL = "https://github.com/Marketto/suriclean/releases/latest/download/";
-  const OS = /Windows/i.test(navigator.userAgent) ? "win" : /Mac/i.test(navigator.platform + navigator.userAgent) ? "mac" : /Linux|X11/i.test(navigator.userAgent) ? "linux" : "mac";
+  const OS = /Android/i.test(navigator.userAgent) ? "android" : /Windows/i.test(navigator.userAgent) ? "win" : /Mac/i.test(navigator.platform + navigator.userAgent) ? "mac" : /Linux|X11/i.test(navigator.userAgent) ? "linux" : "mac";
   const DL = {
     mac: { label: "Scarica per Mac", file: "SuriClean.dmg", icon: "🍎", note: "macOS 12 o successivi · Intel e Apple Silicon", c: "#FF5A82" },
     win: { label: "Scarica per Windows", file: "SuriClean-Windows-Setup.exe", icon: "🪟", note: "Windows 10 e 11", c: "#6CB2FF" },
     linux: { label: "Scarica per Ubuntu", file: "SuriClean-Linux.deb", icon: "🐧", note: "Ubuntu 22.04+ · .deb", c: "#A88FFA" },
     appimage: { label: "Linux AppImage", file: "SuriClean-Linux.AppImage", icon: "📦", note: "Qualsiasi distribuzione", c: "#61D6AD" },
+    android: { label: "Scarica per Android", file: "SuriClean-Android.apk", icon: "🤖", note: "Android 8 o successivi · .apk", c: "#61D6AD" },
   };
-  const order = [OS, ...["mac", "win", "linux", "appimage"].filter(k => k !== OS)];
+  const order = [OS, ...["mac", "win", "android", "linux", "appimage"].filter(k => k !== OS)];
   document.getElementById("downloads").innerHTML = order.map((k, i) => {
     const d = DL[k];
     return `<a class="dl ${i === 0 ? "main" : "sec"}" href="${REL + d.file}" data-dl="${k}" ${i === 0 ? "" : ""} style="${i === 0 ? `--c:${d.c}` : ""}">
@@ -195,6 +196,7 @@
     ["👯", "File gemelli", "Duplicati confermati con SHA-256. Suri tiene sempre almeno una copia 💎.", "#A88FFA"],
     ["🦖", "File giganti", "I mostroni da 100 MB in su, ordinati dal più ciccione.", "#FF80A8"],
     ["😴", "App dormienti (Mac)", "App che non apri da secoli, con tutti i loro dati nascosti. E gli installer di macOS da 12 GB!", "#A88FFA"],
+    ["📱", "Anche su Android", "Media di WhatsApp e Telegram, foto doppie, APK dimenticati, app dormienti e le cache di tutte le app in un tocco.", "#61D6AD"],
     ["🔄", "Si aggiorna da sola", "Controlla GitHub e installa le nuove versioni senza disturbarti.", "#FFA85C"],
   ];
   document.getElementById("features").innerHTML = FEATS.map(([i, t, p, c]) =>
