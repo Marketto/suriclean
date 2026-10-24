@@ -42,12 +42,41 @@ object ShizukuBridge {
         } catch (e: Throwable) { onResult = null; cb(false) }
     }
 
-    /** `pm clear <pkg>` with shell rights. Returns true when Android says "Success". */
-    fun clearData(pkg: String): Boolean = try {
+    /** Running and allowed: ready to work without asking anything. */
+    fun ready(): Boolean = running() && granted()
+
+    /** Runs a command with shell (adb) rights, entirely on the phone. Null if Shizuku is not usable. */
+    fun exec(vararg cmd: String): Pair<Int, String>? = try {
         val m = Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
         m.isAccessible = true
-        val p = m.invoke(null, arrayOf("pm", "clear", pkg), null, null) as Process
+        val p = m.invoke(null, arrayOf(*cmd), null, null) as Process
         val out = p.inputStream.bufferedReader().readText()
-        p.waitFor() == 0 && out.contains("Success")
-    } catch (e: Throwable) { false }
+        p.errorStream.bufferedReader().readText()
+        p.waitFor() to out
+    } catch (e: Throwable) { null }
+
+    fun sh(script: String) = exec("sh", "-c", script)
+
+    fun q(s: String) = "'" + s.replace("'", "'\\''") + "'"
+
+    /** `pm clear <pkg>`: the app goes back to freshly installed. */
+    fun clearData(pkg: String): Boolean = exec("pm", "clear", pkg)?.let { it.first == 0 && it.second.contains("Success") } ?: false
+
+    /** Asks Android to free all app caches (same as the system "clear cache" for every app). */
+    fun trimCaches(): Boolean = exec("pm", "trim-caches", "999G")?.first == 0
+
+    /** `du -sk` lines ("<kb>\t<path>") of the given shell glob(s). */
+    fun du(globs: String): List<Pair<String, Long>> {
+        val out = sh("for d in $globs; do [ -d \"\$d\" ] && du -sk \"\$d\" 2>/dev/null; done")?.second ?: return emptyList()
+        return out.lines().mapNotNull { l ->
+            val t = l.split('\t', limit = 2)
+            val kb = t.getOrNull(0)?.trim()?.toLongOrNull() ?: return@mapNotNull null
+            (t.getOrNull(1) ?: return@mapNotNull null) to kb * 1024
+        }
+    }
+
+    fun remove(path: String): Boolean {
+        sh("rm -rf -- ${q(path)}")
+        return sh("[ -e ${q(path)} ] && echo yes")?.second?.contains("yes") == false
+    }
 }

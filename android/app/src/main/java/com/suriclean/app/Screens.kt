@@ -126,6 +126,7 @@ private fun Home(vm: AppVM) {
             }
         }
         if (!vm.hasFiles || !vm.hasUsage) PermissionsCard(vm)
+        if (vm.shizuku < 3 && !vm.shizukuHidden) ShizukuCard(vm)
         if (vm.askPerms) ConfirmDialog("Onegai~! Mi apri le porte? 🔑",
             (if (!vm.hasFiles) "📂 «Accesso a tutti i file» per guardare foto, video, Download, chat e le aree di sistema.\n" else "") +
             (if (!vm.hasUsage) "📊 «Accesso ai dati di utilizzo» per sapere quanto pesano le app e quando le usi.\n" else "") +
@@ -151,6 +152,22 @@ private fun Home(vm: AppVM) {
             KText(if (vm.autoUpdate) "🔄 auto ON" else "🔄 auto OFF", 11.sp, alpha = 0.6f, modifier = Modifier.clickable { vm.setAuto(!vm.autoUpdate) }.padding(6.dp))
         }
         Spacer(Modifier.height(30.dp))
+    }
+}
+
+@Composable
+private fun ShizukuCard(vm: AppVM) {
+    Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.lilac).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        KText("🔑 Le stanze nascoste (facoltativo)", 15.sp)
+        KText(when (vm.shizuku) {
+            2 -> "Shizuku è acceso: dammi il permesso e vedrò le cache in Android/data, svuoterò la cache di tutte le app con un tocco e cancellerò i dati di più app insieme."
+            1 -> "Shizuku è installato ma spento. Aprilo e avvialo con il «Debug wireless», poi torna qui."
+            else -> "Con l'app gratuita Shizuku vedo le cache nascoste in Android/data, svuoto tutte le cache in un tocco e cancello i dati di più app insieme. Funziona tutto dentro il telefono, senza internet."
+        }, 12.sp, bold = false, alpha = 0.75f)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BubblyButton(when (vm.shizuku) { 2 -> "Concedi ☆"; 1 -> "Apri Shizuku"; else -> "Installa Shizuku" }, Kawaii.lilac) { vm.shizukuAction() }
+            BubblyButton("Non mi serve", Kawaii.sky) { vm.hideShizuku() }
+        }
     }
 }
 
@@ -214,7 +231,7 @@ private fun TipsCard(vm: AppVM, start: (Intent) -> Unit) {
         KText("Trucchetti segreti di Suri ✧", 16.sp)
         TipRow("🗑️", "Cestino di Suri", "Lo spazio torna libero quando lo svuoti", Fs.bytes(vm.trashSize),
             if (vm.trashSize > 0) "Svuota" else null, Kawaii.coral) { askEmpty = true }
-        TipRow("🧽", "Cache di tutte le app", if (vm.appCache > 0) "Una sola conferma di Android, le app le ricreano" else "Scansiona le «App dormienti» per vedere quanto pesano",
+        TipRow("🧽", "Cache di tutte le app", if (vm.shizuku == 3) "Con Shizuku: un tocco e via, le app le ricreano" else if (vm.appCache > 0) "Una sola conferma di Android, le app le ricreano" else "Scansiona le «App dormienti» per vedere quanto pesano",
             if (vm.appCache > 0) Fs.bytes(vm.appCache) else "", if (Build.VERSION.SDK_INT >= 25) "Pulisci" else null, Kawaii.mint) {
             vm.clearAllCaches()
         }

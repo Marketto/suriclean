@@ -43,7 +43,7 @@ enum class Category(
         "Miniature delle foto che Android ricrea da solo, cartelle vuote, file di log e file temporanei. Tutto si può togliere senza pensieri.",
         "🧹", Kawaii.coral, Risk.SAFE, Act.SWEEPING, "Saa~ caccia alla polvere! 🧹"),
     SYSTEM("Aree di sistema", "Backup vecchi, aggiornamenti e avanzi di Android ⚙️",
-        "La fetta «Sistema» di Android non si può toccare senza root. Qui trovi quello che il sistema e le app lasciano nella memoria del telefono: vecchi backup di WhatsApp (il più recente resta sempre), pacchetti di aggiornamento già installati, dati di giochi (OBB) e cartelle di app disinstallate, log dei produttori, backup di app e file che Android ha già messo nel cestino.",
+        "La fetta «Sistema» di Android non si può toccare senza root. Qui trovi quello che il sistema e le app lasciano nella memoria del telefono: vecchi backup di WhatsApp (il più recente resta sempre), pacchetti di aggiornamento già installati, dati di giochi (OBB) e cartelle di app disinstallate, log dei produttori, backup di app e file che Android ha già messo nel cestino. Con Shizuku anche le cache nascoste delle app in Android/data.",
         "⚙️", Kawaii.sky, Risk.REVIEW, Act.SWEEPING, "Suri esplora le stanze di Android! 🏯"),
     APPS("App pesanti e dormienti", "Chi si mangia la memoria? Nyam~",
         "Le app installate dalla più pesante, con programma, dati e cache, e l'ultima volta che le hai aperte. Seleziona e premi «Cancella dati» per riportarle come appena installate senza toglierle (in un colpo con Shizuku), oppure «Disinstalla». ⚙️ apre la scheda della singola app.",

@@ -39,6 +39,9 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     var hasUsage by mutableStateOf(true)
     /** The "may I come in?" dialog, and the step-by-step permission tour behind it. */
     var askPerms by mutableStateOf(false)
+    /** 0 = not installed, 1 = installed but off, 2 = on but not allowed yet, 3 = ready */
+    var shizuku by mutableStateOf(0)
+    var shizukuHidden by mutableStateOf(prefs.getBoolean("shizukuHidden", false))
     private var permTour = false
     private var permTourScan = false
     private val permAsked = mutableSetOf<String>()
@@ -92,6 +95,12 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         hasFiles = if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager() else true
         hasUsage = AppsInfo.hasUsageAccess(ctx)
+        shizuku = when {
+            ShizukuBridge.ready() -> 3
+            ShizukuBridge.running() -> 2
+            ShizukuBridge.installed(ctx) -> 1
+            else -> 0
+        }
         if (!permsChecked) {
             permsChecked = true
             if ((!hasFiles || !hasUsage) && prefs.getString("permsSnoozed", "") != version) askPerms = true
@@ -243,14 +252,18 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                     }
                     val idx = index
                     when (c) {
-                        Category.MAP -> idx?.let { Scanners.map(it) } ?: emptyList()
+                        Category.MAP -> idx?.let { i ->
+                            val hidden = HiddenAreas.mapEntries()
+                            val extra = hidden.filter { it.path.endsWith("/Android/data") || it.path.endsWith("/Android/obb") }.sumOf { it.size }
+                            Scanners.map(i).map { if (it.path == Fs.root.absolutePath) it.copy(size = it.size + extra) else it } + hidden
+                        } ?: emptyList()
                         Category.CHATS -> Scanners.chats(rep)
                         Category.DUPLICATES -> idx?.let { Scanners.duplicates(it, rep) } ?: emptyList()
                         Category.BIG -> idx?.let { Scanners.big(it) } ?: emptyList()
                         Category.DOWNLOADS -> Scanners.downloads(rep)
                         Category.APKS -> idx?.let { Scanners.apks(it) } ?: emptyList()
                         Category.JUNK -> idx?.let { Scanners.junk(it) } ?: emptyList()
-                        Category.SYSTEM -> idx?.let { SystemAreas.scan(ctx, it, rep) } ?: emptyList()
+                        Category.SYSTEM -> (idx?.let { SystemAreas.scan(ctx, it, rep) } ?: emptyList()) + HiddenAreas.caches(rep)
                         Category.APPS -> if (AppsInfo.hasUsageAccess(ctx)) {
                             val (apps, cache) = AppsInfo.scan(ctx, rep)
                             withContext(Dispatchers.Main) { appCache = cache }
@@ -325,7 +338,40 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun shizukuAction() {
+        Chiptune.sfx(Sfx.POP)
+        when (shizuku) {
+            2 -> ShizukuBridge.request { ok -> viewModelScope.launch(Dispatchers.Main) {
+                refresh(); showToast(if (ok) "Yatta~! Con Shizuku vedo le stanze nascoste 🔑✨" else "Shizuku non ha dato il permesso")
+            } }
+            1 -> ctx.packageManager.getLaunchIntentForPackage(ShizukuBridge.PACKAGE)?.let {
+                showToast("Avvia Shizuku (Debug wireless) e torna qui ♡"); pendingIntent = it
+            }
+            0 -> pendingIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${ShizukuBridge.PACKAGE}"))
+        }
+    }
+
+    fun hideShizuku() { shizukuHidden = true; prefs.edit().putBoolean("shizukuHidden", true).apply() }
+
     fun clearAllCaches() {
+        if (ShizukuBridge.ready()) {
+            if (busy != null) return
+            busy = Busy(Act.SWEEPING, "Suri svuota le cache di tutte le app! 🧽", progress = null)
+            Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
+            viewModelScope.launch {
+                val before = Fs.storage().second
+                val ok = withContext(Dispatchers.IO) { ShizukuBridge.trimCaches() }
+                delay(800)
+                val gained = (Fs.storage().second - before).coerceAtLeast(0)
+                busy = null
+                freed += gained; prefs.edit().putLong("freed", freed).apply()
+                refresh()
+                if (ok) celebrate(Celebration("Pika-pika! Cache svuotate ✨", "Liberati ${Fs.bytes(gained)} in un colpo solo"))
+                else showToast("Shizuku non è riuscito a svuotare le cache")
+                if (results[Category.APPS] != null) rescan(Category.APPS)
+            }
+            return
+        }
         if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
             showToast("Per pulire le cache serve l'«Accesso a tutti i file» ♡"); return
         }

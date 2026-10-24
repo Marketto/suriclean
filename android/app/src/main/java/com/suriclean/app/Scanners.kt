@@ -256,6 +256,38 @@ object Scanners {
     }
 }
 
+/** What only Shizuku can see: the Android/data and Android/obb folders of every app. */
+object HiddenAreas {
+    private fun root() = Fs.root.absolutePath
+
+    /** The cache folders apps keep in Android/data: always safe to remove, the apps rebuild them. */
+    fun caches(rep: Reporter): List<Item> {
+        if (!ShizukuBridge.ready()) return emptyList()
+        rep.report("Cache nascoste in Android/data (Shizuku)…", 0.95f, force = true)
+        val r = root()
+        return ShizukuBridge.du("$r/Android/data/*/cache $r/Android/data/*/files/cache $r/Android/data/*/files/Cache").mapNotNull { (path, bytes) ->
+            if (bytes < 256 * 1024) return@mapNotNull null
+            val pkg = path.removePrefix("$r/Android/data/").substringBefore('/')
+            Item(Fs.nextId(), path, "Cache nascosta · $pkg", "📱/Android/data/$pkg · la ricrea l'app", bytes, null,
+                Risk.SAFE, true, listOf("🧽 cache", "🔑 via Shizuku"), isDir = true)
+        }
+    }
+
+    /** Sizes of Android/data and Android/obb (and of each app inside), for the storage map. */
+    fun mapEntries(): List<Item> {
+        if (!ShizukuBridge.ready()) return emptyList()
+        val r = root()
+        val out = ArrayList<Item>()
+        for ((path, bytes) in ShizukuBridge.du("$r/Android/data $r/Android/obb $r/Android/data/* $r/Android/obb/*")) {
+            val top = path == "$r/Android/data" || path == "$r/Android/obb"
+            if (!top && bytes < 50L * 1_048_576) continue
+            out.add(Item(Fs.nextId(), path, path.substringAfterLast('/'), Fs.pretty(File(path)), bytes, null, Risk.CAREFUL, false,
+                listOf("🔑 via Shizuku"), isDir = true))
+        }
+        return out
+    }
+}
+
 object SystemAreas {
     private val dated = Regex("^msgstore-\\d{4}-\\d{2}-\\d{2}\\..*")
 
@@ -432,7 +464,9 @@ object Trash {
             var dest = File(dir, f.name)
             var k = 1
             while (dest.exists()) { dest = File(dir, "${f.nameWithoutExtension} ($k)${if (f.extension.isNotEmpty()) "." + f.extension else ""}"); k++ }
-            val ok = f.renameTo(dest) || (f.isDirectory && f.listFiles().isNullOrEmpty() && f.delete())
+            val hidden = it.path.contains("/Android/data/") || it.path.contains("/Android/obb/")
+            val ok = if (hidden && !f.canWrite() && ShizukuBridge.ready()) ShizukuBridge.remove(it.path)   // rebuildable caches: gone for good
+                else f.renameTo(dest) || (f.isDirectory && f.listFiles().isNullOrEmpty() && f.delete())
             if (ok) { removed.add(it.id); bytes += it.size; scan.add(f.absolutePath) } else failed.add(it.name)
         }
         if (scan.isNotEmpty()) MediaScannerConnection.scanFile(ctx, scan.toTypedArray(), null, null)
