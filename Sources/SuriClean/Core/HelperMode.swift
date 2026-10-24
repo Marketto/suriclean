@@ -77,16 +77,9 @@ enum HelperMode {
             let out = work.appendingPathComponent("user-\(h.lastPathComponent).json")
             lines.append("\(q(exe)) --scan-user \(q(h.path)) --categories \(cats) --out \(q(out.path)) >/dev/null 2>&1")
         }
-        let script = work.appendingPathComponent("full.sh")
-        guard (try? lines.joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)) != nil else {
-            r.error = "Non riesco a preparare la scansione"
-            return r
-        }
         rep.report(homes.isEmpty ? "Misuro tutto il disco… 🔐" : "Misuro tutto il disco e le cartelle di \(homes.map { $0.lastPathComponent }.joined(separator: ", "))… 🔐", force: true)
-        let cmd = "/bin/bash " + q(script.path)
-        let esc = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let o = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(esc)\" with administrator privileges with prompt \"SuriClean vuole misurare tutto il disco e le cartelle di tutti gli utenti.\""], mergeStderr: true)
-        if o.output.contains("-128") {
+        let o = Admin.run(Array(lines.dropFirst()), prompt: "SuriClean vuole misurare tutto il disco e le cartelle di tutti gli utenti.")
+        if o.cancelled {
             r.error = "Hai annullato la richiesta della password"
             return r
         }

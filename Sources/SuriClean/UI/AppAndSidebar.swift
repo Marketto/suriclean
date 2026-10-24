@@ -83,6 +83,10 @@ struct ContentView: View {
                 CelebrationOverlay(c: c)
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))
             }
+            if let p = model.passwordPrompt {
+                PasswordOverlay(prompt: p)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            }
         }
         .foregroundColor(Theme.cocoa)
         .animation(.spring(response: 0.45, dampingFraction: 0.82), value: model.selectedCategory)

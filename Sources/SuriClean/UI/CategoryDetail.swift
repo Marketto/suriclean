@@ -394,7 +394,7 @@ struct DiskBreakdownCard: View {
                         if model.deniedPaths.count > 15 {
                             Text("…e altre \(model.deniedPaths.count - 15)").font(Theme.font(11, .bold)).opacity(0.5)
                         }
-                        Text("Sono protette dalla privacy di macOS anche per l'amministratore. Se c'è la tua cartella, controlla che SuriClean abbia l'Accesso completo al disco (dopo un aggiornamento macOS a volte lo chiede di nuovo: togli e rimetti la spunta). Quelle degli altri utenti puoi controllarle solo entrando col loro account.")
+                        Text(model.hasFDA ? "Le cartelle rimaste sono blindate da macOS stesso (Protezione dell'integrità di sistema): nemmeno l'amministratore può aprirle, ed è giusto così. Se vedi ancora Scrivania o Documenti, rifai «Misura tutto il disco» e scrivi la password nella finestra di Suri." : "Sono protette dalla privacy di macOS: concedi a SuriClean l'«Accesso completo al disco» e rifai la misura.")
                             .font(Theme.font(11, .medium)).opacity(0.6).fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 4)
                     }

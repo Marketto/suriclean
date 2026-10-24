@@ -265,10 +265,10 @@ enum Scanners {
         let err = out.appendingPathExtension("err")
         let cmd = "/usr/bin/du -x -k -d 4 '\(root)' > '\(out.path)' 2> '\(err.path)'; /bin/chmod 644 '\(out.path)' '\(err.path)'"
         rep.report("Misuro tutto il disco, anche gli altri utenti… (qualche minuto) 🔐", force: true)
-        let r = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(cmd)\" with administrator privileges with prompt \"SuriClean vuole misurare tutto il disco, compresi gli altri utenti.\""], mergeStderr: true)
+        let r = Admin.run([cmd], prompt: "SuriClean vuole misurare tutto il disco, compresi gli altri utenti.")
         defer { try? FileManager.default.removeItem(at: out); try? FileManager.default.removeItem(at: err) }
         guard let text = try? String(contentsOf: out, encoding: .utf8), !text.isEmpty else {
-            let why = r.output.contains("-128") ? "Hai annullato la richiesta della password" : "Non sono riuscita a misurare il disco"
+            let why = r.cancelled ? "Hai annullato la richiesta della password" : "Non sono riuscita a misurare il disco"
             return .failure(NSError(domain: "SuriClean", code: 2, userInfo: [NSLocalizedDescriptionKey: why]))
         }
         return .success((parseDu(text), parseDuErrors((try? String(contentsOf: err, encoding: .utf8)) ?? "")))

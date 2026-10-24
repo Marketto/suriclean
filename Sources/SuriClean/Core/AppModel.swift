@@ -11,6 +11,8 @@ final class AppModel: ObservableObject {
     @Published var selectedCategory: CleanCategory?
     @Published var hasFDA = true
     @Published var showFDAGuide = false
+    @Published var passwordPrompt: PasswordPrompt?
+    private var passwordWaiter: CheckedContinuation<Bool, Never>?
     private var fullScanAfterFDA = false
     private var fullDiskAfterFDA = false
     @Published var trashSize: Int64 = 0
@@ -211,6 +213,46 @@ final class AppModel: ObservableObject {
     func recheckFDA() {
         hasFDA = FS.hasFullDiskAccess()
         showToast(hasFDA ? "Yatta! Ora vedo tutte le stanze ✨" : "Ancora niente accesso completo: dopo averlo concesso riapri l'app")
+    }
+
+    // MARK: administrator password (see Admin)
+
+    /// Makes sure root commands can keep Full Disk Access: asks the password in Suri's window.
+    /// Returns false only if the user cancels.
+    func ensureAdmin(_ reason: String) async -> Bool {
+        if Admin.password != nil || !Admin.isAdminUser { return true }
+        return await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
+            passwordWaiter?.resume(returning: false)
+            passwordWaiter = c
+            passwordPrompt = PasswordPrompt(reason: reason)
+            Chiptune.shared.sfx(.pop)
+        }
+    }
+
+    func submitPassword(_ pw: String) {
+        guard !pw.isEmpty, passwordPrompt?.checking != true else { return }
+        passwordPrompt?.checking = true
+        passwordPrompt?.error = nil
+        Task {
+            let ok = await Task.detached(priority: .userInitiated) { Admin.validate(pw) }.value
+            if ok {
+                Admin.remember(pw)
+                passwordPrompt = nil
+                Chiptune.shared.sfx(.coin)
+                passwordWaiter?.resume(returning: true)
+                passwordWaiter = nil
+            } else {
+                passwordPrompt?.checking = false
+                passwordPrompt?.error = "Ehh… password sbagliata, riprova ♡"
+                Chiptune.shared.sfx(.error)
+            }
+        }
+    }
+
+    func cancelPassword() {
+        passwordPrompt = nil
+        passwordWaiter?.resume(returning: false)
+        passwordWaiter = nil
     }
 
     func fdaGuideDismissed() {
@@ -448,7 +490,9 @@ final class AppModel: ObservableObject {
             if thenFull && !rep.isCancelled {
                 updateBusy { $0.activity = .lookout; $0.title = "Ora tutto il disco e gli altri utenti! 🔐"; $0.progress = nil; $0.detail = "Serve la password una volta sola" }
                 Chiptune.shared.mood = .scanning
-                let full = await Task.detached(priority: .userInitiated) { HelperMode.fullScan(rep) }.value
+                let allowed = await ensureAdmin("Per misurare tutto il disco e le cartelle degli altri utenti.")
+                var full = HelperMode.FullResult(error: "Hai annullato: guardo solo la tua cartella ♡")
+                if allowed { full = await Task.detached(priority: .userInitiated) { HelperMode.fullScan(rep) }.value }
                 if let e = full.error { showToast(e) }
                 if !full.map.isEmpty {
                     deniedPaths = full.denied
@@ -512,7 +556,10 @@ final class AppModel: ObservableObject {
         }
         Chiptune.shared.mood = .cleaning
         Chiptune.shared.sfx(.whoosh)
+        let fm = FileManager.default
+        let needsAdmin = toTrash.contains { !$0.owner.isEmpty || !fm.isWritableFile(atPath: $0.url.deletingLastPathComponent().path) }
         Task {
+            if needsAdmin { _ = await ensureAdmin("Alcuni elementi sono di macOS o di altri utenti: per spostarli nel Cestino.") }
             let o = await Task.detached(priority: .userInitiated) { Cleaner.trash(toTrash, reporter: rep) }.value
             let removed = Set(o.removed)
             for key in Array(results.keys) {
@@ -569,6 +616,12 @@ final class AppModel: ObservableObject {
         rep.onUpdate = { [weak self] text, _ in self?.updateBusy { $0.detail = text } }
         Chiptune.shared.mood = .scanning
         Task {
+            guard await ensureAdmin("Per misurare tutto il disco, compresi gli altri utenti.") else {
+                busy = nil
+                reporter = nil
+                Chiptune.shared.mood = .menu
+                return
+            }
             let r = await Task.detached(priority: .userInitiated) { Scanners.diskMapFull(rep) }.value
             busy = nil
             reporter = nil
@@ -614,15 +667,12 @@ final class AppModel: ObservableObject {
         Chiptune.shared.mood = .cleaning
         let before = DiskInfo.current().availableImportant
         Task {
+            guard await ensureAdmin("Per eliminare le istantanee locali del disco.") else { busy = nil; Chiptune.shared.mood = .menu; return }
             let ok = await Task.detached(priority: .userInitiated) { () -> Bool in
                 func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-                var lines = ["#!/bin/bash", "/usr/bin/tmutil deletelocalsnapshots / >/dev/null 2>&1"]
+                var lines = ["/usr/bin/tmutil deletelocalsnapshots / >/dev/null 2>&1"]
                 for n in names { lines.append("/usr/sbin/diskutil apfs deleteSnapshot /System/Volumes/Data -name \(q(n)) >/dev/null 2>&1") }
-                let script = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-snap.sh")
-                try? lines.joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)
-                defer { try? FileManager.default.removeItem(at: script) }
-                let r = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"/bin/bash \(script.path)\" with administrator privileges with prompt \"SuriClean vuole eliminare le istantanee locali del disco.\""])
-                return r.status == 0
+                return Admin.run(lines, prompt: "SuriClean vuole eliminare le istantanee locali del disco.").ok
             }.value
             busy = nil
             try? await Task.sleep(nanoseconds: 2_000_000_000)   // APFS frees space asynchronously
@@ -680,4 +730,10 @@ extension Result {
         if case .failure(let e) = self { return (e as NSError).localizedDescription }
         return ""
     }
+}
+
+struct PasswordPrompt: Equatable {
+    var reason: String
+    var error: String? = nil
+    var checking = false
 }

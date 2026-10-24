@@ -241,12 +241,7 @@ enum Cleaner {
             lines.append("/usr/sbin/chown -R \(q(user)) \(q(u.path)) 2>/dev/null; /bin/mv \(q(u.path)) \(q(dest))")
         }
         guard lines.count > 1 else { return }
-        let script = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-admin-\(stamp).sh")
-        guard (try? lines.joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)) != nil else { return }
-        let cmd = "/bin/bash " + q(script.path)
-        let escaped = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        _ = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(escaped)\" with administrator privileges with prompt \"SuriClean vuole spostare nel Cestino \(entries.count) elementi protetti o di altri utenti.\""])
-        try? FileManager.default.removeItem(at: script)
+        _ = Admin.run(Array(lines.dropFirst()), prompt: "SuriClean vuole spostare nel Cestino \(entries.count) elementi protetti o di altri utenti.")
     }
 
     @discardableResult
