@@ -151,8 +151,77 @@ jobs:
           path: dist/*
           if-no-files-found: warn
 
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "SURI_VERSION=1.$((GITHUB_RUN_NUMBER + 10))" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Signing key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/suri.p12"
+            echo "SURI_KEYSTORE=$RUNNER_TEMP/suri.p12" >> "$GITHUB_ENV"
+            echo "SIGNED=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Manca il segreto ANDROID_KEYSTORE_B64: APK di prova, non pubblicato"
+          fi
+
+      - name: Build APK
+        env:
+          SURI_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          gradle -p android assembleRelease --no-daemon --stacktrace
+          mkdir -p dist
+          if [ "$SIGNED" = "1" ]; then N=SuriClean-Android.apk; else N=SuriClean-Android-test.apk; fi
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/$N"
+          ls -la dist
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Emulator test (screenshots)
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: false
+          script: |
+            adb install -r dist/*.apk
+            adb shell appops set com.suriclean.app MANAGE_EXTERNAL_STORAGE allow
+            adb shell appops set com.suriclean.app GET_USAGE_STATS allow
+            adb shell am start -n com.suriclean.app/.MainActivity
+            sleep 20
+            adb exec-out screencap -p > dist/screenshot-android.png
+            adb shell input swipe 540 1800 540 600 400
+            sleep 3
+            adb exec-out screencap -p > dist/screenshot-android-2.png
+            adb logcat -d -s AndroidRuntime:E | tail -40
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+          if-no-files-found: warn
+
   release:
-    needs: [mac, desktop]
+    needs: [mac, desktop, android]
     if: always() && needs.mac.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -171,7 +240,7 @@ jobs:
           ls -la art
           NOTES=$(git log -1 --pretty=%B | grep -v -E '^(Co-Authored-By|Claude-Session):' )
           printf '%s\n\n---\n**Installazione:** Mac → apri il DMG e trascina Suri in Applicazioni (prima volta: tasto destro › Apri). Windows → esegui il Setup («Ulteriori informazioni» › «Esegui comunque»). Ubuntu → apri il .deb oppure usa l'\''AppImage.\n\nSito: https://marketto.github.io/suriclean/\n' "$NOTES" > notes.md
-          FILES=$(ls art/SuriClean.dmg art/SuriClean-Windows-Setup.exe art/SuriClean-Linux.deb art/SuriClean-Linux.AppImage 2>/dev/null)
+          FILES=$(ls art/SuriClean.dmg art/SuriClean-Windows-Setup.exe art/SuriClean-Linux.deb art/SuriClean-Linux.AppImage art/SuriClean-Android.apk 2>/dev/null)
           if gh release view "v${SURI_VERSION}" >/dev/null 2>&1; then
             gh release upload "v${SURI_VERSION}" $FILES --clobber
           else

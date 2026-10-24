@@ -4,3 +4,9 @@ dist/
 *.dmg
 .DS_Store
 .swiftpm/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.p12
+*.jks
