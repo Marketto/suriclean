@@ -10,6 +10,9 @@ final class AppModel: ObservableObject {
     @Published var disk = DiskInfo.current()
     @Published var selectedCategory: CleanCategory?
     @Published var hasFDA = true
+    @Published var showFDAGuide = false
+    private var fullScanAfterFDA = false
+    private var fullDiskAfterFDA = false
     @Published var trashSize: Int64 = 0
     @Published var askEmptyTrash = false
     @Published var snapshotCount: Int?
@@ -60,6 +63,9 @@ final class AppModel: ObservableObject {
         Chiptune.shared.mood = .menu
         refreshDisk()
         hasFDA = FS.hasFullDiskAccess()
+        if !hasFDA && UserDefaults.standard.string(forKey: "fdaSnoozedVersion") != Updater.currentVersion {
+            showFDAGuide = true
+        }
         refreshTrash()
         refreshSnapshots()
         Task {
@@ -203,6 +209,23 @@ final class AppModel: ObservableObject {
         showToast(hasFDA ? "Yatta! Ora vedo tutte le stanze ✨" : "Ancora niente accesso completo: dopo averlo concesso riapri l'app")
     }
 
+    func fdaGuideDismissed() {
+        showFDAGuide = false
+        UserDefaults.standard.set(Updater.currentVersion, forKey: "fdaSnoozedVersion")
+        if fullScanAfterFDA { fullScanAfterFDA = false; scanAll(full: true, askedFDA: true) }
+        if fullDiskAfterFDA { fullDiskAfterFDA = false; scanFullDisk(askedFDA: true) }
+    }
+
+    /// Full Disk Access only applies to a fresh process: quit and open again.
+    func relaunch() {
+        let path = Bundle.main.bundlePath.replacingOccurrences(of: "'", with: "'\\''")
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "sleep 1; /usr/bin/open '\(path)'"]
+        try? p.run()
+        NSApp.terminate(nil)
+    }
+
     func openFDASettings() {
         if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
             NSWorkspace.shared.open(u)
@@ -319,7 +342,12 @@ final class AppModel: ObservableObject {
     func scanAll() { askScanScope = true; Chiptune.shared.sfx(.pop) }
 
     /// full = also the whole disk and every other user's folder (one admin password).
-    func scanAll(full: Bool) {
+    func scanAll(full: Bool, askedFDA: Bool = false) {
+        if full && !askedFDA && !FS.hasFullDiskAccess() {
+            fullScanAfterFDA = true
+            showFDAGuide = true
+            return
+        }
         if full {
             runScan(CleanCategory.allCases.filter { $0 != .diskMap }, thenFull: true)
         } else {
@@ -508,8 +536,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func scanFullDisk() {
+    func scanFullDisk(askedFDA: Bool = false) {
         guard busy == nil else { return }
+        if !askedFDA && !FS.hasFullDiskAccess() {
+            fullDiskAfterFDA = true
+            showFDAGuide = true
+            return
+        }
         let rep = Reporter()
         reporter = rep
         busy = BusyState(activity: .lookout, title: "Misuro tutto il disco, kira-kira! 💽", progress: nil)

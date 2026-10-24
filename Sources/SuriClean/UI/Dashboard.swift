@@ -66,7 +66,7 @@ struct FDABanner: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button("Apri Impostazioni") { model.openFDASettings() }
+            Button("Concedi l'accesso") { model.showFDAGuide = true }
                 .buttonStyle(BubblyButtonStyle(color: Theme.orange))
             Button("Ricontrolla") { model.recheckFDA() }
                 .buttonStyle(BubblyButtonStyle(color: Theme.lilac))

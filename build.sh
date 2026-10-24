@@ -50,7 +50,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# A fixed designated requirement (bundle id) keeps privacy permissions such as
+# Full Disk Access valid across updates, even with the free ad-hoc signature.
+codesign --force --deep --sign - --requirements "=designated => identifier \"com.suriclean.app\"" "$APP" >/dev/null 2>&1 \
+  || codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+codesign -d -r- "$APP" 2>&1 | grep designated || true
 
 echo ""
 echo "✅ Fatto! SuriClean.app è pronta in: $(pwd)"

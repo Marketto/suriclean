@@ -99,6 +99,7 @@ struct ContentView: View {
         } message: {
             Text("«Tutto il disco» chiede la password una volta e guarda anche le cartelle degli altri utenti e di sistema. Poi in ogni zona potrai filtrare «Io» o «Tutti».")
         }
+        .sheet(isPresented: $model.showFDAGuide) { FDAGuide().environmentObject(model) }
         .alert("Svuotare il Cestino?", isPresented: $model.askEmptyTrash) {
             Button("Annulla", role: .cancel) {}
             Button("Svuota per sempre", role: .destructive) { model.emptyTrash() }

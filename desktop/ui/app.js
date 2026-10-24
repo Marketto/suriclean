@@ -218,6 +218,7 @@
         <div class="card tips"><h3>Trucchetti segreti di Suri ✧</h3>
           <div class="tip" style="--c:${C.coral}"><div class="ic">🗑️</div><div class="txt"><b>${trashName}</b><span>Lo spazio torna libero solo quando lo svuoti</span></div><div class="val">${bytes(S.trash)}</div>${S.trash ? `<button class="btn" style="--c:${C.coral}" data-act="askEmpty">Svuota</button>` : ""}</div>
           <div class="tip" style="--c:${C.mint}"><div class="ic">🔄</div><div class="txt"><b>Aggiorna i numeri del disco</b><span>Dopo aver svuotato il Cestino o disinstallato programmi</span></div><button class="btn" style="--c:${C.mint}" data-act="refresh">Aggiorna</button></div>
+          ${S.adminDone ? "" : `<div class="tip" style="--c:${C.orange}"><div class="ic">🔑</div><div class="txt"><b>Dammi le chiavi di casa</b><span>Con la password da amministratore misuro tutto il disco (anche gli altri utenti) e le aree di sistema protette</span></div><button class="btn" style="--c:${C.orange}" data-act="admin">Concedi 🔐</button></div>`}
           ${S.platform === "windows" ? `<div class="tip" style="--c:${C.sky}"><div class="ic">🪟</div><div class="txt"><b>Pulizia disco di Windows</b><span>Per aggiornamenti di Windows e file di sistema (serve l'amministratore)</span></div><button class="btn" style="--c:${C.sky}" data-act="cleanmgr">Apri</button></div>` :
           `<div class="tip" style="--c:${C.sky}"><div class="ic">🐧</div><div class="txt"><b>Pacchetti di sistema</b><span>Da terminale: <code>sudo apt autoremove && sudo apt clean</code>, <code>flatpak uninstall --unused</code></span></div></div>`}
         </div></div>
@@ -356,6 +357,7 @@
         <label class="search">🔍<input id="q" placeholder="Cerca…" value="${esc(S.query)}"></label>
         <span class="count" id="count"></span>
         <button class="btn" style="--c:${C.sky}" data-act="rescan" ${S.busy ? "disabled" : ""}>🔄 Riscansiona</button>
+        ${["diskMap", "systemAreas"].includes(cat.id) ? `<button class="btn" style="--c:${C.orange}" data-act="admin" ${S.busy ? "disabled" : ""}>🔐 Misura tutto da admin</button>` : ""}
       </div></div>
       <div class="list" id="list"></div><div id="footer"></div>`;
     Suri.setActivity($("#suri-head"), cat.act);
@@ -435,6 +437,43 @@
     $("#overlay").appendChild(ov);
     confetti(ov);
     Suri.setActivity($("#suri-cele"), "celebrating");
+  }
+
+  function choiceBox(title, text, choices) {
+    const ov = document.createElement("div"); ov.className = "ov confirm";
+    ov.innerHTML = `<div class="card panel"><div class="suri-ov" id="suri-conf" style="width:120px;height:142px"></div><h3>${esc(title)}</h3><div class="hint">${esc(text)}</div>
+      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;justify-content:center"><button class="btn" style="--c:${C.lilac}" data-c="no">Annulla</button>
+      ${choices.map(([l, c], i) => `<button class="btn big" style="--c:${c}" data-c="${i}">${esc(l)}</button>`).join("")}</div></div>`;
+    $("#overlay").appendChild(ov);
+    Suri.setActivity($("#suri-conf"), "wave");
+    ov.addEventListener("click", e => {
+      const c = e.target.closest("[data-c]")?.dataset.c;
+      if (!c) return;
+      ov.remove(); sfx("pop");
+      if (c !== "no") choices[Number(c)][2]();
+    });
+  }
+
+  /// One administrator prompt: SuriClean measures the whole disk and the protected system areas.
+  async function adminScan() {
+    if (S.busy) return;
+    S.steps = 1;
+    S.busy = { act: "lookout", title: "Suri-admin misura tutto il disco! 🔐", detail: "Prima la password, poi qualche minuto di scavo…", progress: null, step: 0, found: 0, foundBytes: 0 };
+    Chiptune.setMood("scanning"); sfx("whoosh"); showBusy();
+    try {
+      const res = await invoke("elevated_scan", { categories: ["diskMapFull", "systemAreas"] });
+      if (res.diskMapFull) setResults("diskMap", res.diskMapFull);
+      if (res.systemAreas) setResults("systemAreas", res.systemAreas);
+      S.adminDone = true;
+      S.busy = null; showBusy();
+      Chiptune.setMood("results"); sfx("coin");
+      toast("Yatta~! Ora vedo tutto il disco, anche le stanze chiuse 🔑✨");
+    } catch (e) {
+      S.busy = null; showBusy();
+      Chiptune.setMood("menu"); sfx("error");
+      toast(`Niente permessi: ${e}`);
+    }
+    await refreshDisk(); render();
   }
 
   function confirmBox(title, text, okLabel, onOk) {
@@ -596,7 +635,15 @@
     if (!act) return;
     const cat = CAT[S.view];
     switch (act) {
-      case "scanAll": runScan(CATS.map(c => c.id)); break;
+      case "scanAll":
+        if (S.adminDone) { runScan(CATS.map(c => c.id)); break; }
+        sfx("pop");
+        choiceBox("Dove scaviamo? ☆", "«Tutto il disco» chiede la password da amministratore una volta e misura anche le cartelle degli altri utenti e le aree di sistema protette.", [
+          ["🐾 Solo la mia cartella", C.mint, () => runScan(CATS.map(c => c.id))],
+          ["💽 Tutto il disco 🔐", C.orange, async () => { await runScan(CATS.map(c => c.id)); adminScan(); }],
+        ]);
+        break;
+      case "admin": adminScan(); break;
       case "rescan": if (cat) { if (["buildDeps", "gitRepos", "duplicates", "bigFiles", "installers"].includes(cat.id)) await invoke("invalidate_index"); runScan([cat.id]); } break;
       case "cancel": if (S.busy) { S.busy.cancelled = true; S.busy.title = "Okke~ mi fermo! ✋"; showBusy(); invoke("cancel_scan"); sfx("error"); } break;
       case "mute": S.muted = !S.muted; localStorage.setItem("suri.muted", S.muted ? "1" : "0"); Chiptune.setMuted(S.muted); renderSidebar(); break;

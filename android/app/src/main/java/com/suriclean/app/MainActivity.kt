@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
                             // some phones refuse the uninstall-with-result screen: use the plain one
                             try { launcher.launch(android.content.Intent(android.content.Intent.ACTION_DELETE, pending.data)) }
                             catch (e2: Exception) { vm.showToast("Android non mi lascia disinstallare: usa ⚙️ sull'app ♡"); vm.uninstallQueue.clear() }
-                        } else vm.showToast("Android non ha aperto la schermata richiesta")
+                        } else { vm.showToast("Android non ha aperto la schermata richiesta"); vm.onSystemResult(false) }
                     }
                 }
             }

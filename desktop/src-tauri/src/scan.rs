@@ -1,5 +1,5 @@
 // Scanners for Windows and Linux. Mirrors the logic of the native macOS version.
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -51,8 +51,8 @@ impl Reporter {
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
-#[derive(Serialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct Item {
     pub id: u64,
     pub path: String,
@@ -1085,13 +1085,34 @@ fn old_downloads(rep: &Reporter) -> Vec<Item> {
 // ───────────────────────── disk map ─────────────────────────
 
 /// Every folder >= 300 MB down to 4 levels below Home (view-only).
+pub fn fresh_id() -> u64 {
+    NEXT_ID.fetch_add(1, Ordering::Relaxed)
+}
+
 fn disk_map(rep: &Reporter) -> Vec<Item> {
-    let h = home();
+    disk_map_at(&home(), "La tua cartella Inizio", "~", "🏡 la tana", rep)
+}
+
+/// The whole system drive (needs the administrator to see everything).
+fn disk_map_full(rep: &Reporter) -> Vec<Item> {
+    let root = if cfg!(windows) {
+        PathBuf::from(std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into()) + "\\")
+    } else {
+        PathBuf::from("/")
+    };
+    let label = root.to_string_lossy().to_string();
+    disk_map_at(&root, "Tutto il disco", &label, "💽 tutto il disco", rep)
+}
+
+fn disk_map_at(h: &Path, title: &str, detail: &str, badge: &str, rep: &Reporter) -> Vec<Item> {
+    let h = h.to_path_buf();
     let base = h.components().count();
     let mut sizes: HashMap<PathBuf, u64> = HashMap::new();
     let mut total = 0u64;
     let mut n = 0u64;
-    for e in WalkDir::new(&h).follow_links(false).into_iter().flatten() {
+    let skip: [&Path; 3] = [Path::new("/proc"), Path::new("/snap"), Path::new("/run")];
+    for e in WalkDir::new(&h).follow_links(false).same_file_system(true).into_iter()
+        .filter_entry(|e| !skip.contains(&e.path())).flatten() {
         n += 1;
         if n % 500 == 0 {
             if rep.cancelled() {
@@ -1120,7 +1141,7 @@ fn disk_map(rep: &Reporter) -> Vec<Item> {
             anc = a.parent();
         }
     }
-    let mut out = vec![new_item(&h, "La tua cartella Inizio".into(), "~".into(), total, None, "careful", false, vec!["🏡 la tana".into()])];
+    let mut out = vec![new_item(&h, title.into(), detail.into(), total, None, "careful", false, vec![badge.into()])];
     for (p, s) in sizes {
         let depth = p.components().count() - base;
         let threshold = if depth == 1 { 50 * MB } else { 300 * MB };
@@ -1145,6 +1166,7 @@ pub fn scan(category: &str, rep: &Reporter) -> Vec<Item> {
     };
     match (category, idx) {
         ("diskMap", _) => disk_map(rep),
+        ("diskMapFull", _) => disk_map_full(rep),
         ("caches", _) => caches(rep),
         ("logsTemp", _) => logs_temp(rep),
         ("systemAreas", _) => system_areas(rep),

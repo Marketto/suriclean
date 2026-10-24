@@ -305,12 +305,60 @@ fn install_kind() -> &'static str {
     }
 }
 
+/// The app started by itself as administrator: scan, write JSON, quit (no window).
+fn elevated_main(cats: &str, out: &str) {
+    let rep = Reporter::new(Arc::new(|_: String, _: Option<f64>| {}), &CANCEL);
+    let mut res: std::collections::HashMap<String, Vec<Item>> = std::collections::HashMap::new();
+    for c in cats.split(',').filter(|c| !c.is_empty()) {
+        res.insert(c.to_string(), scan::scan(c, &rep));
+    }
+    if let Ok(json) = serde_json::to_string(&res) {
+        let _ = std::fs::write(out, json);
+    }
+}
+
+/// ONE administrator prompt (UAC / pkexec): runs SuriClean itself elevated on the given zones.
+#[tauri::command]
+async fn elevated_scan(app: AppHandle, categories: Vec<String>) -> Result<std::collections::HashMap<String, Vec<Item>>, String> {
+    let rep = reporter(&app);
+    tauri::async_runtime::spawn_blocking(move || {
+        rep.report_force("Aspetto la password da amministratore… 🔐", None);
+        let out = std::env::temp_dir().join(format!("suriclean-scan-{}.json", std::process::id()));
+        let _ = std::fs::remove_file(&out);
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let q = |s: &str| scan::shell_quote(s);
+        let cats = categories.join(",");
+        let line = match std::env::var("APPIMAGE") {
+            Ok(img) if !cfg!(windows) => format!("env APPIMAGE_EXTRACT_AND_RUN=1 {} --elevated-scan {} {}", q(&img), cats, q(&out.to_string_lossy())),
+            _ => format!("{} --elevated-scan {} {}", q(&exe.to_string_lossy()), cats, q(&out.to_string_lossy())),
+        };
+        scan::run_elevated(&[line])?;
+        rep.report_force("Leggo cosa ha misurato Suri-admin…", None);
+        let text = std::fs::read_to_string(&out).map_err(|_| "La misura da amministratore non è riuscita".to_string())?;
+        let _ = std::fs::remove_file(&out);
+        let mut res: std::collections::HashMap<String, Vec<Item>> = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        for list in res.values_mut() {
+            for it in list.iter_mut() {
+                it.id = scan::fresh_id();
+            }
+        }
+        Ok(res)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--elevated-scan") {
+        elevated_main(args.get(i + 1).map(|s| s.as_str()).unwrap_or(""), args.get(i + 2).map(|s| s.as_str()).unwrap_or(""));
+        return;
+    }
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             platform, disk_info, has_git, scan_category, cancel_scan, invalidate_index,
             trash_items, trash_size, empty_trash, existing, reveal, open_folder, open_url,
-            app_version, install_update, install_kind
+            app_version, install_update, install_kind, elevated_scan
         ])
         .run(tauri::generate_context!())
         .expect("error while running SuriClean");

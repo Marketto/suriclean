@@ -125,6 +125,11 @@ private fun Home(vm: AppVM) {
             }
         }
         if (!vm.hasFiles || !vm.hasUsage) PermissionsCard(vm)
+        if (vm.askPerms) ConfirmDialog("Onegai~! Mi apri le porte? 🔑",
+            (if (!vm.hasFiles) "📂 «Accesso a tutti i file» per guardare foto, video, Download, chat e le aree di sistema.\n" else "") +
+            (if (!vm.hasUsage) "📊 «Accesso ai dati di utilizzo» per sapere quanto pesano le app e quando le usi.\n" else "") +
+            "Ti porto io alle pagine giuste, una alla volta: accendi l'interruttore e torna indietro ♡ Leggo solo il telefono e non invio niente.",
+            "Andiamo! ☆", onDismiss = { vm.snoozePerms() }) { vm.startPermTour() }
         StorageCard(vm)
         if (vm.breakdown.isNotEmpty()) BreakdownCard(vm)
         TipsCard(vm) { i -> ctx.startActivity(i) }
@@ -155,17 +160,11 @@ private fun PermissionsCard(vm: AppVM) {
         KText("Onegai~! Fammi entrare 🙏", 16.sp)
         if (!vm.hasFiles) {
             KText("Per guardare foto, video, Download e chat mi serve l'«Accesso a tutti i file». Leggo solo la memoria del telefono e non invio niente a nessuno.", 12.sp, bold = false, alpha = 0.75f)
-            BubblyButton("📂 Accesso a tutti i file", Kawaii.orange) {
-                if (Build.VERSION.SDK_INT >= 30) {
-                    val i = try { Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}")) }
-                    catch (e: Exception) { Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION) }
-                    ctx.startActivity(i)
-                }
-            }
+            BubblyButton("📂 Accesso a tutti i file", Kawaii.orange) { vm.startPermTour() }
         }
         if (!vm.hasUsage) {
             KText("Per sapere quanto pesano le app e quando le hai usate l'ultima volta mi serve l'«Accesso ai dati di utilizzo».", 12.sp, bold = false, alpha = 0.75f)
-            BubblyButton("📊 Accesso ai dati di utilizzo", Kawaii.lilac) { ctx.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+            BubblyButton("📊 Accesso ai dati di utilizzo", Kawaii.lilac) { vm.startPermTour() }
         }
     }
 }

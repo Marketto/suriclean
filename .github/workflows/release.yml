@@ -55,6 +55,8 @@ jobs:
           hdiutil attach dist/SuriClean.dmg -nobrowse -mountpoint /tmp/suri
           ls -la /tmp/suri
           /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" /tmp/suri/SuriClean.app/Contents/Info.plist
+          codesign -d -r- /tmp/suri/SuriClean.app 2>&1 | grep designated
+          codesign --verify --deep /tmp/suri/SuriClean.app && echo "✅ signature ok"
           hdiutil detach /tmp/suri
 
       - uses: actions/upload-artifact@v4

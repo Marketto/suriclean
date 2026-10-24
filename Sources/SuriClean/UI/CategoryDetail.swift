@@ -370,7 +370,7 @@ struct DiskBreakdownCard: View {
                     .buttonStyle(BubblyButtonStyle(color: Theme.sky))
                 }
                 if !model.hasFDA {
-                    Button(action: { model.openFDASettings() }) { Label("Accesso completo al disco", systemImage: "lock.open.fill") }
+                    Button(action: { model.showFDAGuide = true }) { Label("Accesso completo al disco", systemImage: "lock.open.fill") }
                         .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
                 }
                 Spacer()

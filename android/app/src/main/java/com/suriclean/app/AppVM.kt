@@ -37,6 +37,12 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     var appCache by mutableStateOf(0L)
     var hasFiles by mutableStateOf(true)
     var hasUsage by mutableStateOf(true)
+    /** The "may I come in?" dialog, and the step-by-step permission tour behind it. */
+    var askPerms by mutableStateOf(false)
+    private var permTour = false
+    private var permTourScan = false
+    private val permAsked = mutableSetOf<String>()
+    private var permsChecked = false
     var muted by mutableStateOf(prefs.getBoolean("muted", false))
         private set
     var freed by mutableStateOf(prefs.getLong("freed", 0))
@@ -80,6 +86,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         hasFiles = if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager() else true
         hasUsage = AppsInfo.hasUsageAccess(ctx)
+        if (!permsChecked) {
+            permsChecked = true
+            if ((!hasFiles || !hasUsage) && prefs.getString("permsSnoozed", "") != version) askPerms = true
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val s = Fs.storage()
             val t = Trash.size()
@@ -145,7 +155,48 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         if (c != null && results[c] == null && busy == null) scan(listOf(c))
     }
 
-    fun scanAll() = scan(Category.entries.toList())
+    fun scanAll() {
+        if (!hasFiles || !hasUsage) { permTourScan = true; askPerms = true; return }
+        scan(Category.entries.toList())
+    }
+
+    fun snoozePerms() {
+        askPerms = false
+        prefs.edit().putString("permsSnoozed", version).apply()
+        if (permTourScan) { permTourScan = false; scan(Category.entries.toList()) }
+    }
+
+    /** Opens the settings page of each missing permission, one after the other, then (if asked) starts the scan. */
+    fun startPermTour() {
+        askPerms = false
+        permTour = true
+        permAsked.clear()
+        nextPermission()
+    }
+
+    private fun nextPermission() {
+        hasFiles = if (Build.VERSION.SDK_INT >= 30) Environment.isExternalStorageManager() else true
+        hasUsage = AppsInfo.hasUsageAccess(ctx)
+        when {
+            !hasFiles && "files" !in permAsked && Build.VERSION.SDK_INT >= 30 -> {
+                permAsked += "files"
+                showToast("Cerca SuriClean e accendi l'interruttore ♡")
+                pendingIntent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}"))
+            }
+            !hasUsage && "usage" !in permAsked -> {
+                permAsked += "usage"
+                showToast("Tocca SuriClean e consenti l'accesso ♡")
+                pendingIntent = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            }
+            else -> {
+                permTour = false
+                refresh()
+                if (hasFiles && hasUsage) { Chiptune.sfx(Sfx.COIN); showToast("Yatta~! Ora vedo tutte le stanze 🔑✨") }
+                else showToast("Okke~ guardo quello che posso: puoi darmi i permessi quando vuoi dalla tana")
+                if (permTourScan) { permTourScan = false; scan(Category.entries.toList()) }
+            }
+        }
+    }
 
     fun rescan(c: Category) { index = null; scan(listOf(c)) }
 
@@ -272,6 +323,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     /** Called with the result of any system screen we opened. */
     fun onSystemResult(resultOk: Boolean) {
+        if (permTour) { nextPermission(); return }
         if (cacheRequestAt > 0) {
             val quick = System.currentTimeMillis() - cacheRequestAt < 1500
             cacheRequestAt = 0
