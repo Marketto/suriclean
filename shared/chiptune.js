@@ -33,6 +33,9 @@
   let ctx = null, master = null, sfxBus = null, noiseBuf = null, waves = {};
   let mood = "menu", pending = null, step = 0, nextTime = 0, timer = null;
   let intensity = 0, muted = false, volume = 0.5;
+  // Dubstep/trap remix: half-time drums, wobble bass, trap hat rolls, echoed chiptune lead.
+  let remix = false, wob = null;
+  const GATE = "xxxxxxxx.xxxxx.x", WOB_STEPS = [4, 2, 8 / 3, 1];
 
   const midi = n => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -73,17 +76,82 @@
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   }
 
-  function kick(t) {
+  function kick(t, big) {
     const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.setValueAtTime(165, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-    g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.3);
+    o.frequency.setValueAtTime(big ? 180 : 165, t); o.frequency.exponentialRampToValueAtTime(big ? 42 : 45, t + 0.12);
+    g.gain.setValueAtTime(big ? 0.65 : 0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + (big ? 0.42 : 0.28));
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + (big ? 0.45 : 0.3));
+  }
+
+  function wobChain() {
+    if (wob) return wob;
+    const saw1 = ctx.createOscillator(), saw2 = ctx.createOscillator(), sub = ctx.createOscillator();
+    saw1.type = saw2.type = "sawtooth"; sub.type = "sine"; saw2.detune.value = 20;
+    const filt = ctx.createBiquadFilter(); filt.type = "lowpass"; filt.Q.value = 9; filt.frequency.value = 200;
+    const sawG = ctx.createGain(); sawG.gain.value = 0.16;
+    const subG = ctx.createGain(); subG.gain.value = 0.3;
+    const gate = ctx.createGain(); gate.gain.value = 0;
+    const duck = ctx.createGain(); duck.gain.value = 1;
+    saw1.connect(sawG); saw2.connect(sawG); sawG.connect(filt); filt.connect(gate); sub.connect(subG); subG.connect(gate);
+    gate.connect(duck); duck.connect(master);
+    [saw1, saw2, sub].forEach(o => o.start());
+    wob = { saw1, saw2, sub, filt, gate, duck };
+    return wob;
+  }
+
+  function dropWob() {
+    if (!wob) return;
+    const w = wob; wob = null;
+    w.gate.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+    setTimeout(() => { [w.saw1, w.saw2, w.sub].forEach(o => { try { o.stop(); } catch (e) {} }); w.duck.disconnect(); }, 300);
+  }
+
+  function heldBass(s, i) {
+    for (let k = 0; k < 32; k++) { const n = s.bass[((i - k) % s.bass.length + s.bass.length) % s.bass.length]; if (n > 0) return n; }
+    return 45;
+  }
+
+  function remixStep(s, i, t, stepDur) {
+    const w = wobChain(), bar = Math.floor(i / 16), st = i % 16;
+    const ln = s.lead[i % s.lead.length];
+    if (ln > 0) {
+      tone(null, midi(ln), t, 0.45, 0.10, master, waves[0.25]);
+      tone(null, midi(ln) * 2, t + 3 * stepDur, 0.4, 0.035, master, waves[0.125]);   // echo
+    }
+    let n = heldBass(s, i);
+    while (n > 45) n -= 12;
+    while (n < 33) n += 12;
+    const f = midi(n);
+    w.saw1.frequency.setValueAtTime(f * 2, t); w.saw2.frequency.setValueAtTime(f * 2, t); w.sub.frequency.setValueAtTime(f, t);
+    const ws = WOB_STEPS[bar % 4];
+    for (let k = 0; k <= 4; k++) {   // tempo-synced LFO on the filter cutoff
+      const pos = (((i % 48) + k / 4) % ws) / ws, lfo = 0.5 - 0.5 * Math.cos(2 * Math.PI * pos);
+      const v = 110 + 2600 * lfo * lfo, tt = t + k * stepDur / 4;
+      if (k === 0) w.filt.frequency.setValueAtTime(v, tt); else w.filt.frequency.linearRampToValueAtTime(v, tt);
+    }
+    w.gate.gain.setTargetAtTime(GATE[st] === "x" ? 1 : 0, t, 0.012);
+    const fill = bar % 4 === 3 && st >= 12, roll = bar % 2 === 1 && st >= 12 && !fill;
+    if (st === 0 || st === 10 || (bar % 2 === 1 && st === 3)) {
+      kick(t, true);
+      w.duck.gain.setValueAtTime(0.35, t); w.duck.gain.setTargetAtTime(1, t + 0.01, 0.09);
+    } else if (st === 8 || fill) {
+      noise(t, 0.32, 0.24, 900); tone("triangle", 185, t, 0.12, 0.22);
+    } else if (st % 2 === 0 || roll) {
+      noise(t, 0.03, 0.045, 8000);
+      if (roll) noise(t + stepDur / 2, 0.03, 0.04, 8000);
+    }
   }
 
   function schedule() {
     while (nextTime < ctx.currentTime + 0.12) {
       if (pending) { mood = pending; pending = null; step = 0; }
       const s = SONGS[mood];
+      if (remix) {
+        const stepDur = 60 / (Math.min(150, Math.max(132, s.bpm * 1.15)) * (1 + intensity * 0.08)) / 4;
+        remixStep(s, step, nextTime, stepDur);
+        nextTime += stepDur; step++;
+        continue;
+      }
       const stepDur = 60 / (s.bpm * (1 + intensity * 0.3)) / 4;
       const t = nextTime;
       const ln = s.lead[step % s.lead.length];
@@ -112,7 +180,12 @@
     timer = setInterval(schedule, 25);
   }
 
-  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } if (ctx) dropWob(); }
+
+  function setRemix(on) {
+    remix = !!on;
+    if (!remix && ctx) dropWob();
+  }
 
   function setMood(m) { if (SONGS[m] && m !== (pending || mood)) pending = m; }
   function getMood() { return pending || mood; }
@@ -150,5 +223,5 @@
     }
   }
 
-  window.Chiptune = { start, stop, setMood, getMood, setIntensity, setMuted, sfx, get muted() { return muted; }, get running() { return !!timer; } };
+  window.Chiptune = { start, stop, setMood, setRemix, get remix() { return remix; }, getMood, setIntensity, setMuted, sfx, get muted() { return muted; }, get running() { return !!timer; } };
 })();

@@ -81,6 +81,17 @@ final class SynthState {
     var volume: Double = 0.5
     var sfxKind: Int = 0
     var sfxReset = false
+    /// Dubstep/trap remix: half-time drums, wobble bass, trap hat rolls, echoed chiptune lead.
+    var remix = false
+
+    // remix voices
+    private var wobFreq = 55.0, wobPhase = 0.0, wobPhase2 = 0.0, subPhase = 0.0
+    private var svfLow = 0.0, svfBand = 0.0
+    private var gate = 0.0, gateTarget = 0.0, wobSteps = 2.0
+    private var echoFreq = 0.0, echoAmp = 0.0, echoPhase = 0.0
+    private var echoQueue = [0, 0, 0, 0]
+    private var kickAge = 1.0
+    private var rollPending = false
 
     private var sampleRate: Double = 44_100
     private var song: Song = Songs.menu
@@ -118,6 +129,7 @@ final class SynthState {
             stepIndex += 1
         }
         let i = stepIndex
+        if remix { advanceRemix(i); return }
         let ln = song.lead[i % song.lead.count]
         if ln > 0 { leadFreq = SynthState.midi(ln); leadAmp = 1; vibT = 0 }
         let bn = song.bass[i % song.bass.count]
@@ -130,8 +142,109 @@ final class SynthState {
         }
     }
 
+    /// Root of the chord playing at step i (last bass note at or before it).
+    private func heldBass(_ i: Int) -> Int {
+        for k in 0..<32 {
+            let n = song.bass[((i - k) % song.bass.count + song.bass.count) % song.bass.count]
+            if n > 0 { return n }
+        }
+        return 45
+    }
+
+    private var remixBpm: Double { min(150, max(132, song.bpm * 1.15)) * (1 + intensity * 0.08) }
+
+    private func advanceRemix(_ i: Int) {
+        let bar = i / 16, st = i % 16
+        // lead + echo three 16ths later
+        let echo = echoQueue[i % 4]
+        echoQueue[i % 4] = 0
+        if echo > 0 { echoFreq = SynthState.midi(echo); echoAmp = 0.45 }
+        let ln = song.lead[i % song.lead.count]
+        if ln > 0 { leadFreq = SynthState.midi(ln); leadAmp = 1; vibT = 0; echoQueue[(i + 3) % 4] = ln }
+        // wobble bass on the chord root
+        var n = heldBass(i)
+        while n > 45 { n -= 12 }
+        while n < 33 { n += 12 }
+        wobFreq = SynthState.midi(n)
+        wobSteps = [4.0, 2.0, 8.0 / 3.0, 1.0][bar % 4]
+        gateTarget = Array("xxxxxxxx.xxxxx.x".utf8)[st] == UInt8(ascii: "x") ? 1 : 0
+        // half-time drums with trap rolls
+        let fill = bar % 4 == 3 && st >= 12
+        let roll = bar % 2 == 1 && st >= 12 && !fill
+        if st == 0 || st == 10 || (bar % 2 == 1 && st == 3) {
+            drumKind = 1; drumT = 0; kickPhase = 0; kickAge = 0
+        } else if st == 8 || fill {
+            drumKind = 4; drumT = 0
+        } else if st % 2 == 0 || roll {
+            drumKind = 3; drumT = 0
+            rollPending = roll
+        }
+    }
+
+    private func nextRemix(_ dt: Double, stepLen: Double) -> Double {
+        if rollPending && stepPos >= stepLen / 2 { rollPending = false; drumKind = 3; drumT = 0 }
+        var out = 0.0
+        kickAge += dt
+        let duck = 1 - 0.65 * exp(-kickAge * 9)
+        // wobble: two detuned saws through a resonant low-pass whose cutoff follows a tempo-synced LFO
+        let pos = ((Double(stepIndex % 48) + stepPos / stepLen).truncatingRemainder(dividingBy: wobSteps)) / wobSteps
+        let lfo = 0.5 - 0.5 * cos(2 * Double.pi * pos)
+        let cutoff = 110 + 2600 * lfo * lfo
+        wobPhase += wobFreq * 2 * dt; wobPhase -= floor(wobPhase)
+        wobPhase2 += wobFreq * 2.012 * dt; wobPhase2 -= floor(wobPhase2)
+        let saw = (wobPhase * 2 - 1) + (wobPhase2 * 2 - 1)
+        let f = 2 * sin(Double.pi * min(cutoff, sampleRate / 6) / sampleRate)
+        svfLow += f * svfBand
+        let high = saw - svfLow - 0.28 * svfBand
+        svfBand += f * high
+        gate += (gateTarget - gate) * 0.004
+        subPhase += wobFreq * dt; subPhase -= floor(subPhase)
+        out += (max(-1.5, min(1.5, svfLow)) * 0.22 + sin(2 * Double.pi * subPhase) * 0.22) * gate * duck
+        // chiptune lead and its echo
+        if leadAmp > 0.001 {
+            vibT += dt
+            let vib = vibT > 0.12 ? sin(vibT * 2 * Double.pi * 7) * 0.008 : 0
+            leadPhase += leadFreq * (1 + vib) * dt; leadPhase -= floor(leadPhase)
+            out += (leadPhase < 0.25 ? 1.0 : -1.0) * leadAmp * 0.13 * (0.55 + 0.45 * duck)
+            leadAmp *= leadDecay
+        }
+        if echoAmp > 0.001 {
+            echoPhase += echoFreq * 2 * dt; echoPhase -= floor(echoPhase)
+            out += (echoPhase < 0.125 ? 1.0 : -1.0) * echoAmp * 0.07
+            echoAmp *= leadDecay
+        }
+        if drumKind != 0 {
+            drumT += dt
+            switch drumKind {
+            case 1:
+                let fr = 42 + 140 * exp(-drumT * 26)
+                kickPhase += fr * dt
+                out += sin(2 * Double.pi * kickPhase) * exp(-drumT * 9) * 0.6
+                if drumT > 0.4 { drumKind = 0 }
+            case 4:
+                kickPhase += 185 * dt
+                out += (noise() * exp(-drumT * 13) * 0.26 + sin(2 * Double.pi * kickPhase) * exp(-drumT * 30) * 0.22)
+                if drumT > 0.35 { drumKind = 0 }
+            default:
+                out += noise() * exp(-drumT * 90) * 0.05
+                if drumT > 0.05 { drumKind = 0 }
+            }
+        }
+        return out
+    }
+
     func next() -> Float {
         let dt = 1.0 / sampleRate
+        if remix {
+            let stepLen = sampleRate * 60 / remixBpm / 4
+            if stepPos >= stepLen { stepPos = 0; advanceStep() }
+            stepPos += 1
+            var out = nextRemix(dt, stepLen: stepLen) * volume
+            if sfxReset { sfxReset = false; sfxT = 0; sfxPhase = 0; sfxLP = 0 }
+            if sfxKind != 0 { out += sfx(dt) }
+            if muted { return 0 }
+            return Float(max(-1, min(1, out)))
+        }
         let bpm = song.bpm * (1 + intensity * 0.3)
         let stepLen = sampleRate * 60 / bpm / 4
         if stepPos >= stepLen { stepPos = 0; advanceStep() }
@@ -277,6 +390,11 @@ final class Chiptune {
     var muted: Bool {
         get { synth.muted }
         set { synth.muted = newValue }
+    }
+
+    var remix: Bool {
+        get { synth.remix }
+        set { synth.remix = newValue }
     }
 
     func sfx(_ e: SFX) {

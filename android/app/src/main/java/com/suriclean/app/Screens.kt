@@ -101,6 +101,7 @@ private fun TopBar(vm: AppVM) {
             KText("スリちゃん · spazzina kawaii", 10.sp, bold = false, alpha = 0.55f)
         }
         vm.update?.let { u -> BubblyButton("✨ ${u.version}", Kawaii.hot) { vm.installUpdate() } }
+        KText("🎧", 20.sp, alpha = if (vm.remix) 1f else 0.35f, modifier = Modifier.clickable { vm.toggleRemix() }.padding(6.dp))
         KText(if (vm.muted) "🔇" else "🎵", 22.sp, modifier = Modifier.clickable { vm.toggleMute() }.padding(8.dp))
     }
 }

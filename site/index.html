@@ -61,6 +61,8 @@
 
   .music { position: fixed; right: 18px; bottom: 18px; z-index: 5; border: 0; font-family: inherit; font-weight: 900; font-size: 15px; background: #fff; color: var(--cocoa); padding: 12px 18px; border-radius: 99px; box-shadow: 0 5px 0 rgba(255,128,168,.45); cursor: pointer; display: flex; gap: 8px; align-items: center; transition: transform .2s cubic-bezier(.3,1.7,.5,1); }
   .music:hover { transform: scale(1.07) rotate(-2deg); }
+  .music.remix { right: auto; left: 18px; box-shadow: 0 5px 0 rgba(168,143,250,.45); }
+  .music.remix.on { background: #A88FFA; color: #fff; }
   .music .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
   .music .eq i { width: 4px; background: var(--pink); border-radius: 2px; height: 30%; }
   .music.on .eq i { animation: eq .5s ease-in-out infinite alternate; }
@@ -166,6 +168,7 @@
 </div>
 
 <button class="music" id="music"><span class="eq"><i></i><i></i><i></i></span><span id="music-label">♪ Accendi la musica</span></button>
+<button class="music remix" id="remix" title="Versione remix: dubstep/trap con basso wobble">🎧 <span id="remix-label">Remix</span></button>
 
 <script src="suri.js"></script>
 <script src="chiptune.js"></script>
@@ -245,6 +248,14 @@
     if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(false); Chiptune.setMood(SHOW[k][2]); btn.classList.add("on"); label.textContent = "♪ Pikopiko ON"; }
     else if (Chiptune.muted) { Chiptune.setMuted(false); btn.classList.add("on"); label.textContent = "♪ Pikopiko ON"; }
     else { Chiptune.setMuted(true); btn.classList.remove("on"); label.textContent = "♪ Accendi la musica"; }
+  });
+  const rbtn = document.getElementById("remix");
+  rbtn.addEventListener("click", () => {
+    const on = !Chiptune.remix;
+    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMood(SHOW[k][2]); }
+    Chiptune.setRemix(on); Chiptune.setMuted(false);
+    rbtn.classList.toggle("on", on); document.getElementById("remix-label").textContent = on ? "Remix ON" : "Remix";
+    btn.classList.add("on"); label.textContent = "♪ Pikopiko ON";
   });
   document.querySelectorAll(".dl, .feat").forEach(el => el.addEventListener("mouseenter", () => Chiptune.running && Chiptune.sfx("blip")));
   document.querySelectorAll(".dl").forEach(el => el.addEventListener("click", () => {

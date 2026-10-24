@@ -23,6 +23,7 @@ struct SuriCleanApp: App {
                 Button("Torna alla tana") { model.open(nil) }.keyboardShortcut("0")
                 Button("Controlla aggiornamenti…") { Task { await model.checkForUpdates(manual: true) } }
                 Button(model.muted ? "Attiva musica" : "Silenzia musica") { model.muted.toggle() }.keyboardShortcut("m")
+                Button(model.remix ? "Musica originale" : "Musica remix 🎧") { model.remix.toggle() }.keyboardShortcut("m", modifiers: [.command, .shift])
                 Divider()
                 Button("Svuota il Cestino…") { model.askEmptyTrash = true }
             }
@@ -157,6 +158,15 @@ struct Sidebar: View {
                 .buttonStyle(.plain)
                 .opacity(0.7)
                 Spacer()
+                Button(action: { model.remix.toggle(); if model.muted { model.muted = false }; Chiptune.shared.sfx(.pop) }) {
+                    Text(model.remix ? "🎧 Remix ON" : "🎧 Remix")
+                        .font(Theme.font(11, .heavy))
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Capsule().fill(model.remix ? Theme.pink.opacity(0.85) : Color.white.opacity(0.6)))
+                        .foregroundColor(model.remix ? .white : Theme.cocoa)
+                }
+                .buttonStyle(.plain)
+                .help("Versione remix: dubstep/trap con basso wobble")
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 10)
