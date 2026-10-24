@@ -31,10 +31,10 @@ class StorageIndex(
     val emptyDirs: List<File>,
     val junkFiles: List<File>,
     val thumbDirs: List<File>,
-    val trashed: List<File> = emptyList(),      // .trashed-* / old .pending-* left by MediaStore
     val dirSizes: Map<String, Long>,             // folders down to 4 levels
     val total: Long,
     val built: Long = System.currentTimeMillis(),
+    val trashed: List<File> = emptyList(),      // .trashed-* / old .pending-* left by MediaStore
 ) {
     val stale get() = System.currentTimeMillis() - built > 15 * 60_000
 
