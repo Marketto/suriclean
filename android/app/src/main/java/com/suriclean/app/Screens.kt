@@ -307,6 +307,7 @@ private fun Detail(vm: AppVM, c: Category) {
     var tree by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable(c) { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
     var expanded by remember(c) { mutableStateOf(setOf<String>()) }
     val all = vm.items(c)
     val list = all.filter { query.isEmpty() || it.name.contains(query, true) || it.detail.contains(query, true) }.let { l ->
@@ -374,7 +375,11 @@ private fun Detail(vm: AppVM, c: Category) {
                     KText("${sel.size} selezionati", 11.sp, alpha = 0.6f)
                     KText(Fs.bytes(vm.total(sel)), 19.sp, color = c.color.darker())
                 }
-                BubblyButton(if (c == Category.APPS) "🗑️ Disinstalla ☆" else "🧹 Spazza via! ☆", Kawaii.coral, big = true, enabled = sel.isNotEmpty() && vm.busy == null) { confirm = true }
+                if (c == Category.APPS) {
+                    BubblyButton("🧽 Cancella dati", Kawaii.sky, enabled = sel.isNotEmpty() && vm.busy == null) { confirmClear = true }
+                    Spacer(Modifier.width(6.dp))
+                }
+                BubblyButton(if (c == Category.APPS) "🗑️ Disinstalla" else "🧹 Spazza via! ☆", Kawaii.coral, big = c != Category.APPS, enabled = sel.isNotEmpty() && vm.busy == null) { confirm = true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BubblyButton("Consigliati", Kawaii.mint) { vm.selRecommended(c) }
@@ -382,6 +387,16 @@ private fun Detail(vm: AppVM, c: Category) {
                 BubblyButton("Nessuno", Kawaii.lilac) { vm.setSel(all.map { it.id }, false) }
             }
         }
+    }
+    if (confirmClear) {
+        val ctx = LocalContext.current
+        val oneGo = ShizukuBridge.running()
+        ConfirmDialog("Cancellare i dati di ${sel.size} app?",
+            "Le app restano installate ma tornano come appena scaricate: perdi accessi, impostazioni e tutto ciò che non è salvato online (per esempio le chat senza backup). " +
+            (if (oneGo) "Con Shizuku faccio tutto io in un colpo ✨"
+             else "Android non lascia farlo direttamente alle app: apro io la scheda di ognuna, tu tocca «Archiviazione › Cancella dati» e torna indietro. " +
+                  (if (ShizukuBridge.installed(ctx)) "Avvia Shizuku per farlo in un colpo solo." else "Con l'app gratuita Shizuku lo farei in un colpo solo.")),
+            "Sì, cancella 🧽", onDismiss = { confirmClear = false }) { confirmClear = false; vm.clearAppData() }
     }
     if (confirm) ConfirmDialog(
         if (c == Category.APPS) "Disinstallare ${sel.size} app?" else "Spostare nel Cestino di Suri?",

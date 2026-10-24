@@ -55,6 +55,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     /** Package names waiting for the system uninstall dialog. */
     val uninstallQueue = ArrayDeque<String>()
+    /** Apps whose settings page we still have to open for «Cancella dati» (no Shizuku). */
+    private val clearQueue = ArrayDeque<Pair<String, String>>()
+    private var clearGuided = false
+    private var clearTotal = 0
     var pendingIntent by mutableStateOf<Intent?>(null)
     var breakdown by mutableStateOf<List<Slice>>(emptyList())
     /** Set when the «clear all caches» screen is opened, to detect phones that refuse it. */
@@ -347,6 +351,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch { delay(800); refresh(); if (results[Category.APPS] != null) rescan(Category.APPS) }
             return
         }
+        if (clearGuided) { nextClear(); return }
         if (uninstallQueue.isNotEmpty()) nextUninstall() else {
             refresh()
             if (results[Category.APPS] != null && busy == null) scan(listOf(Category.APPS))
@@ -357,6 +362,90 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         Chiptune.sfx(Sfx.POP)
         pendingIntent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
     }
+
+    // ───────── clear app data ─────────
+
+    /** Wipes the data of the selected apps: in one go with Shizuku, otherwise app page after app page. */
+    fun clearAppData() {
+        if (busy != null) return
+        val apps = selected(Category.APPS).filter { it.packageName != null }
+        if (apps.isEmpty()) return
+        if (ShizukuBridge.running()) {
+            ShizukuBridge.request { ok ->
+                viewModelScope.launch(Dispatchers.Main) {
+                    if (ok) clearWithShizuku(apps)
+                    else { showToast("Shizuku non ha dato il permesso: faccio una scheda alla volta ♡"); clearGuidedStart(apps) }
+                }
+            }
+        } else {
+            if (ShizukuBridge.installed(ctx)) showToast("Shizuku è installato ma spento: avvialo per fare tutto in un colpo. Intanto una scheda alla volta ♡")
+            clearGuidedStart(apps)
+        }
+    }
+
+    private fun clearWithShizuku(apps: List<Item>) {
+        busy = Busy(Act.SWEEPING, "Suri svuota i dati di ${apps.size} app… 🧽", progress = 0f)
+        Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
+        viewModelScope.launch {
+            var bytes = 0L
+            val failed = ArrayList<String>()
+            for ((k, a) in apps.withIndex()) {
+                busy = busy?.copy(detail = a.name, progress = k.toFloat() / apps.size)
+                val ok = withContext(Dispatchers.IO) { ShizukuBridge.clearData(a.packageName!!) }
+                if (ok) { bytes += dataBytes(a); Chiptune.sfx(Sfx.COIN) } else failed += a.name
+            }
+            busy = null
+            freed += bytes; prefs.edit().putLong("freed", freed).apply()
+            selection = selection - apps.map { it.id }.toSet()
+            refresh()
+            celebrate(Celebration(
+                if (failed.size < apps.size) "Pika-pika! Dati svuotati ✨" else "Ehh… gomen! 🙈",
+                if (failed.size < apps.size) "${apps.size - failed.size} app come appena installate, circa ${Fs.bytes(bytes)} liberati" else "Android non mi ha lasciato svuotare niente",
+                if (failed.isNotEmpty()) "Non svuotate: ${failed.take(3).joinToString()}${if (failed.size > 3) "…" else ""}" else ""))
+            delay(600)
+            rescan(Category.APPS)
+        }
+    }
+
+    /** The data part of an app's size (total minus the program itself), from the badge we computed. */
+    private fun dataBytes(a: Item): Long {
+        val b = a.badges.firstOrNull { it.startsWith("📦 app") } ?: return a.size
+        val appPart = b.substringAfter("📦 app ").substringBefore(" ·")
+        return (a.size - parseBytes(appPart)).coerceAtLeast(0)
+    }
+
+    private fun parseBytes(s: String): Long {
+        val parts = s.trim().split(" ")
+        val n = parts.getOrNull(0)?.replace(",", ".")?.toDoubleOrNull() ?: return 0
+        val mult = when (parts.getOrNull(1)?.uppercase()) { "KB" -> 1e3; "MB" -> 1e6; "GB" -> 1e9; "TB" -> 1e12; else -> 1.0 }
+        return (n * mult).toLong()
+    }
+
+    private fun clearGuidedStart(apps: List<Item>) {
+        clearQueue.clear()
+        apps.forEach { clearQueue.add(it.packageName!! to it.name) }
+        clearTotal = apps.size
+        clearGuided = true
+        selection = selection - apps.map { it.id }.toSet()
+        nextClear()
+    }
+
+    private fun nextClear() {
+        val next = clearQueue.removeFirstOrNull()
+        if (next == null) {
+            clearGuided = false
+            refresh()
+            showToast("Fatto! Rimisuro le app ♡")
+            viewModelScope.launch { delay(500); rescan(Category.APPS) }
+            return
+        }
+        val n = clearTotal - clearQueue.size
+        // a system toast stays visible on top of the Settings app
+        android.widget.Toast.makeText(ctx, "🐾 $n di $clearTotal · ${next.second}\nArchiviazione › Cancella dati, poi torna indietro", android.widget.Toast.LENGTH_LONG).show()
+        pendingIntent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${next.first}"))
+    }
+
+    fun stopClearing() { clearQueue.clear(); clearGuided = false }
 
     private fun uninstall(apps: List<Item>) {
         uninstallQueue.clear()
