@@ -3,16 +3,16 @@ import SwiftUI
 enum Quips {
     static func list(_ a: MeerkatActivity) -> [String] {
         switch a {
-        case .digging: return ["Hori-hori! Scavo scavo~ 🕳️", "Ooh! Qui sotto c'è qualcosa di ciccione!", "Zampette turbo attivate ☆", "Sniff… odore di file giganti!"]
-        case .detective: return ["Hmm~ questi due sono gemellini! 🔍", "Confronto le impronte SHA-256, kira!", "Elementare, mio caro Mac ♡", "Nessun gemello sfugge a Suri-chan!"]
-        case .sweeping: return ["Saa~ spazza spazza! 🧹", "Bye-bye polverina digitale!", "Pika-pika, tutto lucido ✨", "Che soddisfazione, kyaa~!"]
-        case .reading: return ["Leggo i diari segreti dei repo 📜", "Eeh?! Ultimo commit… secoli fa!", "Tutto pushato? Controllo bene ♡", "git log, git status, git… nyaa~"]
-        case .sleepy: return ["Shh~ le app fanno la nanna 💤", "Questa dorme dal Pleistocene!", "Una pecorella, due pecorelle… ☁️"]
-        case .hacking: return ["Bip-bup! Annuso i file dei robot 🤖", "Claude e Codex lasciano briciole~", "Modelli AI in vista, sugoi!", "01101110 = «nyam» ♡"]
-        case .sniffing: return ["Kun-kun! Sento le cache 👃", "Profumino di file temporanei~", "Briciole ovunque, waa!", "Odore di app dimenticata…"]
-        case .lookout: return ["Sentinella Suri, pronta! 👀", "Download antichi all'orizzonte!", "Dalla collinetta vedo tutto ☆"]
-        case .celebrating: return ["Yatta~! 🎉"]
-        case .idle, .wave: return ["Eccomi!"]
+        case .digging: return [t("mac.quip.digging.1"), t("mac.quip.digging.2"), t("mac.quip.digging.3"), t("mac.quip.digging.4")]
+        case .detective: return [t("mac.quip.detective.1"), t("mac.quip.detective.2"), t("mac.quip.detective.3"), t("mac.quip.detective.4")]
+        case .sweeping: return [t("mac.quip.sweeping.1"), t("mac.quip.sweeping.2"), t("mac.quip.sweeping.3"), t("mac.quip.sweeping.4")]
+        case .reading: return [t("mac.quip.reading.1"), t("mac.quip.reading.2"), t("mac.quip.reading.3"), t("mac.quip.reading.4")]
+        case .sleepy: return [t("mac.quip.sleepy.1"), t("mac.quip.sleepy.2"), t("mac.quip.sleepy.3")]
+        case .hacking: return [t("mac.quip.hacking.1"), t("mac.quip.hacking.2"), t("mac.quip.hacking.3"), t("mac.quip.hacking.4")]
+        case .sniffing: return [t("mac.quip.sniffing.1"), t("mac.quip.sniffing.2"), t("mac.quip.sniffing.3"), t("mac.quip.sniffing.4")]
+        case .lookout: return [t("mac.quip.lookout.1"), t("mac.quip.lookout.2"), t("mac.quip.lookout.3")]
+        case .celebrating: return [t("mac.quip.celebrating.1")]
+        case .idle, .wave: return [t("mac.quip.idle.1")]
         }
     }
 }
@@ -43,15 +43,15 @@ struct LoadingOverlay: View {
                     .opacity(0.55)
                 if state.foundCount > 0 {
                     HStack(spacing: 6) {
-                        Text("Bottino ☆").font(Theme.font(13, .bold)).opacity(0.6)
+                        Text(t("mac.busy.loot")).font(Theme.font(13, .bold)).opacity(0.6)
                         AnimatedBytes(value: state.foundBytes).font(Theme.font(16, .heavy)).foregroundColor(Theme.mint.darker)
-                        Text("· \(state.foundCount) elementi").font(Theme.font(13, .bold)).opacity(0.6)
+                        Text(t("mac.zone.count", state.foundCount)).font(Theme.font(13, .bold)).opacity(0.6)
                     }
                 }
                 if state.steps > 1 {
-                    Text("Zona \(state.step + 1) di \(state.steps)").font(Theme.font(11.5, .bold)).opacity(0.45)
+                    Text(t("mac.busy.zone", state.step + 1, state.steps)).font(Theme.font(11.5, .bold)).opacity(0.45)
                 }
-                Button("Annulla") { model.cancel() }
+                Button(t("mac.common.cancel")) { model.cancel() }
                     .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
             }
             .padding(30)
@@ -80,17 +80,17 @@ struct CelebrationOverlay: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if c.kind == .trashed && c.bytes > 0 {
-                    Text("Psst~ lo spazio torna libero davvero quando svuoti il Cestino ♡")
+                    Text(t("mac.cele.psst"))
                         .font(Theme.font(12.5, .semibold)).foregroundColor(Theme.coral.darker)
                 }
                 HStack(spacing: 12) {
                     if c.kind == .trashed && model.trashSize > 0 {
                         Button(action: { model.askEmptyTrash = true }) {
-                            Label("Svuota il Cestino", systemImage: "trash.fill")
+                            Label(t("mac.cele.empty"), systemImage: "trash.fill")
                         }
                         .buttonStyle(BubblyButtonStyle(color: Theme.coral, big: true))
                     }
-                    Button("Arigatō! ♡") { model.dismissCelebration() }
+                    Button(t("mac.cele.thanks")) { model.dismissCelebration() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.mint, big: true))
                 }
                 .padding(.top, 6)
@@ -103,17 +103,17 @@ struct CelebrationOverlay: View {
 
     private var title: String {
         switch c.kind {
-        case .trashed: return c.bytes > 0 ? "Yatta~!! 🎉" : "Ehh… gomen! 🙈"
-        case .emptied: return "Pika-pika! Cestino vuoto ✨"
-        case .info: return "Sugoi! Fatto 🌟"
+        case .trashed: return c.bytes > 0 ? t("mac.cele.yatta") : t("mac.cele.gomen")
+        case .emptied: return t("mac.cele.emptied")
+        case .info: return t("mac.cele.info")
         }
     }
 
     private var subtitle: String {
         switch c.kind {
-        case .trashed: return c.bytes > 0 ? "Ho spedito \(Fmt.bytes(c.bytes)) nel Cestino ☆" : "Non sono riuscita a spostare niente, scusa~"
-        case .emptied: return "Hai recuperato \(Fmt.bytes(c.bytes)) di spazio vero! Sugoi~ ♡"
-        case .info: return "Spazio recuperato: \(Fmt.bytes(c.bytes))"
+        case .trashed: return c.bytes > 0 ? t("mac.cele.sent", Fmt.bytes(c.bytes)) : t("mac.cele.nothing")
+        case .emptied: return t("mac.cele.recovered", Fmt.bytes(c.bytes))
+        case .info: return t("mac.cele.space", Fmt.bytes(c.bytes))
         }
     }
 }

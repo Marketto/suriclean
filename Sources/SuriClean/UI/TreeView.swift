@@ -100,9 +100,9 @@ struct TreeListView: View {
         let maxSize = max(roots.map { $0.size }.max() ?? 1, 1)
         LazyVStack(spacing: 4) {
             HStack(spacing: 8) {
-                Button("Espandi tutto ▾") { withAnimation(.spring(response: 0.35)) { expanded = allIDs(roots) }; Chiptune.shared.sfx(.pop) }
+                Button(t("mac.tree.expand")) { withAnimation(.spring(response: 0.35)) { expanded = allIDs(roots) }; Chiptune.shared.sfx(.pop) }
                     .buttonStyle(BubblyButtonStyle(color: Theme.sky))
-                Button("Chiudi tutto ▸") { withAnimation(.spring(response: 0.35)) { expanded = [] }; Chiptune.shared.sfx(.pop) }
+                Button(t("mac.tree.collapse")) { withAnimation(.spring(response: 0.35)) { expanded = [] }; Chiptune.shared.sfx(.pop) }
                     .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
                 Spacer()
             }
@@ -196,7 +196,7 @@ struct TreeRowView: View {
                     if let it = node.item {
                         ForEach(it.badges, id: \.self) { Pill(text: $0, color: color) }
                     } else {
-                        Pill(text: "\(node.itemIDs.count) elementi", color: color)
+                        Pill(text: t("mac.tree.count", node.itemIDs.count), color: color)
                     }
                 }
                 if let it = node.item, depth == 0 || !node.children.isEmpty {
@@ -214,12 +214,12 @@ struct TreeRowView: View {
                 RoundIconButton(symbol: "magnifyingglass", color: color.darker) {
                     NSWorkspace.shared.activateFileViewerSelecting([it.url])
                 }
-                .help("Mostra nel Finder")
+                .help(t("mac.reveal"))
             } else {
                 RoundIconButton(symbol: "folder", color: color.darker) {
                     NSWorkspace.shared.open(URL(fileURLWithPath: node.id))
                 }
-                .help("Apri la cartella")
+                .help(t("mac.tree.open"))
             }
         }
         .padding(.horizontal, 12)

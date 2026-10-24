@@ -11,12 +11,12 @@ struct PasswordOverlay: View {
             Color.black.opacity(0.28).ignoresSafeArea()
             VStack(spacing: 12) {
                 MeerkatView(activity: .lookout, size: 110)
-                Text("Password da amministratore 🔐").font(Theme.font(19, .heavy))
+                Text(t("mac.pw.title")).font(Theme.font(19, .heavy))
                 Text(prompt.reason).font(Theme.font(13, .bold)).opacity(0.8).multilineTextAlignment(.center)
-                Text("La chiedo io e non la finestra di macOS perché solo così i comandi da amministratore possono usare l'«Accesso completo al disco» di SuriClean. Resta solo in memoria per 15 minuti, non viene salvata né inviata.")
+                Text(t("mac.pw.why"))
                     .font(Theme.font(11.5, .medium)).opacity(0.6).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                SecureField("Password di \(NSFullUserName())", text: $pw, onCommit: { model.submitPassword(pw) })
+                SecureField(t("mac.pw.field", NSFullUserName()), text: $pw, onCommit: { model.submitPassword(pw) })
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 14))
                     .frame(width: 300)
@@ -25,9 +25,9 @@ struct PasswordOverlay: View {
                     Text(e).font(Theme.font(12, .heavy)).foregroundColor(Theme.coral)
                 }
                 HStack(spacing: 10) {
-                    Button("Annulla") { model.cancelPassword() }
+                    Button(t("mac.common.cancel")) { model.cancelPassword() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
-                    Button(prompt.checking ? "Controllo…" : "Continua ☆") { model.submitPassword(pw) }
+                    Button(prompt.checking ? t("mac.pw.checking") : t("mac.common.continue")) { model.submitPassword(pw) }
                         .buttonStyle(BubblyButtonStyle(color: Theme.mint))
                         .disabled(pw.isEmpty || prompt.checking)
                 }

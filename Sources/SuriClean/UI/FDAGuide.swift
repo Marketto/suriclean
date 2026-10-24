@@ -11,26 +11,26 @@ struct FDAGuide: View {
     var body: some View {
         VStack(spacing: 14) {
             MeerkatView(activity: granted ? .celebrating : .wave, size: 120)
-            Text(granted ? "Yatta~! Ora ho le chiavi di casa 🔑✨" : "Onegai~! Mi apri tutte le stanze? 🙏")
+            Text(granted ? t("mac.fdag.yes") : t("mac.fdag.ask"))
                 .font(Theme.font(20, .heavy))
             Text(granted
-                 ? "Ora vedo anche Scrivania, Documenti, Download, Cestini, Mail, Messaggi e le cartelle degli altri utenti. Se qualcosa resta chiuso, riavviami: macOS a volte lo applica solo alla riapertura."
-                 : "Per misurare tutto il disco macOS vuole che tu mi dia l'«Accesso completo al disco». Non può chiederlo con un semplice Sì/No: si fa una volta in Impostazioni, e io mi accorgo da sola quando è fatto.")
+                 ? t("mac.fdag.yes.text")
+                 : t("mac.fdag.ask.text"))
                 .font(Theme.font(13, .medium)).opacity(0.75).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !granted {
                 VStack(alignment: .leading, spacing: 10) {
-                    step(1, "Apri le Impostazioni", "Si apre Privacy › Accesso completo al disco.") {
-                        Button("Apri Impostazioni") { model.openFDASettings() }
+                    step(1, t("mac.fdag.s1"), t("mac.fdag.s1.text")) {
+                        Button(t("mac.fdag.open")) { model.openFDASettings() }
                             .buttonStyle(BubblyButtonStyle(color: Theme.orange))
                     }
-                    step(2, "Sblocca il lucchetto 🔒", "In basso a sinistra, con la tua password.") { EmptyView() }
-                    step(3, "Aggiungi SuriClean", "Premi «+» e scegli SuriClean in Applicazioni, oppure trascina l'icona dal Finder nell'elenco. Se c'è già con la spunta, toglila con «–» e riaggiungila: era della versione vecchia.") {
-                        Button("Mostra nel Finder") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
+                    step(2, t("mac.fdag.s2"), t("mac.fdag.s2.text")) { EmptyView() }
+                    step(3, t("mac.fdag.s3"), t("mac.fdag.s3.text")) {
+                        Button(t("mac.reveal")) { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
                             .buttonStyle(BubblyButtonStyle(color: Theme.sky))
                     }
-                    step(4, "Torna qui", "Appena macOS me lo concede lo vedo da sola ♡ Se ti chiede «Esci e riapri», va benissimo.") { EmptyView() }
+                    step(4, t("mac.fdag.s4"), t("mac.fdag.s4.text")) { EmptyView() }
                 }
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.7)))
@@ -38,14 +38,14 @@ struct FDAGuide: View {
 
             HStack(spacing: 10) {
                 if granted {
-                    Button("Continua ☆") { model.fdaGrantedContinue() }
+                    Button(t("mac.common.continue")) { model.fdaGrantedContinue() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
-                    Button("🔄 Riavvia SuriClean") { model.relaunch() }
+                    Button(t("mac.fdag.relaunch")) { model.relaunch() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.mint, big: true))
                 } else {
-                    Button("Non ora") { model.fdaGuideDismissed() }
+                    Button(t("mac.fdag.notnow")) { model.fdaGuideDismissed() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
-                    Button("L'ho fatto, riavviami") { model.relaunch() }
+                    Button(t("mac.fdag.done")) { model.relaunch() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.mint))
                 }
             }

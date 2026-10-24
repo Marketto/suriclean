@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -94,53 +94,58 @@
   .marquee { overflow: hidden; white-space: nowrap; background: var(--lemon); font-weight: 900; padding: 10px 0; transform: rotate(-1.5deg); margin: 10px -20px; }
   .marquee div { display: inline-block; animation: marquee 22s linear infinite; }
   @keyframes marquee { to { transform: translateX(-50%); } }
+  .lang { position: fixed; top: 46px; right: 14px; z-index: 6; background: #fff; border-radius: 99px; padding: 6px 12px; font-weight: 900; font-size: 13px; box-shadow: 0 4px 0 rgba(255,128,168,.4); cursor: pointer; }
+  .lang select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  [dir="rtl"] .lang { right: auto; left: 14px; }
+  [dir="rtl"] .speech { right: auto; left: 0; }
   @media (max-width: 860px) { header.hero { grid-template-columns: 1fr; } .steps, .safe { grid-template-columns: 1fr; } .suri-stage { height: 380px; } }
 </style>
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
-<div class="ribbon">☆ NUOVO <b>新発売</b> Gratis per Mac · Windows · Ubuntu · Android ☆</div>
+<div class="ribbon" data-i18n-html="site.ribbon_html"></div>
+<label class="lang" id="lang">🌐 <span id="lang-name"></span><select id="lang-select"></select></label>
 
 <div class="wrap">
   <header class="hero">
     <div>
-      <div class="burst"><svg viewBox="0 0 108 108"><polygon fill="#FF5A82" points="54,0 62,16 79,7 80,26 99,24 92,42 108,54 92,66 99,84 80,82 79,101 62,92 54,108 46,92 29,101 28,82 9,84 16,66 0,54 16,42 9,24 28,26 29,7 46,16"/></svg><span>GRATIS<small>無料!</small></span></div>
+      <div class="burst"><svg viewBox="0 0 108 108"><polygon fill="#FF5A82" points="54,0 62,16 79,7 80,26 99,24 92,42 108,54 92,66 99,84 80,82 79,101 62,92 54,108 46,92 29,101 28,82 9,84 16,66 0,54 16,42 9,24 28,26 29,7 46,16"/></svg><span data-i18n-html="site.burst_html"></span></div>
       <div class="kicker">スリちゃんの おそうじ大作戦 ✧</div>
       <h1>SuriClean<span class="jp">スリクリーン ♡ pika-pika!</span></h1>
-      <p class="tagline">La suricata kawaii che <mark>scava nel tuo disco</mark> e trova i GB sprecati: cache, duplicati, repo git dimenticati, dati di Claude e Codex… <mark>Tu decidi, lei spazza!</mark> 🧹✨</p>
+      <p class="tagline" data-i18n-html="site.tagline_html"></p>
       <div class="downloads" id="downloads"></div>
-      <div class="tiny" id="version-note">Versione più recente da GitHub · open source · nessun abbonamento, nessuna pubblicità</div>
+      <div class="tiny" id="version-note"></div>
     </div>
     <div class="suri-stage">
       <div class="halo"></div>
-      <div class="speech" id="speech">Kyaa~! Scarica e scaviamo insieme ♡</div>
+      <div class="speech" id="speech"></div>
       <div id="suri"></div>
-      <div class="hint-click">↑ toccami! ☆</div>
+      <div class="hint-click" data-i18n="site.hint_click"></div>
     </div>
   </header>
 </div>
 
-<div class="marquee"><div>✦ Cache delle app ✦ Claude & Codex ✦ node_modules dimenticati ✦ Repo git ✦ File gemelli ✦ Mappa del disco ✦ Aree di sistema ✦ Installer vecchi ✦ App dormienti ✦ Cache delle app ✦ Claude & Codex ✦ node_modules dimenticati ✦ Repo git ✦ File gemelli ✦ Mappa del disco ✦ Aree di sistema ✦ Installer vecchi ✦ App dormienti ✦</div></div>
+<div class="marquee"><div id="marquee"></div></div>
 
 <div class="wrap">
   <section>
-    <h2><span class="jp">ポイント</span>Cosa trova Suri-chan? ☆</h2>
-    <p class="sub">Quattordici zone di scavo. Tutto quello che è sicuro è già preselezionato, il resto lo decidi tu.</p>
+    <h2><span class="jp">ポイント</span><span data-i18n="site.features_title"></span></h2>
+    <p class="sub" data-i18n="site.features_sub"></p>
     <div class="features" id="features"></div>
   </section>
 
   <section>
-    <h2><span class="jp">スクリーンショット</span>Eccola al lavoro! ♡</h2>
-    <p class="sub">Animazioni ovunque e musica 16-bit che cambia ritmo mentre scava.</p>
-    <img class="shot" src="screenshot.png" alt="Schermata di SuriClean" onerror="this.style.display='none'">
+    <h2><span class="jp">スクリーンショット</span><span data-i18n="site.shot_title"></span></h2>
+    <p class="sub" data-i18n="site.shot_sub"></p>
+    <img class="shot" id="shot" src="screenshot.png" alt="SuriClean" onerror="this.style.display='none'">
   </section>
 
   <section>
-    <h2><span class="jp">かんたん</span>Facilissimo, in 3 zampate 🐾</h2>
+    <h2><span class="jp">かんたん</span><span data-i18n="site.steps_title"></span></h2>
     <div class="steps">
-      <div class="step"><div class="n">1</div><h3>Scarica</h3><p>Il DMG per Mac, l'installer per Windows o il pacchetto per Ubuntu.</p></div>
-      <div class="step"><div class="n">2</div><h3>Scansiona</h3><p>Premi «Via allo scavo! ☆» e guarda Suri scavare, indagare e annusare.</p></div>
-      <div class="step"><div class="n">3</div><h3>Spazza via</h3><p>Controlla l'elenco (anche ad albero) e manda nel Cestino solo ciò che vuoi.</p></div>
+      <div class="step"><div class="n">1</div><h3 data-i18n="site.step1_title"></h3><p data-i18n="site.step1_text"></p></div>
+      <div class="step"><div class="n">2</div><h3 data-i18n="site.step2_title"></h3><p data-i18n="site.step2_text"></p></div>
+      <div class="step"><div class="n">3</div><h3 data-i18n="site.step3_title"></h3><p data-i18n="site.step3_text"></p></div>
     </div>
   </section>
 
@@ -148,63 +153,99 @@
     <div class="safe">
       <div id="suri-safe"></div>
       <div>
-        <h2 style="text-align:left">Anshin! Niente paura ♡ <span class="jp" style="display:inline;margin-left:8px">安心</span></h2>
+        <h2 style="text-align:start"><span data-i18n="site.safe_title"></span> <span class="jp" style="display:inline;margin-inline-start:8px">安心</span></h2>
         <ul>
-          <li>Tutto finisce nel <b>Cestino</b>: puoi sempre ripensarci.</li>
-          <li>Chiede sempre <b>conferma</b> prima di spostare qualcosa.</li>
-          <li>I repo git vengono toccati solo se sono <b>al sicuro sul remote</b>; il comando per riclonarli viene salvato.</li>
-          <li>Rami e stash eliminati: commit annotato e <b>copia .patch</b> salvata.</li>
-          <li>Si <b>aggiorna da sola</b> quando esce una versione nuova.</li>
+          <li data-i18n-html="site.safe1_html"></li>
+          <li data-i18n-html="site.safe2_html"></li>
+          <li data-i18n-html="site.safe3_html"></li>
+          <li data-i18n-html="site.safe4_html"></li>
+          <li data-i18n-html="site.safe5_html"></li>
         </ul>
       </div>
     </div>
   </section>
 
   <footer>
-    Fatto con ♡ da Marco Ricupero e una suricata · <a href="https://github.com/Marketto/suriclean">codice su GitHub</a> ·
-    <a href="https://github.com/Marketto/suriclean/releases">tutte le versioni</a><br>
-    <span style="font-size:13px">Prima apertura su Mac: tasto destro sull'app › Apri. Su Windows: «Ulteriori informazioni» › «Esegui comunque».</span>
+    <span data-i18n="site.footer_made"></span> · <a href="https://github.com/Marketto/suriclean" data-i18n="site.footer_code"></a> ·
+    <a href="https://github.com/Marketto/suriclean/releases" data-i18n="site.footer_releases"></a><br>
+    <span style="font-size:13px" data-i18n="site.footer_first_open"></span>
   </footer>
 </div>
 
-<button class="music" id="music"><span class="eq"><i></i><i></i><i></i></span><span id="music-label">♪ Accendi la musica</span></button>
-<button class="music remix" id="remix" title="Remix: «Arcade Sparkle»">🎧 <span id="remix-label">Remix</span></button>
+<button class="music" id="music"><span class="eq"><i></i><i></i><i></i></span><span id="music-label"></span></button>
+<button class="music remix" id="remix">🎧 <span id="remix-label"></span></button>
 
+<script src="i18n.js"></script>
 <script src="suri.js"></script>
 <script src="chiptune.js"></script>
 <script>
-(function () {
+(async function () {
+  const t = (k, ...a) => I18n.t(k, ...a);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const REL = "https://github.com/Marketto/suriclean/releases/latest/download/";
   const OS = /Android/i.test(navigator.userAgent) ? "android" : /Windows/i.test(navigator.userAgent) ? "win" : /Mac/i.test(navigator.platform + navigator.userAgent) ? "mac" : /Linux|X11/i.test(navigator.userAgent) ? "linux" : "mac";
   const DL = {
-    mac: { label: "Scarica per Mac", file: "SuriClean.dmg", icon: "🍎", note: "macOS 12 o successivi · Intel e Apple Silicon", c: "#FF5A82" },
-    win: { label: "Scarica per Windows", file: "SuriClean-Windows-Setup.exe", icon: "🪟", note: "Windows 10 e 11", c: "#6CB2FF" },
-    linux: { label: "Scarica per Ubuntu", file: "SuriClean-Linux.deb", icon: "🐧", note: "Ubuntu 22.04+ · .deb", c: "#A88FFA" },
-    appimage: { label: "Linux AppImage", file: "SuriClean-Linux.AppImage", icon: "📦", note: "Qualsiasi distribuzione", c: "#61D6AD" },
-    android: { label: "Scarica per Android", file: "SuriClean-Android.apk", icon: "🤖", note: "Android 8 o successivi · .apk", c: "#61D6AD" },
+    mac: { file: "SuriClean.dmg", icon: "🍎", c: "#FF5A82" },
+    win: { file: "SuriClean-Windows-Setup.exe", icon: "🪟", c: "#6CB2FF" },
+    linux: { file: "SuriClean-Linux.deb", icon: "🐧", c: "#A88FFA" },
+    appimage: { file: "SuriClean-Linux.AppImage", icon: "📦", c: "#61D6AD" },
+    android: { file: "SuriClean-Android.apk", icon: "🤖", c: "#61D6AD" },
   };
   const order = [OS, ...["mac", "win", "android", "linux", "appimage"].filter(k => k !== OS)];
-  document.getElementById("downloads").innerHTML = order.map((k, i) => {
-    const d = DL[k];
-    return `<a class="dl ${i === 0 ? "main" : "sec"}" href="${REL + d.file}" data-dl="${k}" ${i === 0 ? "" : ""} style="${i === 0 ? `--c:${d.c}` : ""}">
-      <span class="os">${d.icon}</span><span>${d.label}<small>${d.note}</small></span></a>`;
-  }).join("");
-
   const FEATS = [
-    ["🗺️", "Mappa del disco", "Dove sono finiti tutti i GB? Un albero di cartelle con le dimensioni, per scoprire subito i bestioni.", "#FFD14D"],
-    ["🌬️", "Cache e temporanei", "Briciole magiche che ricrescono da sole: cache di app e browser, log, file temporanei.", "#6CB2FF"],
-    ["⚙️", "Aree di sistema", "Log e report di crash del sistema, temporanei, aggiornamenti già installati, dump, Windows.old, vecchi snap e pacchetti. Una password sola.", "#6CB2FF"],
-    ["🤖", "Claude, Codex & AI", "Sessioni vecchie di Claude Code e Codex, cache di Claude Desktop, Cursor e VS Code, modelli scaricati.", "#FF80A8"],
-    ["📦", "Dipendenze ricreabili", "node_modules, venv, target e bin/obj di progetti fermi da mesi. Si rigenerano con un comando.", "#61D6AD"],
-    ["🌿", "Repo Git dimenticati", "Controlla remote, modifiche, stash e commit non pushati. Pulisci rami e stash uno per uno.", "#FF786E"],
-    ["👯", "File gemelli", "Duplicati confermati con SHA-256. Suri tiene sempre almeno una copia 💎.", "#A88FFA"],
-    ["🦖", "File giganti", "I mostroni da 100 MB in su, ordinati dal più ciccione.", "#FF80A8"],
-    ["😴", "App dormienti (Mac)", "App che non apri da secoli, con tutti i loro dati nascosti. E gli installer di macOS da 12 GB!", "#A88FFA"],
-    ["📱", "Anche su Android", "Media di WhatsApp e Telegram, foto doppie, APK dimenticati, app dormienti e le cache di tutte le app in un tocco.", "#61D6AD"],
-    ["🔄", "Si aggiorna da sola", "Controlla GitHub e installa le nuove versioni senza disturbarti.", "#FFA85C"],
+    ["🗺️", "map", "#FFD14D"], ["🌬️", "cache", "#6CB2FF"], ["⚙️", "system", "#6CB2FF"], ["🤖", "ai", "#FF80A8"],
+    ["📦", "deps", "#61D6AD"], ["🌿", "git", "#FF786E"], ["👯", "dups", "#A88FFA"], ["🦖", "big", "#FF80A8"],
+    ["😴", "apps", "#A88FFA"], ["📱", "android", "#61D6AD"], ["🔄", "update", "#FFA85C"],
   ];
-  document.getElementById("features").innerHTML = FEATS.map(([i, t, p, c]) =>
-    `<div class="feat" style="--c:${c}"><div class="ic">${i}</div><h3>${t}</h3><p>${p}</p></div>`).join("");
+  const SHOW = [
+    ["digging", "scanning"], ["detective", "detective"], ["hacking", "scanning"], ["reading", "results"], ["sweeping", "cleaning"],
+    ["sniffing", "scanning"], ["lookout", "results"], ["celebrating", "victory"], ["wave", "menu"],
+  ];
+  let k = SHOW.length - 1, latest = null, thanks = false;
+  const suri = document.getElementById("suri"), speech = document.getElementById("speech");
+  const btn = document.getElementById("music"), label = document.getElementById("music-label");
+  const rbtn = document.getElementById("remix");
+
+  function musicLabels() {
+    label.textContent = t(btn.classList.contains("on") ? "site.music_on" : "site.music_off");
+    document.getElementById("remix-label").textContent = t(rbtn.classList.contains("on") ? "site.remix_on" : "site.remix");
+    rbtn.title = t("site.remix_title");
+  }
+
+  function render() {
+    document.title = t("site.title");
+    const md = document.querySelector('meta[name="description"]'); if (md) md.content = t("site.meta_desc");
+    document.querySelectorAll("[data-i18n]").forEach(el => el.textContent = t(el.dataset.i18n));
+    document.querySelectorAll("[data-i18n-html]").forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+    document.getElementById("shot").alt = t("site.shot_alt");
+    document.getElementById("version-note").textContent = latest ? t("site.version_note_v", latest) : t("site.version_note");
+    const mq = t("site.marquee"); document.getElementById("marquee").textContent = `${mq} ${mq} ✦`;
+    document.getElementById("downloads").innerHTML = order.map((key, i) => {
+      const d = DL[key];
+      return `<a class="dl ${i === 0 ? "main" : "sec"}" href="${REL + d.file}" data-dl="${key}" style="${i === 0 ? `--c:${d.c}` : ""}">
+        <span class="os">${d.icon}</span><span>${esc(t(`site.dl.${key}`))}<small>${esc(t(`site.dl.${key}_note`))}</small></span></a>`;
+    }).join("");
+    document.getElementById("features").innerHTML = FEATS.map(([i, key, c]) =>
+      `<div class="feat" style="--c:${c}"><div class="ic">${i}</div><h3>${esc(t(`site.feat.${key}`))}</h3><p>${esc(t(`site.feat.${key}_text`))}</p></div>`).join("");
+    speech.textContent = thanks ? t("site.show.thanks") : t(`site.show.${SHOW[k][0]}`);
+    musicLabels();
+    const cur = I18n.languages.find(l => l.code === I18n.lang);
+    document.getElementById("lang-name").textContent = cur ? cur.name : I18n.lang;
+    const sel = document.getElementById("lang-select");
+    sel.title = t("site.lang_title");
+    sel.innerHTML = [`<option value="" ${I18n.chosen ? "" : "selected"}>${esc(t("site.lang_auto"))}</option>`]
+      .concat(I18n.languages.map(l => `<option value="${l.code}" ${I18n.chosen === l.code ? "selected" : ""}>${esc(l.name)}</option>`)).join("");
+    bindHover();
+  }
+
+  function bindHover() {
+    document.querySelectorAll(".dl, .feat").forEach(el => el.addEventListener("mouseenter", () => Chiptune.running && Chiptune.sfx("blip")));
+    document.querySelectorAll(".dl").forEach(el => el.addEventListener("click", () => {
+      if (Chiptune.running) { Chiptune.setMood("victory"); Chiptune.sfx("coin"); }
+      thanks = true;
+      Suri.setActivity(suri, "celebrating"); speech.textContent = t("site.show.thanks");
+    }));
+  }
 
   // background bubbles
   const bg = document.querySelector(".bg"), cols = ["#FF80A8", "#6CB2FF", "#FFD14D", "#A88FFA", "#61D6AD"];
@@ -218,54 +259,43 @@
   }
 
   // Suri reacts to clicks
-  const suri = document.getElementById("suri"), speech = document.getElementById("speech");
   Suri.mount(suri, "wave");
   Suri.mount(document.getElementById("suri-safe"), "sleepy");
-  const SHOW = [
-    ["digging", "Hori-hori! Scavo nel tuo disco ⛏️", "scanning"],
-    ["detective", "Detective Suri trova i gemellini 🔍", "detective"],
-    ["hacking", "Bip-bup! Le briciole di Claude e Codex 🤖", "scanning"],
-    ["reading", "Leggo i diari segreti dei repo 📜", "results"],
-    ["sweeping", "Saa~ spazza spazza! 🧹", "cleaning"],
-    ["sniffing", "Kun-kun! Sento odore di cache 👃", "scanning"],
-    ["lookout", "Sentinella in posizione! 👀", "results"],
-    ["celebrating", "Yatta~! Disco pika-pika ✨", "victory"],
-    ["wave", "Kyaa~! Scarica e scaviamo insieme ♡", "menu"],
-  ];
-  let k = SHOW.length - 1;
-  function next() {
-    k = (k + 1) % SHOW.length;
-    const [act, text, mood] = SHOW[k];
+  suri.addEventListener("click", () => {
+    k = (k + 1) % SHOW.length; thanks = false;
+    const [act, mood] = SHOW[k];
     Suri.setActivity(suri, act);
-    speech.textContent = text;
+    speech.textContent = t(`site.show.${act}`);
     if (Chiptune.running) { Chiptune.setMood(mood); Chiptune.sfx("pop"); }
-  }
-  suri.addEventListener("click", next);
+  });
 
   // music
-  const btn = document.getElementById("music"), label = document.getElementById("music-label");
   btn.addEventListener("click", () => {
-    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(false); Chiptune.setMood(SHOW[k][2]); btn.classList.add("on"); label.textContent = "♪ Pikopiko ON"; }
-    else if (Chiptune.muted) { Chiptune.setMuted(false); btn.classList.add("on"); label.textContent = "♪ Pikopiko ON"; }
-    else { Chiptune.setMuted(true); btn.classList.remove("on"); label.textContent = "♪ Accendi la musica"; }
+    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(false); Chiptune.setMood(SHOW[k][1]); btn.classList.add("on"); }
+    else if (Chiptune.muted) { Chiptune.setMuted(false); btn.classList.add("on"); }
+    else { Chiptune.setMuted(true); btn.classList.remove("on"); }
+    musicLabels();
   });
-  const rbtn = document.getElementById("remix");
   rbtn.addEventListener("click", () => {
     const on = !Chiptune.remix;
-    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMood(SHOW[k][2]); }
+    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMood(SHOW[k][1]); }
     Chiptune.setRemix(on); Chiptune.setMuted(false);
-    rbtn.classList.toggle("on", on); document.getElementById("remix-label").textContent = on ? "Remix ON" : "Remix";
-    btn.classList.add("on"); label.textContent = "♪ Pikopiko ON";
+    rbtn.classList.toggle("on", on); btn.classList.add("on");
+    musicLabels();
   });
-  document.querySelectorAll(".dl, .feat").forEach(el => el.addEventListener("mouseenter", () => Chiptune.running && Chiptune.sfx("blip")));
-  document.querySelectorAll(".dl").forEach(el => el.addEventListener("click", () => {
-    if (Chiptune.running) { Chiptune.setMood("victory"); Chiptune.sfx("coin"); }
-    Suri.setActivity(suri, "celebrating"); speech.textContent = "Arigatō!! Ci vediamo nel tuo disco ♡";
-  }));
+
+  // language
+  document.getElementById("lang-select").addEventListener("change", async e => {
+    await I18n.setLang(e.target.value || null);
+    render();
+  });
+
+  await I18n.init();
+  render();
 
   // latest version label
   fetch("https://api.github.com/repos/Marketto/suriclean/releases/latest").then(r => r.ok ? r.json() : null).then(j => {
-    if (j && j.tag_name) document.getElementById("version-note").textContent = `Versione ${j.tag_name.replace(/^v/, "")} · open source · nessun abbonamento, nessuna pubblicità`;
+    if (j && j.tag_name) { latest = j.tag_name.replace(/^v/, ""); document.getElementById("version-note").textContent = t("site.version_note_v", latest); }
   }).catch(() => {});
 })();
 </script>

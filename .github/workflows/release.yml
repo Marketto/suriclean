@@ -96,7 +96,8 @@ jobs:
       - name: Prepare sources and version
         shell: bash
         run: |
-          cp shared/suri.js shared/chiptune.js shared/audio/remix.mp3 desktop/ui/
+          cp shared/suri.js shared/chiptune.js shared/i18n.js shared/audio/remix.mp3 desktop/ui/
+          mkdir -p desktop/ui/i18n && cp i18n/*.json desktop/ui/i18n/
           V="${SURI_VERSION}.0"
           node -e "const f='desktop/src-tauri/tauri.conf.json';const j=require('./'+f);j.version='$V';require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
           sed -i.bak "0,/^version = .*/s//version = \"$V\"/" desktop/src-tauri/Cargo.toml && rm desktop/src-tauri/Cargo.toml.bak
@@ -258,7 +259,8 @@ jobs:
       - name: Build site
         run: |
           mkdir -p _site
-          cp site/index.html shared/suri.js shared/chiptune.js shared/audio/remix.mp3 _site/
+          cp site/index.html shared/suri.js shared/chiptune.js shared/i18n.js shared/audio/remix.mp3 _site/
+          mkdir -p _site/i18n && cp i18n/*.json _site/i18n/
           cp Resources/AppIcon.png _site/icon.png
           if [ -f art/screenshot-mac.png ]; then cp art/screenshot-mac.png _site/screenshot.png; fi
       - uses: actions/upload-pages-artifact@v3
