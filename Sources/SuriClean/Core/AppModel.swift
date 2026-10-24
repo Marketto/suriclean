@@ -66,6 +66,10 @@ final class AppModel: ObservableObject {
         if !hasFDA && UserDefaults.standard.string(forKey: "fdaSnoozedVersion") != Updater.currentVersion {
             showFDAGuide = true
         }
+        if UserDefaults.standard.bool(forKey: "fullScanAfterRelaunch") {
+            UserDefaults.standard.set(false, forKey: "fullScanAfterRelaunch")
+            if hasFDA { askScanScope = true }
+        }
         refreshTrash()
         refreshSnapshots()
         Task {
@@ -218,12 +222,28 @@ final class AppModel: ObservableObject {
 
     /// Full Disk Access only applies to a fresh process: quit and open again.
     func relaunch() {
+        showFDAGuide = false
+        UserDefaults.standard.set(fullScanAfterFDA || fullDiskAfterFDA, forKey: "fullScanAfterRelaunch")
         let path = Bundle.main.bundlePath.replacingOccurrences(of: "'", with: "'\\''")
+        let pid = ProcessInfo.processInfo.processIdentifier
+        // wait until this copy has really quit, otherwise `open` would only bring it to the front
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        p.arguments = ["-c", "sleep 1; /usr/bin/open '\(path)'"]
+        p.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; /usr/bin/open -n '\(path)'"]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
         try? p.run()
-        NSApp.terminate(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { NSApp.terminate(nil) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { exit(0) }   // never stay stuck
+    }
+
+    /// Permission granted: carry on without restarting (macOS usually applies it right away).
+    func fdaGrantedContinue() {
+        hasFDA = FS.hasFullDiskAccess()
+        showFDAGuide = false
+        showToast("Yatta! Ora vedo tutte le stanze ✨")
+        if fullScanAfterFDA { fullScanAfterFDA = false; scanAll(full: true, askedFDA: true) }
+        if fullDiskAfterFDA { fullDiskAfterFDA = false; scanFullDisk(askedFDA: true) }
     }
 
     func openFDASettings() {

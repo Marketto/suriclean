@@ -14,7 +14,7 @@ struct FDAGuide: View {
             Text(granted ? "Yatta~! Ora ho le chiavi di casa 🔑✨" : "Onegai~! Mi apri tutte le stanze? 🙏")
                 .font(Theme.font(20, .heavy))
             Text(granted
-                 ? "Riavviami un attimo e vedrò anche Scrivania, Documenti, Download, Cestini, Mail, Messaggi e le cartelle degli altri utenti."
+                 ? "Ora vedo anche Scrivania, Documenti, Download, Cestini, Mail, Messaggi e le cartelle degli altri utenti. Se qualcosa resta chiuso, riavviami: macOS a volte lo applica solo alla riapertura."
                  : "Per misurare tutto il disco macOS vuole che tu mi dia l'«Accesso completo al disco». Non può chiederlo con un semplice Sì/No: si fa una volta in Impostazioni, e io mi accorgo da sola quando è fatto.")
                 .font(Theme.font(13, .medium)).opacity(0.75).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -38,6 +38,8 @@ struct FDAGuide: View {
 
             HStack(spacing: 10) {
                 if granted {
+                    Button("Continua ☆") { model.fdaGrantedContinue() }
+                        .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
                     Button("🔄 Riavvia SuriClean") { model.relaunch() }
                         .buttonStyle(BubblyButtonStyle(color: Theme.mint, big: true))
                 } else {
