@@ -117,19 +117,19 @@ private fun Home(vm: AppVM) {
                 Box(Modifier.kawaiiCard(Kawaii.peach, 18.dp).padding(12.dp)) { Typewriter(vm.greeting(), 13.5.sp) }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BubblyButton("✨ Via allo scavo! ☆", Kawaii.hot, big = true, enabled = vm.busy == null) { vm.scanAll() }
-            if (vm.recommendedTotal > 0) Column {
+            if (vm.recommendedTotal > 0) Row(verticalAlignment = Alignment.Bottom) {
                 KText(Fs.bytes(vm.recommendedTotal), 20.sp, color = Kawaii.mint.darker())
-                KText("liberabili senza pensieri ✧", 11.sp, bold = false, alpha = 0.6f)
+                KText("  liberabili senza pensieri ✧", 11.sp, bold = false, alpha = 0.6f)
             }
         }
         if (!vm.hasFiles || !vm.hasUsage) PermissionsCard(vm)
         StorageCard(vm)
         TipsCard(vm) { i -> ctx.startActivity(i) }
-        Row(verticalAlignment = Alignment.Bottom) {
+        Column {
             KText("Dove scaviamo oggi? ♡", 21.sp)
-            KText("  tocca una zona!", 12.sp, bold = false, alpha = 0.5f)
+            KText("tocca una zona, pika!", 12.sp, bold = false, alpha = 0.5f)
         }
         Category.entries.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
