@@ -166,7 +166,7 @@ struct Sidebar: View {
                         .foregroundColor(model.remix ? .white : Theme.cocoa)
                 }
                 .buttonStyle(.plain)
-                .help("Versione remix: dubstep/trap con basso wobble")
+                .help("Remix: «Arcade Sparkle»")
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 10)

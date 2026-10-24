@@ -71,6 +71,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     private var index: StorageIndex? = null
 
     init {
+        Chiptune.attach(app)
         Chiptune.muted = muted
         Chiptune.remix = remix
         refresh()
@@ -134,7 +135,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         remix = !remix; Chiptune.remix = remix; prefs.edit().putBoolean("remix", remix).apply()
         if (muted) toggleMute()
         Chiptune.sfx(Sfx.POP)
-        showToast(if (remix) "🎧 Remix ON! Wub-wub~ ドロップ!" else "🎵 Torna la musica originale ♪")
+        showToast(if (remix) "🎧 Remix ON! «Arcade Sparkle» ♪" else "🎵 Torna la musica originale ♪")
     }
 
     fun toggleMute() { muted = !muted; Chiptune.muted = muted; prefs.edit().putBoolean("muted", muted).apply() }
