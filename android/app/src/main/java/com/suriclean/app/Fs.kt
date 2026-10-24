@@ -25,20 +25,20 @@ object Fs {
         val u = listOf("byte", "KB", "MB", "GB", "TB")
         var i = 0
         while (v >= 1000 && i < 4) { v /= 1000; i++ }
-        return if (i == 0) "${b.coerceAtLeast(0)} byte" else String.format(java.util.Locale.ITALY, "%.1f %s", v, u[i])
+        return if (i == 0) L.t("and.unit.bytes", b.coerceAtLeast(0)) else String.format(L.locale, "%.1f %s", v, u[i])
     }
 
     fun relative(millis: Long?): String {
-        if (millis == null || millis <= 0) return "mai"
+        if (millis == null || millis <= 0) return L.t("and.time.never")
         val s = (System.currentTimeMillis() - millis) / 1000
         val d = s / 86_400
         return when {
-            s < 3600 -> "poco fa"
-            d < 1 -> "oggi"
-            d < 2 -> "ieri"
-            d < 30 -> "$d giorni fa"
-            d < 365 -> (d / 30).let { if (it == 1L) "1 mese fa" else "$it mesi fa" }
-            else -> (d / 365).let { if (it == 1L) "1 anno fa" else "$it anni fa" }
+            s < 3600 -> L.t("and.time.justNow")
+            d < 1 -> L.t("and.time.today")
+            d < 2 -> L.t("and.time.yesterday")
+            d < 30 -> L.tp("and.time.days", d, d)
+            d < 365 -> (d / 30).let { L.tp("and.time.months", it, it) }
+            else -> (d / 365).let { L.tp("and.time.years", it, it) }
         }
     }
 

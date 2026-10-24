@@ -36,7 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +54,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,17 +64,25 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.delay
 import java.io.File
 
-private val QUIPS = mapOf(
-    Act.DIGGING to listOf("Hori-hori! Scavo scavo~ 🕳️", "Ooh! Qui sotto c'è qualcosa di ciccione!", "Zampette turbo attivate ☆"),
-    Act.DETECTIVE to listOf("Hmm~ questi due sono gemellini! 🔍", "Confronto le impronte SHA-256, kira!", "Nessun gemello sfugge a Suri-chan!"),
-    Act.SWEEPING to listOf("Saa~ spazza spazza! 🧹", "Bye-bye polverina digitale!", "Pika-pika, tutto lucido ✨"),
-    Act.SNIFFING to listOf("Kun-kun! Sento le chat 👃", "Profumino di video ricevuti~", "Quanti vocali, waa!"),
-    Act.LOOKOUT to listOf("Sentinella Suri, pronta! 👀", "Download antichi all'orizzonte!", "Dalla collinetta vedo tutto ☆"),
-    Act.SLEEPY to listOf("Shh~ le app fanno la nanna 💤", "Questa dorme dal Pleistocene!", "Una pecorella, due pecorelle… ☁️"),
-)
+private val QUIP_ACTS = setOf(Act.DIGGING, Act.DETECTIVE, Act.SWEEPING, Act.SNIFFING, Act.LOOKOUT, Act.SLEEPY)
+
+private fun quips(a: Act): List<String> =
+    if (a in QUIP_ACTS) (0..2).map { L.t("and.quip.${a.name.lowercase()}.$it") } else listOf("…")
+
+/** Right-to-left for Arabic and Hebrew; also re-applied inside dialog windows. */
+@Composable
+fun WithDirection(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalLayoutDirection provides if (L.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr, content = content)
+}
 
 @Composable
 fun SuriApp(vm: AppVM) {
+    val lang = L.lang
+    WithDirection { key(lang) { SuriAppContent(vm) } }
+}
+
+@Composable
+private fun SuriAppContent(vm: AppVM) {
     BackHandler(enabled = vm.view != null) { vm.open(null) }
     Box(Modifier.fillMaxSize()) {
         KawaiiBackground()
@@ -91,18 +103,55 @@ fun SuriApp(vm: AppVM) {
 
 @Composable
 private fun TopBar(vm: AppVM) {
+    var pickLang by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.55f)).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         if (vm.view != null) {
-            KText("‹", 30.sp, modifier = Modifier.clickable { vm.open(null) }.padding(horizontal = 8.dp))
+            KText(if (L.isRtl) "›" else "‹", 30.sp, modifier = Modifier.clickable { vm.open(null) }.padding(horizontal = 8.dp))
         }
         Suri(vm.busy?.act ?: Act.IDLE, 46.dp)
         Column(Modifier.weight(1f).padding(start = 6.dp)) {
             KText("SuriClean", 19.sp)
-            KText("スリちゃん · spazzina kawaii", 10.sp, bold = false, alpha = 0.55f)
+            KText(L.t("and.top.tagline"), 10.sp, bold = false, alpha = 0.55f)
         }
         vm.update?.let { u -> BubblyButton("✨ ${u.version}", Kawaii.hot) { vm.installUpdate() } }
         KText("🎧", 20.sp, alpha = if (vm.remix) 1f else 0.35f, modifier = Modifier.clickable { vm.toggleRemix() }.padding(6.dp))
+        KText("🌐", 20.sp, modifier = Modifier.clickable { pickLang = true; Chiptune.sfx(Sfx.POP) }.padding(6.dp))
         KText(if (vm.muted) "🔇" else "🎵", 22.sp, modifier = Modifier.clickable { vm.toggleMute() }.padding(8.dp))
+    }
+    if (pickLang) LanguageDialog { pickLang = false }
+}
+
+@Composable
+private fun LanguageDialog(onDone: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDone,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        WithDirection {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).clickable(remember { MutableInteractionSource() }, null) { onDone() },
+                contentAlignment = Alignment.Center) {
+                Column(Modifier.padding(24.dp).fillMaxWidth().kawaiiCard(Kawaii.sky, 26.dp).clickable(remember { MutableInteractionSource() }, null) {}.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    KText(L.t("and.lang.title"), 18.sp)
+                    LazyColumn(Modifier.fillMaxWidth().height(420.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        item {
+                            LangRow(L.t("and.lang.auto"), L.chosen == null) { L.set(null); onDone() }
+                        }
+                        items(L.languages, key = { it.code }) { l ->
+                            LangRow(l.name, L.chosen == l.code) { L.set(l.code); onDone() }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LangRow(label: String, on: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth()
+        .background(if (on) Kawaii.sky.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.8f), RoundedCornerShape(14.dp))
+        .clickable { Chiptune.sfx(Sfx.COIN); onClick() }.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        KText(label, 14.sp, modifier = Modifier.weight(1f))
+        if (on) KText("🐾", 14.sp)
     }
 }
 
@@ -119,25 +168,25 @@ private fun Home(vm: AppVM) {
             }
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            BubblyButton("✨ Via allo scavo! ☆", Kawaii.hot, big = true, enabled = vm.busy == null) { vm.scanAll() }
+            BubblyButton(L.t("and.home.go"), Kawaii.hot, big = true, enabled = vm.busy == null) { vm.scanAll() }
             if (vm.recommendedTotal > 0) Row(verticalAlignment = Alignment.Bottom) {
                 KText(Fs.bytes(vm.recommendedTotal), 20.sp, color = Kawaii.mint.darker())
-                KText("  liberabili senza pensieri ✧", 11.sp, bold = false, alpha = 0.6f)
+                KText("  " + L.t("and.home.freeable"), 11.sp, bold = false, alpha = 0.6f)
             }
         }
         if (!vm.hasFiles || !vm.hasUsage) PermissionsCard(vm)
         if (vm.shizuku < 3 && !vm.shizukuHidden) ShizukuCard(vm)
-        if (vm.askPerms) ConfirmDialog("Onegai~! Mi apri le porte? 🔑",
-            (if (!vm.hasFiles) "📂 «Accesso a tutti i file» per guardare foto, video, Download, chat e le aree di sistema.\n" else "") +
-            (if (!vm.hasUsage) "📊 «Accesso ai dati di utilizzo» per sapere quanto pesano le app e quando le usi.\n" else "") +
-            "Ti porto io alle pagine giuste, una alla volta: accendi l'interruttore e torna indietro ♡ Leggo solo il telefono e non invio niente.",
-            "Andiamo! ☆", onDismiss = { vm.snoozePerms() }) { vm.startPermTour() }
+        if (vm.askPerms) ConfirmDialog(L.t("and.perm.dlgTitle"),
+            (if (!vm.hasFiles) L.t("and.perm.dlgFiles") + "\n" else "") +
+            (if (!vm.hasUsage) L.t("and.perm.dlgUsage") + "\n" else "") +
+            L.t("and.perm.dlgText"),
+            L.t("and.perm.dlgOk"), onDismiss = { vm.snoozePerms() }) { vm.startPermTour() }
         StorageCard(vm)
         if (vm.breakdown.isNotEmpty()) BreakdownCard(vm)
         TipsCard(vm) { i -> ctx.startActivity(i) }
         Column {
-            KText("Dove scaviamo oggi? ♡", 21.sp)
-            KText("tocca una zona, pika!", 12.sp, bold = false, alpha = 0.5f)
+            KText(L.t("and.home.where"), 21.sp)
+            KText(L.t("and.home.tap"), 12.sp, bold = false, alpha = 0.5f)
         }
         Category.entries.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -147,9 +196,9 @@ private fun Home(vm: AppVM) {
         }
         LevelCard(vm)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            KText("v${vm.version} · controlla aggiornamenti", 11.sp, alpha = 0.5f, modifier = Modifier.clickable { vm.checkUpdate(true) }.padding(vertical = 6.dp))
+            KText(L.t("and.home.version", vm.version), 11.sp, alpha = 0.5f, modifier = Modifier.clickable { vm.checkUpdate(true) }.padding(vertical = 6.dp))
             Spacer(Modifier.weight(1f))
-            KText(if (vm.autoUpdate) "🔄 auto ON" else "🔄 auto OFF", 11.sp, alpha = 0.6f, modifier = Modifier.clickable { vm.setAuto(!vm.autoUpdate) }.padding(6.dp))
+            KText(if (vm.autoUpdate) L.t("and.home.autoOn") else L.t("and.home.autoOff"), 11.sp, alpha = 0.6f, modifier = Modifier.clickable { vm.setAuto(!vm.autoUpdate) }.padding(6.dp))
         }
         Spacer(Modifier.height(30.dp))
     }
@@ -158,15 +207,15 @@ private fun Home(vm: AppVM) {
 @Composable
 private fun ShizukuCard(vm: AppVM) {
     Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.lilac).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        KText("🔑 Le stanze nascoste (facoltativo)", 15.sp)
+        KText(L.t("and.shizuku.cardTitle"), 15.sp)
         KText(when (vm.shizuku) {
-            2 -> "Shizuku è acceso: dammi il permesso e vedrò le cache in Android/data, svuoterò la cache di tutte le app con un tocco e cancellerò i dati di più app insieme."
-            1 -> "Shizuku è installato ma spento. Aprilo e avvialo con il «Debug wireless», poi torna qui."
-            else -> "Con l'app gratuita Shizuku vedo le cache nascoste in Android/data, svuoto tutte le cache in un tocco e cancello i dati di più app insieme. Funziona tutto dentro il telefono, senza internet."
+            2 -> L.t("and.shizuku.cardOn")
+            1 -> L.t("and.shizuku.cardOff")
+            else -> L.t("and.shizuku.cardNone")
         }, 12.sp, bold = false, alpha = 0.75f)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BubblyButton(when (vm.shizuku) { 2 -> "Concedi ☆"; 1 -> "Apri Shizuku"; else -> "Installa Shizuku" }, Kawaii.lilac) { vm.shizukuAction() }
-            BubblyButton("No, grazie", Kawaii.sky) { vm.hideShizuku() }
+            BubblyButton(when (vm.shizuku) { 2 -> L.t("and.shizuku.btnGrant"); 1 -> L.t("and.shizuku.btnOpen"); else -> L.t("and.shizuku.btnInstall") }, Kawaii.lilac) { vm.shizukuAction() }
+            BubblyButton(L.t("and.shizuku.btnNo"), Kawaii.sky) { vm.hideShizuku() }
         }
     }
 }
@@ -175,14 +224,14 @@ private fun ShizukuCard(vm: AppVM) {
 private fun PermissionsCard(vm: AppVM) {
     val ctx = LocalContext.current
     Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.orange).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        KText("Onegai~! Fammi entrare 🙏", 16.sp)
+        KText(L.t("and.perm.cardTitle"), 16.sp)
         if (!vm.hasFiles) {
-            KText("Per guardare foto, video, Download e chat mi serve l'«Accesso a tutti i file». Leggo solo la memoria del telefono e non invio niente a nessuno.", 12.sp, bold = false, alpha = 0.75f)
-            BubblyButton("📂 Accesso a tutti i file", Kawaii.orange) { vm.startPermTour() }
+            KText(L.t("and.perm.cardFiles"), 12.sp, bold = false, alpha = 0.75f)
+            BubblyButton(L.t("and.perm.btnFiles"), Kawaii.orange) { vm.startPermTour() }
         }
         if (!vm.hasUsage) {
-            KText("Per sapere quanto pesano le app e quando le hai usate l'ultima volta mi serve l'«Accesso ai dati di utilizzo».", 12.sp, bold = false, alpha = 0.75f)
-            BubblyButton("📊 Accesso ai dati di utilizzo", Kawaii.lilac) { vm.startPermTour() }
+            KText(L.t("and.perm.cardUsage"), 12.sp, bold = false, alpha = 0.75f)
+            BubblyButton(L.t("and.perm.btnUsage"), Kawaii.lilac) { vm.startPermTour() }
         }
     }
 }
@@ -203,14 +252,14 @@ private fun StorageCard(vm: AppVM) {
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 KText("${(frac * 100).toInt()}%", 26.sp)
-                KText("pieno", 11.sp, alpha = 0.5f)
+                KText(L.t("and.storage.full"), 11.sp, alpha = 0.5f)
             }
         }
         Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Legend(Kawaii.pink, "Occupato", Fs.bytes(used))
-            Legend(Kawaii.mint.copy(alpha = 0.4f), "Libero", Fs.bytes(free))
-            Legend(Kawaii.mint, "Liberabile", if (vm.recommendedTotal > 0) Fs.bytes(vm.recommendedTotal) else "—")
-            Legend(Kawaii.lemon, "Trovato", if (vm.foundTotal > 0) Fs.bytes(vm.foundTotal) else "—")
+            Legend(Kawaii.pink, L.t("and.storage.used"), Fs.bytes(used))
+            Legend(Kawaii.mint.copy(alpha = 0.4f), L.t("and.storage.free"), Fs.bytes(free))
+            Legend(Kawaii.mint, L.t("and.storage.freeable"), if (vm.recommendedTotal > 0) Fs.bytes(vm.recommendedTotal) else "—")
+            Legend(Kawaii.lemon, L.t("and.storage.found"), if (vm.foundTotal > 0) Fs.bytes(vm.foundTotal) else "—")
         }
     }
 }
@@ -228,15 +277,15 @@ private fun Legend(c: Color, label: String, value: String) {
 private fun TipsCard(vm: AppVM, start: (Intent) -> Unit) {
     var askEmpty by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.sky).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        KText("Trucchetti segreti di Suri ✧", 16.sp)
-        TipRow("🗑️", "Cestino di Suri", "Lo spazio torna libero quando lo svuoti", Fs.bytes(vm.trashSize),
-            if (vm.trashSize > 0) "Svuota" else null, Kawaii.coral) { askEmpty = true }
-        TipRow("🧽", "Cache di tutte le app", if (vm.shizuku == 3) "Con Shizuku: un tocco e via, le app le ricreano" else if (vm.appCache > 0) "Una sola conferma di Android, le app le ricreano" else "Scansiona le «App dormienti» per vedere quanto pesano",
-            if (vm.appCache > 0) Fs.bytes(vm.appCache) else "", if (Build.VERSION.SDK_INT >= 25) "Pulisci" else null, Kawaii.mint) {
+        KText(L.t("and.tips.title"), 16.sp)
+        TipRow("🗑️", L.t("and.tips.trash"), L.t("and.tips.trashNote"), Fs.bytes(vm.trashSize),
+            if (vm.trashSize > 0) L.t("and.tips.empty") else null, Kawaii.coral) { askEmpty = true }
+        TipRow("🧽", L.t("and.tips.cache"), if (vm.shizuku == 3) L.t("and.tips.cacheShizuku") else if (vm.appCache > 0) L.t("and.tips.cacheOne") else L.t("and.tips.cacheScan"),
+            if (vm.appCache > 0) Fs.bytes(vm.appCache) else "", if (Build.VERSION.SDK_INT >= 25) L.t("and.tips.clean") else null, Kawaii.mint) {
             vm.clearAllCaches()
         }
     }
-    if (askEmpty) ConfirmDialog("Svuotare il Cestino di Suri?", "Tutto ciò che c'è dentro (${Fs.bytes(vm.trashSize)}) verrà eliminato per sempre.", "Svuota per sempre",
+    if (askEmpty) ConfirmDialog(L.t("and.trash.askTitle"), L.t("and.trash.askText", Fs.bytes(vm.trashSize)), L.t("and.trash.askOk"),
         onDismiss = { askEmpty = false }) { askEmpty = false; vm.emptyTrash() }
 }
 
@@ -264,8 +313,8 @@ private fun ZoneCard(vm: AppVM, c: Category, modifier: Modifier) {
         KText(c.title, 14.5.sp, maxLines = 2)
         KText(c.subtitle, 11.sp, bold = false, alpha = 0.62f, maxLines = 2)
         Spacer(Modifier.weight(1f))
-        if (r != null) KText(if (r.isEmpty()) "pika-pika ✨" else "${Fs.bytes(vm.displayTotal(c))} · ${r.size}", 15.sp, color = c.color.darker())
-        else KText("Ancora da esplorare~ 🐾", 11.5.sp, alpha = 0.45f)
+        if (r != null) KText(if (r.isEmpty()) L.t("and.zone.clean") else "${Fs.bytes(vm.displayTotal(c))} · ${r.size}", 15.sp, color = c.color.darker())
+        else KText(L.t("and.zone.unexplored"), 11.5.sp, alpha = 0.45f)
     }
 }
 
@@ -274,7 +323,7 @@ private fun LevelCard(vm: AppVM) {
     val (name, prog, next) = vm.level()
     Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.mint, 16.dp).padding(12.dp)) {
         KText(name, 13.sp)
-        KText("Liberati in totale: ${Fs.bytes(vm.freed)}", 10.5.sp, bold = false, alpha = 0.6f)
+        KText(L.t("and.level.freed", Fs.bytes(vm.freed)), 10.5.sp, bold = false, alpha = 0.6f)
         StripedProgress(prog.coerceAtLeast(0.04f), Kawaii.mint, Modifier.fillMaxWidth().padding(vertical = 6.dp).height(9.dp))
         KText(next, 10.sp, bold = false, alpha = 0.5f)
     }
@@ -345,17 +394,17 @@ private fun Detail(vm: AppVM, c: Category) {
                 Suri(c.act, 74.dp)
             }
             KText(c.explain, 11.5.sp, bold = false, alpha = 0.68f)
-            if (vm.results[c] != null) KText("${all.size} elementi · ${Fs.bytes(vm.displayTotal(c))}", 12.sp, color = c.color.darker())
+            if (vm.results[c] != null) KText(L.tp("and.detail.count", all.size, all.size, Fs.bytes(vm.displayTotal(c))), 12.sp, color = c.color.darker())
             if (c == Category.MAP && vm.breakdown.isNotEmpty()) BreakdownCard(vm)
-            if (c == Category.APPS && !vm.hasUsage) KText("⚠️ Senza l'«Accesso ai dati di utilizzo» Android non mi dice quanto pesano le app: attivalo dalla tana ♡", 11.5.sp, color = Kawaii.coral.darker())
+            if (c == Category.APPS && !vm.hasUsage) KText(L.t("and.apps.noUsageWarn"), 11.5.sp, color = Kawaii.coral.darker())
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!c.viewOnly && c != Category.APPS) SegmentRow(listOf("☰ Lista" to !tree, "🌳 Albero" to tree), c.color) { tree = it == 1; expanded = emptySet() }
-                SegmentRow(listOf("Più grandi" to (sort == 0), "Più vecchi" to (sort == 1), "Nome" to (sort == 2)), c.color) { sort = it }
+                if (!c.viewOnly && c != Category.APPS) SegmentRow(listOf(L.t("and.detail.list") to !tree, L.t("and.detail.tree") to tree), c.color) { tree = it == 1; expanded = emptySet() }
+                SegmentRow(listOf(L.t("and.detail.sortBig") to (sort == 0), L.t("and.detail.sortOld") to (sort == 1), L.t("and.detail.sortName") to (sort == 2)), c.color) { sort = it }
                 BubblyButton("🔄", Kawaii.sky, enabled = vm.busy == null) { vm.rescan(c) }
             }
             BasicTextField(query, { query = it }, singleLine = true, textStyle = ktext(13.sp, false),
                 modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 9.dp),
-                decorationBox = { inner -> Box { if (query.isEmpty()) KText("🔍 Cerca…", 13.sp, bold = false, alpha = 0.45f); inner() } })
+                decorationBox = { inner -> Box { if (query.isEmpty()) KText(L.t("and.detail.search"), 13.sp, bold = false, alpha = 0.45f); inner() } })
         }
         Box(Modifier.weight(1f)) {
             when {
@@ -384,50 +433,50 @@ private fun Detail(vm: AppVM, c: Category) {
             }
         }
         if (c.viewOnly) {
-            KText("ℹ️ La mappa serve solo a guardare ☆ Per liberare spazio usa le altre zone.", 11.5.sp, bold = false, alpha = 0.7f,
+            KText(L.t("and.detail.mapInfo"), 11.5.sp, bold = false, alpha = 0.7f,
                 modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.7f)).padding(14.dp))
         } else Column(Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.75f)).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    KText("${sel.size} selezionati", 11.sp, alpha = 0.6f)
+                    KText(L.tp("and.detail.selected", sel.size, sel.size), 11.sp, alpha = 0.6f)
                     KText(Fs.bytes(vm.total(sel)), 19.sp, color = c.color.darker())
                 }
                 if (c == Category.APPS) {
-                    BubblyButton("🧽 Cancella dati", Kawaii.sky, enabled = sel.isNotEmpty() && vm.busy == null) { confirmClear = true }
+                    BubblyButton(L.t("and.detail.clearData"), Kawaii.sky, enabled = sel.isNotEmpty() && vm.busy == null) { confirmClear = true }
                     Spacer(Modifier.width(6.dp))
                 }
-                BubblyButton(if (c == Category.APPS) "🗑️ Disinstalla" else "🧹 Spazza via! ☆", Kawaii.coral, big = c != Category.APPS, enabled = sel.isNotEmpty() && vm.busy == null) { confirm = true }
+                BubblyButton(if (c == Category.APPS) L.t("and.detail.uninstall") else L.t("and.detail.sweep"), Kawaii.coral, big = c != Category.APPS, enabled = sel.isNotEmpty() && vm.busy == null) { confirm = true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BubblyButton("Consigliati", Kawaii.mint) { vm.selRecommended(c) }
-                BubblyButton("Tutti", Kawaii.lilac) { vm.setSel(all.map { it.id }, true) }
-                BubblyButton("Nessuno", Kawaii.lilac) { vm.setSel(all.map { it.id }, false) }
+                BubblyButton(L.t("and.detail.selRec"), Kawaii.mint) { vm.selRecommended(c) }
+                BubblyButton(L.t("and.detail.selAll"), Kawaii.lilac) { vm.setSel(all.map { it.id }, true) }
+                BubblyButton(L.t("and.detail.selNone"), Kawaii.lilac) { vm.setSel(all.map { it.id }, false) }
             }
         }
     }
     if (confirmClear) {
         val ctx = LocalContext.current
         val oneGo = ShizukuBridge.running()
-        ConfirmDialog("Cancellare i dati di ${sel.size} app?",
-            "Le app restano installate ma tornano come appena scaricate: perdi accessi, impostazioni e tutto ciò che non è salvato online (per esempio le chat senza backup). " +
-            (if (oneGo) "Con Shizuku faccio tutto io in un colpo ✨"
-             else "Android non lascia farlo direttamente alle app: apro io la scheda di ognuna, tu tocca «Archiviazione › Cancella dati» e torna indietro. " +
-                  (if (ShizukuBridge.installed(ctx)) "Avvia Shizuku per farlo in un colpo solo." else "Con l'app gratuita Shizuku lo farei in un colpo solo.")),
-            "Sì, cancella 🧽", onDismiss = { confirmClear = false }) { confirmClear = false; vm.clearAppData() }
+        ConfirmDialog(L.t("and.clear.askTitle", sel.size),
+            L.t("and.clear.askText") + " " +
+            (if (oneGo) L.t("and.clear.oneGo")
+             else L.t("and.clear.guided") + " " +
+                  (if (ShizukuBridge.installed(ctx)) L.t("and.clear.startShizuku") else L.t("and.clear.getShizuku"))),
+            L.t("and.clear.askOk"), onDismiss = { confirmClear = false }) { confirmClear = false; vm.clearAppData() }
     }
     if (confirm) ConfirmDialog(
-        if (c == Category.APPS) "Disinstallare ${sel.size} app?" else "Spostare nel Cestino di Suri?",
-        if (c == Category.APPS) "Android ti chiederà conferma per ognuna. I loro dati verranno eliminati."
-        else "${sel.size} elementi per ${Fs.bytes(vm.total(sel))} finiranno nel Cestino di Suri: potrai recuperarli finché non lo svuoti.",
-        if (c == Category.APPS) "Sì, disinstalla" else "Sì, spazza spazza! 🧹", onDismiss = { confirm = false }) { confirm = false; vm.clean(c) }
+        if (c == Category.APPS) L.t("and.uninstall.askTitle", sel.size) else L.t("and.sweep.askTitle"),
+        if (c == Category.APPS) L.t("and.uninstall.askText")
+        else L.tp("and.sweep.askText", sel.size, sel.size, Fs.bytes(vm.total(sel))),
+        if (c == Category.APPS) L.t("and.uninstall.askOk") else L.t("and.sweep.askOk"), onDismiss = { confirm = false }) { confirm = false; vm.clean(c) }
 }
 
 @Composable
 private fun Empty(c: Category, scanned: Boolean, onScan: () -> Unit) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Suri(if (scanned) Act.CELEBRATING else c.act, 150.dp)
-        KText(if (scanned) "Pika-pika! Qui è tutto lucido ✨" else "Questa zona è ancora un mistero~ ♡", 17.sp, modifier = Modifier.padding(12.dp))
-        if (!scanned) BubblyButton("🐾 Esploriamo! ☆", c.color, big = true, onClick = onScan)
+        KText(if (scanned) L.t("and.empty.clean") else L.t("and.empty.mystery"), 17.sp, modifier = Modifier.padding(12.dp))
+        if (!scanned) BubblyButton(L.t("and.empty.explore"), c.color, big = true, onClick = onScan)
     }
 }
 
@@ -497,13 +546,13 @@ private fun TreeRow(vm: AppVM, c: Category, n: Node, depth: Int, max: Long, open
         .background(if (all) c.color.copy(alpha = 0.18f) else if (folder) c.color.copy(alpha = 0.07f).compositeOverWhite() else Color.White.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
         .clickable { if (c.viewOnly) { if (n.children.isNotEmpty()) toggle() } else vm.setSel(n.ids, !all) }
         .padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        KText(if (n.children.isEmpty()) " " else if (open) "▾" else "▸", 16.sp, color = c.color.darker(),
+        KText(if (n.children.isEmpty()) " " else if (open) "▾" else if (L.isRtl) "◂" else "▸", 16.sp, color = c.color.darker(),
             modifier = Modifier.width(22.dp).clickable(enabled = n.children.isNotEmpty()) { toggle() })
         if (!c.viewOnly) Checkbox(all, nsel > 0 && !all, c.color)
         KText(if (folder) "📁" else n.item?.let { emojiFor(it) } ?: "📄", 18.sp, modifier = Modifier.padding(horizontal = 6.dp))
         Column(Modifier.weight(1f)) {
             KText(if (!folder) n.item!!.name else n.name, 12.5.sp, maxLines = 1)
-            if (n.item == null) KText("${n.ids.size} elementi", 10.sp, bold = false, alpha = 0.5f)
+            if (n.item == null) KText(L.tp("and.tree.items", n.ids.size, n.ids.size), 10.sp, bold = false, alpha = 0.5f)
             else if (n.item!!.badges.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { n.item!!.badges.take(2).forEach { Pill(it, c.color) } }
         }
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(74.dp)) {
@@ -524,6 +573,7 @@ fun ConfirmDialog(title: String, text: String, ok: String, onDismiss: () -> Unit
     // a real window on top of everything: placed inline it ended up below the screen and never showed
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+    WithDirection {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).clickable(remember { MutableInteractionSource() }, null) { onDismiss() },
         contentAlignment = Alignment.Center) {
         Column(Modifier.padding(24.dp).kawaiiCard(Kawaii.coral, 30.dp).clickable(remember { MutableInteractionSource() }, null) {}.padding(22.dp),
@@ -532,10 +582,11 @@ fun ConfirmDialog(title: String, text: String, ok: String, onDismiss: () -> Unit
             KText(title, 18.sp)
             KText(text, 12.5.sp, bold = false, alpha = 0.7f)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BubblyButton("Annulla", Kawaii.lilac, onClick = onDismiss)
+                BubblyButton(L.t("and.btn.cancel"), Kawaii.lilac, onClick = onDismiss)
                 BubblyButton(ok, Kawaii.coral, onClick = onOk)
             }
         }
+    }
     }
     }
 }
@@ -544,7 +595,7 @@ fun ConfirmDialog(title: String, text: String, ok: String, onDismiss: () -> Unit
 private fun BusyOverlay(vm: AppVM, b: Busy) {
     var qi by remember { mutableIntStateOf(0) }
     LaunchedEffect(b.act) { while (true) { delay(2600); qi++ } }
-    val q = QUIPS[b.act] ?: listOf("…")
+    val q = remember(b.act, L.lang) { quips(b.act) }
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.22f)).clickable(remember { MutableInteractionSource() }, null) {}, contentAlignment = Alignment.Center) {
         Column(Modifier.padding(20.dp).kawaiiCard(Kawaii.lemon, 32.dp).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Suri(b.act, 190.dp)
@@ -552,9 +603,9 @@ private fun BusyOverlay(vm: AppVM, b: Busy) {
             KText(q[qi % q.size], 13.sp, bold = false, alpha = 0.75f)
             StripedProgress(b.progress, Kawaii.pink, Modifier.fillMaxWidth().height(16.dp))
             KText(b.detail.ifEmpty { " " }, 10.5.sp, bold = false, alpha = 0.55f, maxLines = 1)
-            if (b.found > 0) KText("Bottino ☆ ${Fs.bytes(b.foundBytes)} · ${b.found} elementi", 12.sp, color = Kawaii.mint.darker())
-            if (b.steps > 1) KText("Zona ${b.step + 1} di ${b.steps}", 11.sp, alpha = 0.45f)
-            BubblyButton("Annulla", Kawaii.lilac) { vm.cancelJob() }
+            if (b.found > 0) KText(L.tp("and.busy.loot", b.found, Fs.bytes(b.foundBytes), b.found), 12.sp, color = Kawaii.mint.darker())
+            if (b.steps > 1) KText(L.t("and.busy.zone", b.step + 1, b.steps), 11.sp, alpha = 0.45f)
+            BubblyButton(L.t("and.btn.cancel"), Kawaii.lilac) { vm.cancelJob() }
         }
     }
 }
@@ -570,12 +621,12 @@ private fun CelebrationOverlay(vm: AppVM, c: Celebration) {
             KText(c.subtitle, 15.sp)
             if (c.message.isNotEmpty()) KText(c.message, 12.sp, bold = false, alpha = 0.65f)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (c.offerEmptyTrash && vm.trashSize > 0) BubblyButton("🗑️ Svuota il Cestino", Kawaii.coral) { askEmpty = true }
-                BubblyButton("Arigatō! ♡", Kawaii.mint) { vm.dismissCelebration() }
+                if (c.offerEmptyTrash && vm.trashSize > 0) BubblyButton(L.t("and.cele.emptyTrash"), Kawaii.coral) { askEmpty = true }
+                BubblyButton(L.t("and.cele.thanks"), Kawaii.mint) { vm.dismissCelebration() }
             }
         }
     }
-    if (askEmpty) ConfirmDialog("Svuotare il Cestino di Suri?", "Tutto ciò che c'è dentro (${Fs.bytes(vm.trashSize)}) verrà eliminato per sempre.", "Svuota per sempre",
+    if (askEmpty) ConfirmDialog(L.t("and.trash.askTitle"), L.t("and.trash.askText", Fs.bytes(vm.trashSize)), L.t("and.trash.askOk"),
         onDismiss = { askEmpty = false }) { askEmpty = false; vm.emptyTrash() }
 }
 
@@ -585,8 +636,8 @@ private fun BreakdownCard(vm: AppVM) {
     val slices = vm.breakdown
     val total = slices.sumOf { it.bytes }.coerceAtLeast(1)
     Column(Modifier.fillMaxWidth().kawaiiCard(Kawaii.lemon).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        KText("Dove sono tutti i GB? ☆", 15.sp)
-        KText("memoria da ${Fs.bytes(vm.storage.first)} · come la conta Android", 11.sp, bold = false, alpha = 0.55f)
+        KText(L.t("and.bd.title"), 15.sp)
+        KText(L.t("and.bd.sub", Fs.bytes(vm.storage.first)), 11.sp, bold = false, alpha = 0.55f)
         Row(Modifier.fillMaxWidth().height(16.dp).background(Kawaii.cocoa.copy(alpha = 0.06f), RoundedCornerShape(50))) {
             slices.forEach { sl ->
                 val w = (sl.bytes.toFloat() / total).coerceAtLeast(0.004f)
@@ -603,8 +654,8 @@ private fun BreakdownCard(vm: AppVM) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BubblyButton("😴 App pesanti", Kawaii.sky) { vm.open(Category.APPS) }
-            BubblyButton("🧽 Pulisci cache", Kawaii.mint) { vm.clearAllCaches() }
+            BubblyButton(L.t("and.bd.apps"), Kawaii.sky) { vm.open(Category.APPS) }
+            BubblyButton(L.t("and.bd.clean"), Kawaii.mint) { vm.clearAllCaches() }
         }
     }
 }

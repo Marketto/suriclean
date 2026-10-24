@@ -45,7 +45,7 @@ enum Admin {
         let fm = FileManager.default
         let script = fm.temporaryDirectory.appendingPathComponent("suriclean-root-\(UUID().uuidString).sh")
         guard (try? (["#!/bin/bash"] + lines).joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)) != nil else {
-            return Outcome(ok: false, cancelled: false, output: "Non riesco a preparare lo script")
+            return Outcome(ok: false, cancelled: false, output: t("mac.err.script"))
         }
         _ = Shell.run("/bin/chmod", ["700", script.path])
         defer { try? fm.removeItem(at: script) }

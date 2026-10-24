@@ -14,18 +14,29 @@ struct SuriCleanApp: App {
     var body: some Scene {
         WindowGroup("SuriClean") {
             ContentView().environmentObject(model)
+                .id(model.lang)
+                .environment(\.layoutDirection, L10n.shared.isRTL ? .rightToLeft : .leftToRight)
+                .environment(\.locale, L10n.shared.locale)
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandMenu("Suri") {
-                Button("Scansiona tutto") { model.scanAll() }.keyboardShortcut("r")
-                Button("Torna alla tana") { model.open(nil) }.keyboardShortcut("0")
-                Button("Controlla aggiornamenti…") { Task { await model.checkForUpdates(manual: true) } }
-                Button(model.muted ? "Attiva musica" : "Silenzia musica") { model.muted.toggle() }.keyboardShortcut("m")
-                Button(model.remix ? "Musica originale" : "Musica remix 🎧") { model.remix.toggle() }.keyboardShortcut("m", modifiers: [.command, .shift])
+                Button(t("mac.menu.scanall")) { model.scanAll() }.keyboardShortcut("r")
+                Button(t("mac.menu.home")) { model.open(nil) }.keyboardShortcut("0")
+                Button(t("mac.menu.checkupd")) { Task { await model.checkForUpdates(manual: true) } }
+                Button(model.muted ? t("mac.menu.musicon") : t("mac.menu.musicoff")) { model.muted.toggle() }.keyboardShortcut("m")
+                Button(model.remix ? t("mac.menu.original") : t("mac.menu.remix")) { model.remix.toggle() }.keyboardShortcut("m", modifiers: [.command, .shift])
                 Divider()
-                Button("Svuota il Cestino…") { model.askEmptyTrash = true }
+                Button(t("mac.menu.emptytrash")) { model.askEmptyTrash = true }
+                Divider()
+                Menu(t("mac.lang.title")) {
+                    Button((model.langChoice == nil ? "✓ " : "") + t("mac.lang.auto")) { model.setLanguage(nil) }
+                    Divider()
+                    ForEach(L10n.shared.languages, id: \.code) { l in
+                        Button((model.langChoice == l.code ? "✓ " : "") + l.name) { model.setLanguage(l.code) }
+                    }
+                }
             }
         }
     }
@@ -97,19 +108,19 @@ struct ContentView: View {
         .preferredColorScheme(.light)
         .frame(minWidth: 1060, minHeight: 690)
         .onAppear { model.start() }
-        .confirmationDialog("Dove scaviamo? ☆", isPresented: $model.askScanScope, titleVisibility: .visible) {
-            Button("🐾 Solo la mia cartella") { model.scanAll(full: false) }
-            Button("💽 Tutto il disco, tutti gli utenti 🔐") { model.scanAll(full: true) }
-            Button("Annulla", role: .cancel) {}
+        .confirmationDialog(t("mac.scope.title"), isPresented: $model.askScanScope, titleVisibility: .visible) {
+            Button(t("mac.scope.mine")) { model.scanAll(full: false) }
+            Button(t("mac.scope.all")) { model.scanAll(full: true) }
+            Button(t("mac.common.cancel"), role: .cancel) {}
         } message: {
-            Text("«Tutto il disco» chiede la password una volta e guarda anche le cartelle degli altri utenti e di sistema. Poi in ogni zona potrai filtrare «Io» o «Tutti».")
+            Text(t("mac.scope.msg"))
         }
         .sheet(isPresented: $model.showFDAGuide) { FDAGuide().environmentObject(model) }
-        .alert("Svuotare il Cestino?", isPresented: $model.askEmptyTrash) {
-            Button("Annulla", role: .cancel) {}
-            Button("Svuota per sempre", role: .destructive) { model.emptyTrash() }
+        .alert(t("mac.trash.ask"), isPresented: $model.askEmptyTrash) {
+            Button(t("mac.common.cancel"), role: .cancel) {}
+            Button(t("mac.trash.forever"), role: .destructive) { model.emptyTrash() }
         } message: {
-            Text("Tutto ciò che è nel Cestino (\(Fmt.bytes(model.trashSize))) verrà eliminato definitivamente, anche le cose che non ci ha messo Suri.")
+            Text(t("mac.trash.msg", Fmt.bytes(model.trashSize)))
         }
     }
 }
@@ -125,16 +136,16 @@ struct Sidebar: View {
                 MeerkatView(activity: model.busy?.activity ?? .idle, size: 56)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("SuriClean").font(Theme.font(21, .heavy))
-                    Text("スリちゃん · spazzina kawaii").font(Theme.font(11, .semibold)).opacity(0.55)
+                    Text(t("mac.brand.tagline")).font(Theme.font(11, .semibold)).opacity(0.55)
                 }
             }
             .padding(.top, 26)
             .padding(.bottom, 4)
 
-            SidebarRow(icon: "house.fill", title: "La tana ♡", color: Theme.lemon,
+            SidebarRow(icon: "house.fill", title: t("mac.side.home"), color: Theme.lemon,
                        selected: model.selectedCategory == nil, trailing: nil) { model.open(nil) }
 
-            Text("ZONE DI SCAVO ☆").font(Theme.font(10, .heavy)).opacity(0.4).padding(.top, 6).padding(.leading, 8)
+            Text(t("mac.side.zones")).font(Theme.font(10, .heavy)).opacity(0.4).padding(.top, 6).padding(.leading, 8)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 3) {
@@ -151,7 +162,7 @@ struct Sidebar: View {
 
             HStack {
                 Button(action: { model.muted.toggle(); Chiptune.shared.sfx(.pop) }) {
-                    Label(model.muted ? "Musica in pausa~" : "Musica pikopiko ♪",
+                    Label(model.muted ? t("mac.music.paused") : t("mac.music.on"),
                           systemImage: model.muted ? "speaker.slash.fill" : "music.note")
                         .font(Theme.font(12, .bold))
                 }
@@ -166,10 +177,12 @@ struct Sidebar: View {
                         .foregroundColor(model.remix ? .white : Theme.cocoa)
                 }
                 .buttonStyle(.plain)
-                .help("Remix: «Arcade Sparkle»")
+                .help(t("mac.music.remixhelp"))
             }
             .padding(.horizontal, 8)
-            .padding(.bottom, 10)
+            LanguagePicker()
+                .padding(.horizontal, 8)
+                .padding(.bottom, 10)
         }
         .padding(.horizontal, 12)
         .frame(width: 252)
@@ -235,7 +248,7 @@ struct LevelCard: View {
                 Text(lv.emoji).font(.system(size: 20))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(lv.title).font(Theme.font(13, .heavy))
-                    Text("Liberati in totale: \(Fmt.bytes(model.totalFreed))").font(Theme.font(10.5, .semibold)).opacity(0.6)
+                    Text(t("mac.level.freed", Fmt.bytes(model.totalFreed))).font(Theme.font(10.5, .semibold)).opacity(0.6)
                 }
             }
             StripedProgress(progress: max(0.04, lv.progress), color: Theme.mint).frame(height: 9)
@@ -258,8 +271,8 @@ struct UpdatePill: View {
                     HStack(spacing: 8) {
                         Text("✨").font(.system(size: 18))
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("Nuova versione \(model.update?.version ?? "")!").font(Theme.font(12.5, .heavy))
-                            Text("Riavvia e aggiorna ☆").font(Theme.font(10.5, .bold)).opacity(0.75)
+                            Text(t("mac.upd.new", model.update?.version ?? "")).font(Theme.font(12.5, .heavy))
+                            Text(t("mac.upd.restart")).font(Theme.font(10.5, .bold)).opacity(0.75)
                         }
                         Spacer()
                     }
@@ -271,12 +284,12 @@ struct UpdatePill: View {
             case .downloading:
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.6).frame(width: 16, height: 16)
-                    Text("Scarico la versione \(model.update?.version ?? "")…").font(Theme.font(11.5, .bold)).opacity(0.7)
+                    Text(t("mac.upd.downloading", model.update?.version ?? "")).font(Theme.font(11.5, .bold)).opacity(0.7)
                 }
                 .padding(.horizontal, 8)
             case .failed(let msg):
                 Button(action: { Task { await model.downloadUpdate() } }) {
-                    Text("Aggiornamento non riuscito, riprova 🔄").font(Theme.font(11.5, .bold)).foregroundColor(Theme.coral.darker)
+                    Text(t("mac.upd.failed")).font(Theme.font(11.5, .bold)).foregroundColor(Theme.coral.darker)
                 }
                 .buttonStyle(.plain)
                 .help(msg)
@@ -284,18 +297,39 @@ struct UpdatePill: View {
             default:
                 HStack(spacing: 6) {
                     Button(action: { Task { await model.checkForUpdates(manual: true) } }) {
-                        Text(model.updateState == .checking ? "Controllo aggiornamenti…" : "v\(Updater.currentVersion) · controlla aggiornamenti")
+                        Text(model.updateState == .checking ? t("mac.upd.checking") : t("mac.upd.check", Updater.currentVersion))
                             .font(Theme.font(10.5, .bold)).opacity(0.5)
                     }
                     .buttonStyle(.plain)
                     Spacer()
-                    Toggle("auto", isOn: $model.autoUpdate)
+                    Toggle(t("mac.upd.auto"), isOn: $model.autoUpdate)
                         .toggleStyle(.switch).controlSize(.mini)
                         .font(Theme.font(10, .bold))
-                        .help("Scarica e installa da sola le nuove versioni")
+                        .help(t("mac.upd.autohelp"))
                 }
                 .padding(.horizontal, 8)
             }
         }
+    }
+}
+
+
+/// 🌐 + the language in use; opens the list of every language by its own name.
+struct LanguagePicker: View {
+    @EnvironmentObject var model: AppModel
+    var body: some View {
+        Menu {
+            Button((model.langChoice == nil ? "✓ " : "") + t("mac.lang.auto")) { model.setLanguage(nil) }
+            Divider()
+            ForEach(L10n.shared.languages, id: \.code) { l in
+                Button((model.langChoice == l.code ? "✓ " : "") + l.name) { model.setLanguage(l.code) }
+            }
+        } label: {
+            Text("🌐 " + L10n.shared.nativeName).font(Theme.font(11.5, .bold))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .opacity(0.75)
+        .help(t("mac.lang.title"))
     }
 }

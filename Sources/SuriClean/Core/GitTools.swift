@@ -75,7 +75,7 @@ enum GitTools {
 
     private static func log(_ text: String) {
         let f = backupDir.appendingPathComponent("da leggere - come recuperare.txt")
-        let header = "# Rami e stash eliminati da SuriClean e come riaverli.\n\n"
+        let header = t("mac.git.logheader") + "\n\n"
         if let h = try? FileHandle(forWritingTo: f) {
             _ = try? h.seekToEnd(); h.write(Data((text + "\n\n").utf8)); try? h.close()
         } else {
@@ -89,12 +89,12 @@ enum GitTools {
 
     /// Deletes a branch only if it is merged or all its commits are on a remote. Notes the commit to restore it.
     static func deleteBranch(_ repo: URL, _ b: GitBranch) -> Result<String, Error> {
-        guard b.canDelete else { return .failure(err("Il ramo \(b.name) ha commit che esistono solo qui")) }
+        guard b.canDelete else { return .failure(err(t("mac.git.branchunique", b.name))) }
         let sha = g(repo, ["rev-parse", "refs/heads/\(b.name)"]).output
         let r = g(repo, ["branch", "-D", b.name], readOnly: false)
-        guard r.status == 0 else { return .failure(err("git non ha eliminato \(b.name)")) }
-        log("# \(stamp()) · \(repo.path) · ramo «\(b.name)»\ncd \"\(repo.path)\" && git branch \"\(b.name)\" \(sha)")
-        return .success("Ramo «\(b.name)» eliminato ✂️ (il comando per ricrearlo è in Documenti)")
+        guard r.status == 0 else { return .failure(err(t("mac.git.branchfail", b.name))) }
+        log("# \(stamp()) · \(repo.path) · " + t("mac.git.branchword", b.name) + "\ncd \"\(repo.path)\" && git branch \"\(b.name)\" \(sha)")
+        return .success(t("mac.git.branchdone", b.name))
     }
 
     /// Saves the stash as a .patch in Documents, then drops it.
@@ -105,21 +105,21 @@ enum GitTools {
         let safeName = repo.lastPathComponent.replacingOccurrences(of: "/", with: "-")
         let file = backupDir.appendingPathComponent("\(safeName) · \(stamp()) · \(s.id.replacingOccurrences(of: "/", with: "-")).patch")
         do {
-            try ("# \(s.message)\n# stash \(sha) di \(repo.path)\n" + patch.output + "\n").write(to: file, atomically: true, encoding: .utf8)
+            try ("# \(s.message)\n" + t("mac.git.patchheader", sha, repo.path) + "\n" + patch.output + "\n").write(to: file, atomically: true, encoding: .utf8)
         } catch {
-            return .failure(err("Non riesco a salvare la copia dello stash, quindi non lo tocco"))
+            return .failure(err(t("mac.git.stashsavefail")))
         }
         let r = g(repo, ["stash", "drop", s.id], readOnly: false)
-        guard r.status == 0 else { return .failure(err("git non ha eliminato lo stash")) }
-        log("# \(stamp()) · \(repo.path) · stash «\(s.message)»\ncd \"\(repo.path)\" && git apply \"\(file.path)\"\n# oppure, finché git non fa pulizia: git stash apply \(sha)")
-        return .success("Stash eliminato 📦 (copia salvata in Documenti › SuriClean - backup git)")
+        guard r.status == 0 else { return .failure(err(t("mac.git.stashfail"))) }
+        log("# \(stamp()) · \(repo.path) · stash «\(s.message)»\ncd \"\(repo.path)\" && git apply \"\(file.path)\"\n" + t("mac.git.stashalt", sha))
+        return .success(t("mac.git.stashdone"))
     }
 
     /// git gc: packs objects and removes unreachable garbage. Returns bytes saved.
     static func compact(_ repo: URL) -> Result<Int64, Error> {
         let before = FS.allocatedSize(repo.appendingPathComponent(".git"))
         let r = g(repo, ["gc", "--quiet"], readOnly: false)
-        guard r.status == 0 else { return .failure(err("git gc non è riuscito")) }
+        guard r.status == 0 else { return .failure(err(t("mac.git.gcfail"))) }
         let after = FS.allocatedSize(repo.appendingPathComponent(".git"))
         return .success(max(0, before - after))
     }

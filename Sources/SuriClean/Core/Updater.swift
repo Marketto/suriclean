@@ -54,24 +54,24 @@ enum Updater {
         try? fm.removeItem(at: work)
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         let (tmp, resp) = try await URLSession.shared.download(from: info.dmgURL)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw err("download non riuscito") }
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw err(t("mac.upd.err.download")) }
         let dmg = work.appendingPathComponent("SuriClean.dmg")
         try fm.moveItem(at: tmp, to: dmg)
         let mount = work.appendingPathComponent("mnt")
         try fm.createDirectory(at: mount, withIntermediateDirectories: true)
         let a = Shell.run("/usr/bin/hdiutil", ["attach", dmg.path, "-nobrowse", "-noverify", "-noautoopen", "-mountpoint", mount.path], mergeStderr: true)
-        guard a.status == 0 else { throw err("impossibile aprire il DMG: \(a.output)") }
+        guard a.status == 0 else { throw err(t("mac.upd.err.mount", a.output)) }
         defer { _ = Shell.run("/usr/bin/hdiutil", ["detach", mount.path, "-force"]) }
         let src = mount.appendingPathComponent("SuriClean.app")
-        guard fm.fileExists(atPath: src.path) else { throw err("nel DMG manca SuriClean.app") }
+        guard fm.fileExists(atPath: src.path) else { throw err(t("mac.upd.err.missing")) }
         let staged = work.appendingPathComponent("SuriClean.app")
         let c = Shell.run("/usr/bin/ditto", [src.path, staged.path], mergeStderr: true)
-        guard c.status == 0 else { throw err("copia non riuscita: \(c.output)") }
+        guard c.status == 0 else { throw err(t("mac.upd.err.copy", c.output)) }
         _ = Shell.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", staged.path])
         // make sure it's really our app and newer
         guard let b = Bundle(url: staged), b.bundleIdentifier == Bundle.main.bundleIdentifier,
               let v = b.infoDictionary?["CFBundleShortVersionString"] as? String, isNewer(v, than: currentVersion) else {
-            throw err("la versione scaricata non è valida")
+            throw err(t("mac.upd.err.invalid"))
         }
         return staged
     }

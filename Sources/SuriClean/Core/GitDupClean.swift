@@ -135,7 +135,7 @@ enum Duplicates {
         var candidates: [[IndexedFile]] = []
         for (i, group) in bySize.enumerated() {
             if rep.isCancelled { return [] }
-            rep.report("Confronto impronte: \(group[0].url.lastPathComponent)", progress: Double(i) / Double(max(bySize.count, 1)) * 0.4)
+            rep.report(t("mac.busy.compare", group[0].url.lastPathComponent), progress: Double(i) / Double(max(bySize.count, 1)) * 0.4)
             var seen = Set<UInt64>()
             let uniq = group.filter { f in
                 guard let ino = inode(f.url) else { return true }
@@ -148,7 +148,7 @@ enum Duplicates {
         var groups: [[IndexedFile]] = []
         for (i, g) in candidates.enumerated() {
             if rep.isCancelled { return [] }
-            rep.report("SHA-256 di \(g[0].url.lastPathComponent)", progress: 0.4 + Double(i) / Double(max(candidates.count, 1)) * 0.6)
+            rep.report(t("mac.busy.sha", g[0].url.lastPathComponent), progress: 0.4 + Double(i) / Double(max(candidates.count, 1)) * 0.6)
             let byFull = Dictionary(grouping: g, by: { fullHash($0.url, rep) ?? UUID().uuidString })
             for gg in byFull.values where gg.count > 1 { groups.append(gg) }
         }
@@ -156,13 +156,13 @@ enum Duplicates {
         var out: [CleanItem] = []
         for (gid, g) in groups.enumerated() {
             let sorted = g.sorted { keepScore($0) < keepScore($1) }
-            let label = "\(sorted[0].url.lastPathComponent) · \(g.count) copie da \(Fmt.bytes(g[0].size))"
+            let label = t("mac.dup.group", sorted[0].url.lastPathComponent, g.count, Fmt.bytes(g[0].size))
             for (j, f) in sorted.enumerated() {
                 let keep = j == 0
                 out.append(CleanItem(url: f.url, name: f.url.lastPathComponent,
                                      detail: FS.pretty(f.url.deletingLastPathComponent()),
                                      size: f.size, date: f.modified, risk: keep ? .careful : .safe,
-                                     recommended: !keep, badges: [keep ? "💎 da tenere" : "👯 copia"],
+                                     recommended: !keep, badges: [keep ? t("mac.badge.keep") : t("mac.badge.copy")],
                                      group: gid, groupLabel: label))
             }
         }
@@ -194,7 +194,7 @@ enum Cleaner {
             o.removed.append(item.id)
             o.removedURLs.append(item.url)
             o.bytes += item.size
-            if let c = item.copyText { repoLog.append("# \(item.url.path)  (rimosso \(stamp))\n\(c)") }
+            if let c = item.copyText { repoLog.append(t("mac.repolog.entry", item.url.path, stamp) + "\n\(c)") }
         }
 
         for (i, item) in items.enumerated() {
@@ -214,14 +214,14 @@ enum Cleaner {
         }
 
         if !protected.isEmpty && !reporter.isCancelled {
-            reporter.report("Una sola password per \(protected.count) \(protected.count == 1 ? "elemento protetto" : "elementi protetti")… 🔐", progress: 0.85, force: true)
+            reporter.report(tp("mac.busy.onepw", protected.count, protected.count), progress: 0.85, force: true)
             adminTrash(protected.flatMap { it in ([it.url] + it.extraURLs).map { ($0, it.owner) } })
             for item in protected {
                 if fm.fileExists(atPath: item.url.path) { o.failed.append(item.name) } else { done(item) }
             }
         }
         FS.appendToRepoLog(repoLog)
-        reporter.report("Fatto!", progress: 1, force: true)
+        reporter.report(t("mac.busy.done"), progress: 1, force: true)
         return o
     }
 
@@ -241,7 +241,7 @@ enum Cleaner {
             lines.append("/usr/sbin/chown -R \(q(user)) \(q(u.path)) 2>/dev/null; /bin/mv \(q(u.path)) \(q(dest))")
         }
         guard lines.count > 1 else { return }
-        _ = Admin.run(Array(lines.dropFirst()), prompt: "SuriClean vuole spostare nel Cestino \(entries.count) elementi protetti o di altri utenti.")
+        _ = Admin.run(Array(lines.dropFirst()), prompt: t("mac.prompt.admintrash", entries.count))
     }
 
     @discardableResult

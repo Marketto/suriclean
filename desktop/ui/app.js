@@ -10,55 +10,42 @@
     pink: "#FF80A8", coral: "#FF786E", orange: "#FFA85C", lemon: "#FFD14D", mint: "#61D6AD", sky: "#6CB2FF", lilac: "#A88FFA",
   };
   const CATS = [
-    { id: "diskMap", title: "Mappa del disco", sub: "Dove sono finiti tutti i GB? Scopriamolo ☆", icon: "🗺️", color: C.lemon, risk: "careful", act: "digging",
-      scan: "Misuro tutta la tana, cm per cm! 📏", view: true,
-      explain: "Tutto quello che occupa spazio nella tua cartella utente, cartella per cartella (da 300 MB in su). Qui non si cancella niente: guarda e apri le cartelle per scoprire i bestioni." },
-    { id: "caches", title: "Cache delle app", sub: "Briciole magiche che ricrescono da sole ✧", icon: "🌬️", color: C.sky, risk: "safe", act: "sniffing",
-      scan: "Snif snif! Caccia alle cache~ ☆",
-      explain: "Le cache servono solo a velocizzare: se le togli, le app le ricreano quando servono. Meglio chiudere le app (soprattutto i browser) prima di pulire." },
-    { id: "logsTemp", title: "Log e temporanei", sub: "Diari di bordo e roba usa-e-getta", icon: "🧾", color: C.lilac, risk: "safe", act: "reading",
-      scan: "Sfoglio i log, piku-piku! 📜",
-      explain: "File temporanei più vecchi di 3 giorni, dump dei crash e report di errore. Nessuno ne sentirà la mancanza." },
-    { id: "systemAreas", title: "Aree di sistema", sub: "Log, temp, aggiornamenti e dump del sistema 🔐", icon: "⚙️", color: C.sky, risk: "review", act: "sweeping",
-      scan: "Suri esplora le stanze del sistema! 🏯",
-      explain: "Fuori dalla tua cartella: log e report di errore del sistema, temporanei di sistema, aggiornamenti già installati, dump della memoria, pacchetti scaricati, vecchie versioni e backup ruotati. Serve la password di amministratore, una volta sola, e vengono eliminati per sempre (non passano dal Cestino). Le voci con 🔒 si misurano solo da amministratore." },
-    { id: "aiTools", title: "Claude, Codex & AI", sub: "Le briciole dei tuoi amici robot 🤖", icon: "🤖", color: C.pink, risk: "review", act: "hacking",
-      scan: "Bip-bup! Missione robot AI ☆",
-      explain: "Cronologie di Claude Code e Codex, cache di Claude Desktop, Cursor e VS Code, modelli scaricati (Hugging Face, Ollama, LM Studio). Le sessioni recenti e i modelli non sono preselezionati." },
-    { id: "devCaches", title: "Cache da sviluppatore", sub: "npm, pip, Gradle, Cargo, NuGet, Go…", icon: "🔨", color: C.orange, risk: "safe", act: "hacking",
-      scan: "Tic-tac! Hacker mode ON 💻",
-      explain: "Pacchetti scaricati dai gestori di dipendenze. Tutto si riscarica al prossimo build." },
-    { id: "buildDeps", title: "Dipendenze ricreabili", sub: "node_modules, venv, target, bin/obj…", icon: "📦", color: C.mint, risk: "safe", act: "digging",
-      scan: "Scava-scava nei node_modules! ⛏️",
-      explain: "Cartelle che si rigenerano con un comando (npm install, pip install, cargo build, dotnet build…). Preseleziono quelle di progetti fermi da più di 60 giorni." },
-    { id: "gitRepos", title: "Repo Git dimenticati", sub: "Progetti fermi che puoi riclonare", icon: "🌿", color: C.coral, risk: "review", act: "reading",
-      scan: "Leggo i diari segreti dei repo ♡",
-      explain: "Per ogni repo controllo remote, modifiche non salvate, file ignorati importanti, commit non pushati e stash. Preseleziono solo quelli al sicuro sul remote e fermi da 6+ mesi. Il comando git clone viene salvato in Documenti." },
-    { id: "duplicates", title: "File gemelli", sub: "Gemellini identici, byte per byte ♡♡", icon: "👯", color: C.lilac, risk: "review", act: "detective",
-      scan: "Detective Suri in azione! 🔍",
-      explain: "File da 1 MB in su confrontati con impronta SHA-256. In ogni gruppo tengo la copia «originale» (💎) e preseleziono le altre. Almeno una copia resta sempre." },
-    { id: "bigFiles", title: "File giganti", sub: "I mostroni più ciccioni della tana!", icon: "🦖", color: C.pink, risk: "careful", act: "digging",
-      scan: "Caccia ai mostri giganti! ドドーン",
-      explain: "I file da 100 MB in su. Niente è preselezionato: decidi tu." },
-    { id: "installers", title: "Installer e immagini", sub: "Setup e .iso già usati", icon: "💿", color: C.sky, risk: "safe", act: "lookout",
-      scan: "Sentinella Suri, occhi aperti! 👀",
-      explain: "Programmi di installazione e immagini disco. Preseleziono quelli in Download e sul Desktop." },
-    { id: "oldDownloads", title: "Download dimenticati", sub: "Roba nei Download da più di 3 mesi", icon: "📥", color: C.mint, risk: "review", act: "lookout",
-      scan: "Pattuglia dei Download, kira-kira ✧",
-      explain: "Tutto ciò che sta nei Download da più di 90 giorni. Nulla è preselezionato." },
+    { id: "diskMap", icon: "🗺️", color: C.lemon, risk: "careful", act: "digging", view: true },
+    { id: "caches", icon: "🌬️", color: C.sky, risk: "safe", act: "sniffing" },
+    { id: "logsTemp", icon: "🧾", color: C.lilac, risk: "safe", act: "reading" },
+    { id: "systemAreas", icon: "⚙️", color: C.sky, risk: "review", act: "sweeping" },
+    { id: "aiTools", icon: "🤖", color: C.pink, risk: "review", act: "hacking" },
+    { id: "devCaches", icon: "🔨", color: C.orange, risk: "safe", act: "hacking" },
+    { id: "buildDeps", icon: "📦", color: C.mint, risk: "safe", act: "digging" },
+    { id: "gitRepos", icon: "🌿", color: C.coral, risk: "review", act: "reading" },
+    { id: "duplicates", icon: "👯", color: C.lilac, risk: "review", act: "detective" },
+    { id: "bigFiles", icon: "🦖", color: C.pink, risk: "careful", act: "digging" },
+    { id: "installers", icon: "💿", color: C.sky, risk: "safe", act: "lookout" },
+    { id: "oldDownloads", icon: "📥", color: C.mint, risk: "review", act: "lookout" },
   ];
   const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
-  const RISK = { safe: "Sicuro", review: "Da controllare", careful: "Con cautela" };
-  const QUIPS = {
-    digging: ["Hori-hori! Scavo scavo~ 🕳️", "Ooh! Qui sotto c'è qualcosa di ciccione!", "Zampette turbo attivate ☆", "Sniff… odore di file giganti!"],
-    detective: ["Hmm~ questi due sono gemellini! 🔍", "Confronto le impronte SHA-256, kira!", "Elementare, mio caro PC ♡", "Nessun gemello sfugge a Suri-chan!"],
-    sweeping: ["Saa~ spazza spazza! 🧹", "Bye-bye polverina digitale!", "Pika-pika, tutto lucido ✨", "Che soddisfazione, kyaa~!"],
-    reading: ["Leggo i diari segreti dei repo 📜", "Eeh?! Ultimo commit… secoli fa!", "Tutto pushato? Controllo bene ♡", "git log, git status, git… nyaa~"],
-    hacking: ["Bip-bup! Annuso i file dei robot 🤖", "Claude e Codex lasciano briciole~", "Modelli AI in vista, sugoi!", "01101110 = «nyam» ♡"],
-    sniffing: ["Kun-kun! Sento le cache 👃", "Profumino di file temporanei~", "Briciole ovunque, waa!", "Odore di app dimenticata…"],
-    lookout: ["Sentinella Suri, pronta! 👀", "Download antichi all'orizzonte!", "Dalla collinetta vedo tutto ☆"],
-    sleepy: ["Shh~ 💤"], celebrating: ["Yatta~! 🎉"], idle: ["Eccomi!"], wave: ["Eccomi!"],
-  };
+  const RISK = {};
+  const QUIP_COUNTS = {"digging": 4, "detective": 4, "sweeping": 4, "reading": 4, "hacking": 4, "sniffing": 4, "lookout": 3, "sleepy": 1, "celebrating": 1, "idle": 1, "wave": 1};
+  const QUIPS = {};
+  // ───────── translations ─────────
+  const t = (k, ...a) => I18n.t(k, ...a);
+  const tp = (k, n, ...a) => I18n.tp(k, n, ...a);
+  const nItems = n => tp("web.items", n, n);
+  /** Rust messages (and byte counts) → text in the current language. */
+  const msg = s => I18n.msg(s, { bytes });
+  function localizeItem(it) {
+    it._raw ||= { name: it.name, detail: it.detail, badges: it.badges, groupLabel: it.groupLabel };
+    it.name = msg(it._raw.name); it.detail = msg(it._raw.detail);
+    it.badges = (it._raw.badges || []).map(msg); it.groupLabel = it._raw.groupLabel == null ? null : msg(it._raw.groupLabel);
+    return it;
+  }
+  function localize() {
+    CATS.forEach(c => ["title", "sub", "scan", "explain"].forEach(f => c[f] = t(`web.cat.${c.id}.${f}`)));
+    ["safe", "review", "careful"].forEach(r => RISK[r] = t(`web.risk.${r}`));
+    Object.entries(QUIP_COUNTS).forEach(([act, n]) => QUIPS[act] = Array.from({ length: n }, (_, i) => t(`web.quip.${act}.${i}`)));
+    Object.values(S.results || {}).forEach(list => list.forEach(localizeItem));
+  }
+
   const EXT_ICON = { mp4: "🎬", mkv: "🎬", mov: "🎬", avi: "🎬", zip: "📦", rar: "📦", "7z": "📦", gz: "📦", iso: "💿", exe: "⚙️", msi: "⚙️", deb: "📦", rpm: "📦", appimage: "📲", pdf: "📄", jpg: "🖼️", png: "🖼️", mp3: "🎵", wav: "🎵", flac: "🎵" };
 
   // ───────── state ─────────
@@ -74,7 +61,7 @@
     b = Math.max(0, b || 0);
     const u = ["byte", "KB", "MB", "GB", "TB"]; let i = 0;
     while (b >= 1000 && i < 4) { b /= 1000; i++; }
-    return i === 0 ? `${b} byte` : `${b.toFixed(1).replace(".", ",")} ${u[i]}`;
+    return i === 0 ? t("web.fmt.bytes", b) : `${I18n.num(b, 1)} ${u[i]}`;
   }
   const items = id => S.results[id] || [];
   const total = list => list.reduce((a, b) => a + b.size, 0);
@@ -105,10 +92,10 @@
   // ───────── sidebar ─────────
   function level() {
     const gb = S.freed / 1e9;
-    const steps = [[1, "Cucciolina curiosa", "🐣"], [5, "Scavatrice in erba", "🌱"], [20, "Sentinella del disco", "👀"], [50, "Regina delle dune", "👑"]];
+    const steps = [[1, t("web.level.1"), "🐣"], [5, t("web.level.2"), "🌱"], [20, t("web.level.3"), "👀"], [50, t("web.level.4"), "👑"]];
     let prev = 0;
-    for (const [lim, t, e] of steps) { if (gb < lim) return { t, e, p: (gb - prev) / (lim - prev), next: `prossimo livello a ${lim} GB` }; prev = lim; }
-    return { t: "Leggenda del deserto", e: "🌟", p: 1, next: "livello MAX!! Sugoi~" };
+    for (const [lim, name, e] of steps) { if (gb < lim) return { t: name, e, p: (gb - prev) / (lim - prev), next: t("web.level.next", lim) }; prev = lim; }
+    return { t: t("web.level.5"), e: "🌟", p: 1, next: t("web.level.max") };
   }
 
   function renderSidebar() {
@@ -117,16 +104,33 @@
       `<button class="side-row ${S.view === id ? "sel" : ""}" style="--c:${color}" data-open="${id ?? ""}">
         <span class="ic">${icon}</span><span class="lbl">${esc(title)}</span>${badge ? `<span class="badge">${badge}</span>` : ""}</button>`;
     $("#sidebar").innerHTML = `
-      <div class="brand"><div class="suri-mini" id="suri-side"></div><div><h1>SuriClean</h1><small>スリちゃん · spazzina kawaii</small></div></div>
-      ${row(null, "🏡", "La tana ♡", C.lemon)}
-      <div class="section-label">ZONE DI SCAVO ☆</div>
+      <div class="brand"><div class="suri-mini" id="suri-side"></div><div><h1>SuriClean</h1><small>${esc(t("web.brand.sub"))}</small></div></div>
+      ${row(null, "🏡", t("web.side.home"), C.lemon)}
+      <div class="section-label">${esc(t("web.side.zones"))}</div>
       <div class="side-list">${CATS.map(c => row(c.id, c.icon, c.title, c.color, S.results[c.id] ? bytes(displayTotal(c.id)) : "")).join("")}</div>
-      <div class="card level" style="--c:${C.mint}"><div class="t">${lv.e} ${lv.t}</div><div class="s">Liberati in totale: ${bytes(S.freed)}</div>
+      <div class="card level" style="--c:${C.mint}"><div class="t">${lv.e} ${lv.t}</div><div class="s">${esc(t("web.side.freed", bytes(S.freed)))}</div>
         <div class="progress" style="width:100%;height:9px;margin:6px 0"><i style="width:${Math.max(4, lv.p * 100)}%"></i></div><div class="s">${lv.next}</div></div>
       ${updatePill()}
-      <div class="music-row"><button class="music-toggle" data-act="mute">${S.muted ? "🔇 Musica in pausa~" : "🎵 Musica pikopiko ♪"}</button>
-      <button class="remix-toggle ${S.remix ? "on" : ""}" data-act="remix" title="Remix: «Arcade Sparkle»">${S.remix ? "🎧 Remix ON" : "🎧 Remix"}</button></div>`;
+      <div class="music-row"><button class="music-toggle" data-act="mute">${esc(t(S.muted ? "web.music.paused" : "web.music.on"))}</button>
+      <button class="remix-toggle ${S.remix ? "on" : ""}" data-act="remix" title="${esc(t("web.remix.title"))}">${esc(t(S.remix ? "web.remix.on" : "web.remix.off"))}</button></div>
+      ${langPicker()}`;
     Suri.setActivity($("#suri-side"), S.busy ? S.busy.act : "idle");
+  }
+
+  // ───────── language ─────────
+  function langPicker() {
+    const cur = I18n.languages.find(l => l.code === I18n.lang);
+    const opts = [`<option value="" ${I18n.chosen ? "" : "selected"}>${esc(t("web.lang.auto"))}</option>`]
+      .concat(I18n.languages.map(l => `<option value="${l.code}" ${I18n.chosen === l.code ? "selected" : ""}>${esc(l.name)}</option>`));
+    return `<label class="lang-row" title="${esc(t("web.lang.title"))}">🌐 <span>${esc(cur ? cur.name : I18n.lang)}</span>
+      <select data-lang>${opts.join("")}</select></label>`;
+  }
+
+  async function changeLang(code) {
+    await I18n.setLang(code || null);
+    localize();
+    sfx("coin");
+    render();
   }
 
   // ───────── updates ─────────
@@ -152,37 +156,37 @@
         S.update = { version: v, url: asset.browser_download_url };
         renderSidebar();
         if (S.autoUpdate && S.kind !== "deb" && !S.busy && !Object.keys(S.results).length) return installUpdate();
-        toast(`Kyaa~! È uscita SuriClean ${v} ✨ Premi «Aggiorna» nella barra a sinistra`);
-      } else if (manual) toast(`Sei già all'ultima versione (${S.version}) ✨`);
-    } catch (e) { if (manual) toast("Non riesco a contattare GitHub, riprova più tardi~"); }
+        toast(t("web.upd.available", v));
+      } else if (manual) toast(t("web.upd.latest", S.version));
+    } catch (e) { if (manual) toast(t("web.upd.offline")); }
   }
 
   async function installUpdate() {
     if (!S.update || S.busy) return;
     S.steps = 1;
-    S.busy = { act: "digging", title: `Scarico SuriClean ${S.update.version}… ✨`, detail: S.kind === "deb" ? "Poi si apre l'installer dei pacchetti" : "L'app si riavvia da sola", progress: null, step: 0, found: 0 };
+    S.busy = { act: "digging", title: t("web.upd.downloading", S.update.version), detail: t(S.kind === "deb" ? "web.upd.deb_next" : "web.upd.restart"), progress: null, step: 0, found: 0 };
     Chiptune.setMood("cleaning"); showBusy();
     try {
       await invoke("install_update", { url: S.update.url, kind: S.kind });
-      if (S.kind === "deb") { S.busy = null; showBusy(); toast("Pacchetto scaricato nei Download: conferma l'installazione e riapri Suri ♡"); }
-    } catch (e) { S.busy = null; showBusy(); toast(`Aggiornamento non riuscito: ${e}`); }
+      if (S.kind === "deb") { S.busy = null; showBusy(); toast(t("web.upd.deb_saved")); }
+    } catch (e) { S.busy = null; showBusy(); toast(t("web.upd.failed", msg(String(e)))); }
   }
 
   function updatePill() {
-    if (S.update) return `<button class="btn" style="--c:${C.pink};text-align:left" data-act="update">✨ Nuova versione ${S.update.version}! Aggiorna ☆</button>`;
-    return `<div style="display:flex;align-items:center;gap:6px;padding:0 8px"><button class="music-toggle" style="padding:0;opacity:.5;font-size:10.5px" data-act="checkUpdate">v${S.version} · controlla aggiornamenti</button>
-      <label style="margin-left:auto;font-size:10px;font-weight:800;opacity:.6"><input type="checkbox" data-act="autoUpdate" ${S.autoUpdate ? "checked" : ""}> auto</label></div>`;
+    if (S.update) return `<button class="btn" style="--c:${C.pink};text-align:left" data-act="update">${esc(t("web.upd.pill", S.update.version))}</button>`;
+    return `<div style="display:flex;align-items:center;gap:6px;padding:0 8px"><button class="music-toggle" style="padding:0;opacity:.5;font-size:10.5px" data-act="checkUpdate">${esc(t("web.upd.check", S.version))}</button>
+      <label style="margin-left:auto;font-size:10px;font-weight:800;opacity:.6"><input type="checkbox" data-act="autoUpdate" ${S.autoUpdate ? "checked" : ""}> ${esc(t("web.upd.auto"))}</label></div>`;
   }
 
   // ───────── dashboard ─────────
   function greeting() {
     const pct = S.disk.total ? Math.round((1 - S.disk.free / S.disk.total) * 100) : 0;
     if (!Object.keys(S.results).length) {
-      if (pct >= 90) return `Kyaa~! Sono Suri-chan 🐾 Il tuo disco è pieno al ${pct}%… è un'emergenza kawaii!! Premi il bottone e lo faccio tornare pika-pika ✨`;
-      if (pct >= 70) return `Konnichiwa~! Sono Suri-chan 🐾 Il disco è al ${pct}%. Andiamo a caccia di spazio insieme? Ganbarō! ☆`;
-      return `Yahoo~! Sono Suri-chan 🐾 Il disco sta benino (${pct}%), ma un po' di brillantezza in più non guasta mai ✧`;
+      if (pct >= 90) return t("web.greet.full", pct);
+      if (pct >= 70) return t("web.greet.mid", pct);
+      return t("web.greet.ok", pct);
     }
-    return `Sugoi!! Ho scovato ${bytes(foundTotal())} di roba ✨ e ${bytes(recTotal())} puoi buttarli senza pensieri! Tocca una zona e diamo un'occhiatina~ ♡`;
+    return t("web.greet.found", bytes(foundTotal()), bytes(recTotal()));
   }
 
   function typewrite(el, text) {
@@ -201,11 +205,11 @@
       <circle cx="84" cy="84" r="${R}" fill="none" stroke="url(#gg)" stroke-width="26" stroke-linecap="round" transform="rotate(-90 84 84)" stroke-dasharray="${L}" stroke-dashoffset="${L}" style="transition:stroke-dashoffset 1.3s cubic-bezier(.3,1.2,.5,1)" data-to="${L * (1 - used)}"/>
       <circle cx="84" cy="84" r="${R}" fill="none" stroke="#61D6AD" stroke-width="12" stroke-linecap="round" transform="rotate(${-90 + 360 * (used - rec)} 84 84)" stroke-dasharray="${L * rec} ${L}"/>
       <text x="84" y="88" text-anchor="middle" font-size="34" font-weight="900" fill="#54382B">${Math.round(used * 100)}%</text>
-      <text x="84" y="110" text-anchor="middle" font-size="13" font-weight="800" fill="rgba(84,56,43,.5)">pieno</text></svg>
-      <div class="legend"><div><i style="background:#FF80A8"></i>Occupato<b>${bytes(S.disk.total - S.disk.free)}</b></div>
-      <div><i style="background:rgba(97,214,173,.4)"></i>Libero<b>${bytes(S.disk.free)}</b></div>
-      <div><i style="background:#61D6AD"></i>Liberabile (consigliato)<b>${recTotal() ? bytes(recTotal()) : "—"}</b></div>
-      <div><i style="background:#FFD14D"></i>Trovato in totale<b>${foundTotal() ? bytes(foundTotal()) : "—"}</b></div></div></div>`;
+      <text x="84" y="110" text-anchor="middle" font-size="13" font-weight="800" fill="rgba(84,56,43,.5)">${esc(t("web.gauge.full"))}</text></svg>
+      <div class="legend"><div><i style="background:#FF80A8"></i>${esc(t("web.gauge.used"))}<b>${bytes(S.disk.total - S.disk.free)}</b></div>
+      <div><i style="background:rgba(97,214,173,.4)"></i>${esc(t("web.gauge.free"))}<b>${bytes(S.disk.free)}</b></div>
+      <div><i style="background:#61D6AD"></i>${esc(t("web.gauge.rec"))}<b>${recTotal() ? bytes(recTotal()) : "—"}</b></div>
+      <div><i style="background:#FFD14D"></i>${esc(t("web.gauge.found"))}<b>${foundTotal() ? bytes(foundTotal()) : "—"}</b></div></div></div>`;
   }
 
   function renderDashboard() {

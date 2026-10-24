@@ -16,8 +16,8 @@ struct DashboardView: View {
                     TipsPanel()
                 }
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Dove scaviamo oggi? ♡").font(Theme.font(23, .heavy))
-                    Text("tocca una zona, pika!").font(Theme.font(13, .semibold)).opacity(0.5)
+                    Text(t("mac.dash.zones")).font(Theme.font(23, .heavy))
+                    Text(t("mac.dash.zones.sub")).font(Theme.font(13, .semibold)).opacity(0.5)
                 }
                 LazyVGrid(columns: columns, spacing: 18) {
                     ForEach(CleanCategory.allCases) { CategoryCard(category: $0) }
@@ -35,7 +35,7 @@ struct DashboardView: View {
                 SpeechBubble(text: model.greeting)
                 HStack(spacing: 14) {
                     Button(action: { model.scanAll() }) {
-                        Label("Via allo scavo! ☆", systemImage: "sparkles")
+                        Label(t("mac.dash.go"), systemImage: "sparkles")
                     }
                     .buttonStyle(BubblyButtonStyle(color: Theme.pink, big: true))
                     .disabled(model.busy != nil)
@@ -44,7 +44,7 @@ struct DashboardView: View {
                             AnimatedBytes(value: model.recommendedTotal)
                                 .font(Theme.font(24, .heavy))
                                 .foregroundColor(Theme.mint.darker)
-                            Text("liberabili senza pensieri ✧").font(Theme.font(11.5, .semibold)).opacity(0.6)
+                            Text(t("mac.dash.safe")).font(Theme.font(11.5, .semibold)).opacity(0.6)
                         }
                     }
                 }
@@ -60,15 +60,15 @@ struct FDABanner: View {
         HStack(spacing: 14) {
             IconBlob(symbol: "lock.open.fill", color: Theme.orange, size: 46)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Onegai~! Fammi entrare in tutte le stanze 🙏").font(Theme.font(15, .heavy))
-                Text("Senza l'«Accesso completo al disco» non vedo backup iPhone, Mail, Messaggi e qualche cache. Impostazioni › Sicurezza e privacy › Privacy › Accesso completo al disco › aggiungi SuriClean, poi riapri l'app.")
+                Text(t("mac.fdab.title")).font(Theme.font(15, .heavy))
+                Text(t("mac.fdab.text"))
                     .font(Theme.font(12, .medium)).opacity(0.7)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button("Concedi l'accesso") { model.showFDAGuide = true }
+            Button(t("mac.fdab.grant")) { model.showFDAGuide = true }
                 .buttonStyle(BubblyButtonStyle(color: Theme.orange))
-            Button("Ricontrolla") { model.recheckFDA() }
+            Button(t("mac.fdab.recheck")) { model.recheckFDA() }
                 .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
         }
         .padding(16)
@@ -98,15 +98,15 @@ struct DiskGauge: View {
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 0) {
                     Text("\(Int(used * 100))%").font(Theme.font(36, .heavy))
-                    Text("pieno").font(Theme.font(13, .bold)).opacity(0.5)
+                    Text(t("mac.gauge.full")).font(Theme.font(13, .bold)).opacity(0.5)
                 }
             }
             .frame(width: 168, height: 168)
             .padding(.top, 6)
             VStack(spacing: 6) {
-                legend(Theme.pink, "Occupato", Fmt.bytes(disk.used))
-                legend(Theme.mint.opacity(0.4), "Libero", Fmt.bytes(disk.availableImportant))
-                legend(Theme.mint, "Liberabile (consigliato)", reclaimable > 0 ? Fmt.bytes(reclaimable) : "—")
+                legend(Theme.pink, t("mac.gauge.used"), Fmt.bytes(disk.used))
+                legend(Theme.mint.opacity(0.4), t("mac.gauge.free"), Fmt.bytes(disk.availableImportant))
+                legend(Theme.mint, t("mac.gauge.rec"), reclaimable > 0 ? Fmt.bytes(reclaimable) : "—")
             }
         }
         .padding(20)
@@ -131,21 +131,21 @@ struct TipsPanel: View {
     @EnvironmentObject var model: AppModel
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Trucchetti segreti di Suri ✧").font(Theme.font(18, .heavy))
-            TipRow(icon: "trash.fill", color: Theme.coral, title: "Cestino",
-                   note: "Lo spazio torna libero solo quando lo svuoti",
+            Text(t("mac.tips.title")).font(Theme.font(18, .heavy))
+            TipRow(icon: "trash.fill", color: Theme.coral, title: t("mac.tips.trash"),
+                   note: t("mac.tips.trash.note"),
                    value: Fmt.bytes(model.trashSize),
-                   buttonTitle: model.trashSize > 0 ? "Svuota" : nil) { model.askEmptyTrash = true }
-            TipRow(icon: "clock.arrow.circlepath", color: Theme.sky, title: "Istantanee locali di Time Machine",
-                   note: "Copie che macOS tiene sul disco interno",
+                   buttonTitle: model.trashSize > 0 ? t("mac.tips.trash.btn") : nil) { model.askEmptyTrash = true }
+            TipRow(icon: "clock.arrow.circlepath", color: Theme.sky, title: t("mac.tips.snaps"),
+                   note: t("mac.tips.snaps.note"),
                    value: model.snapshotCount.map { "\($0)" } ?? "…",
-                   buttonTitle: (model.snapshotCount ?? 0) > 0 ? "Assottiglia" : nil) { model.thinSnapshots() }
-            TipRow(icon: "icloud.fill", color: Theme.lilac, title: "Spazio «purgeable»",
-                   note: "macOS lo libera da solo quando serve",
+                   buttonTitle: (model.snapshotCount ?? 0) > 0 ? t("mac.tips.snaps.btn") : nil) { model.thinSnapshots() }
+            TipRow(icon: "icloud.fill", color: Theme.lilac, title: t("mac.tips.purge"),
+                   note: t("mac.tips.purge.note"),
                    value: Fmt.bytes(model.disk.purgeable), buttonTitle: nil) {}
-            TipRow(icon: "arrow.clockwise", color: Theme.mint, title: "Aggiorna i numeri del disco",
-                   note: "Dopo aver svuotato il Cestino o disinstallato app",
-                   value: "", buttonTitle: "Aggiorna") {
+            TipRow(icon: "arrow.clockwise", color: Theme.mint, title: t("mac.tips.refresh"),
+                   note: t("mac.tips.refresh.note"),
+                   value: "", buttonTitle: t("mac.tips.refresh.btn")) {
                 model.refreshDisk(); model.refreshTrash(); model.refreshSnapshots()
             }
         }
@@ -206,10 +206,10 @@ struct CategoryCard: View {
                     AnimatedBytes(value: model.displayTotal(category))
                         .font(Theme.font(22, .heavy))
                         .foregroundColor(category.color.darker)
-                    Text(items.isEmpty ? "pika-pika ✨" : "· \(items.count) elementi").font(Theme.font(11.5, .semibold)).opacity(0.55)
+                    Text(items.isEmpty ? t("mac.zone.clean") : t("mac.zone.count", items.count)).font(Theme.font(11.5, .semibold)).opacity(0.55)
                 }
             } else {
-                Text("Ancora da esplorare~ 🐾").font(Theme.font(12.5, .bold)).opacity(0.45)
+                Text(t("mac.zone.unexplored")).font(Theme.font(12.5, .bold)).opacity(0.45)
             }
         }
         .padding(16)

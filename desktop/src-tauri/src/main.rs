@@ -155,7 +155,7 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
             }
         }
         if !admin.is_empty() && !rep.cancelled() {
-            rep.report_force(&format!("Una sola password per {} elementi di sistema… 🔐", admin.len()), Some(0.85));
+            rep.report_force(&scan::m("web.rs.p.one_password", &[&admin.len().to_string()]), Some(0.85));
             let done = std::env::temp_dir().join(format!("suriclean-done-{}.txt", std::process::id()));
             let _ = std::fs::remove_file(&done);
             let dq = scan::shell_quote(&done.to_string_lossy());
@@ -190,7 +190,7 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
         if !log.is_empty() {
             out.repo_log = scan::append_repo_log(&log);
         }
-        rep.report_force("Fatto!", Some(1.0));
+        rep.report_force(&scan::m("web.rs.p.done", &[]), Some(1.0));
         out
     })
     .await
@@ -247,7 +247,7 @@ fn app_version(app: AppHandle) -> String {
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String, kind: String) -> Result<String, String> {
     if !(url.starts_with("https://github.com/") || url.starts_with("https://objects.githubusercontent.com/")) {
-        return Err("indirizzo non valido".into());
+        return Err(scan::m("web.rs.err.bad_url", &[]));
     }
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<(PathBuf, bool), String> {
         let resp = ureq::get(&url).set("User-Agent", "SuriClean").call().map_err(|e| e.to_string())?;
@@ -261,7 +261,7 @@ async fn install_update(app: AppHandle, url: String, kind: String) -> Result<Str
                 Ok((p, true))
             }
             "appimage" => {
-                let current = PathBuf::from(std::env::var("APPIMAGE").map_err(|_| "non è un AppImage".to_string())?);
+                let current = PathBuf::from(std::env::var("APPIMAGE").map_err(|_| scan::m("web.rs.err.not_appimage", &[]))?);
                 let tmp = current.with_extension("new");
                 std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
                 #[cfg(unix)]
@@ -322,7 +322,7 @@ fn elevated_main(cats: &str, out: &str) {
 async fn elevated_scan(app: AppHandle, categories: Vec<String>) -> Result<std::collections::HashMap<String, Vec<Item>>, String> {
     let rep = reporter(&app);
     tauri::async_runtime::spawn_blocking(move || {
-        rep.report_force("Aspetto la password da amministratore… 🔐", None);
+        rep.report_force(&scan::m("web.rs.p.waiting_password", &[]), None);
         let out = std::env::temp_dir().join(format!("suriclean-scan-{}.json", std::process::id()));
         let _ = std::fs::remove_file(&out);
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -333,8 +333,8 @@ async fn elevated_scan(app: AppHandle, categories: Vec<String>) -> Result<std::c
             _ => format!("{} --elevated-scan {} {}", q(&exe.to_string_lossy()), cats, q(&out.to_string_lossy())),
         };
         scan::run_elevated(&[line])?;
-        rep.report_force("Leggo cosa ha misurato Suri-admin…", None);
-        let text = std::fs::read_to_string(&out).map_err(|_| "La misura da amministratore non è riuscita".to_string())?;
+        rep.report_force(&scan::m("web.rs.p.reading_admin", &[]), None);
+        let text = std::fs::read_to_string(&out).map_err(|_| scan::m("web.rs.err.admin_failed", &[]))?;
         let _ = std::fs::remove_file(&out);
         let mut res: std::collections::HashMap<String, Vec<Item>> = serde_json::from_str(&text).map_err(|e| e.to_string())?;
         for list in res.values_mut() {

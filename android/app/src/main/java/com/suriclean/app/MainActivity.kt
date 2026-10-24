@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        L.init(applicationContext)
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT < 30) {
             legacyPerms.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE))
@@ -36,8 +37,8 @@ class MainActivity : ComponentActivity() {
                         if (pending.action == android.content.Intent.ACTION_UNINSTALL_PACKAGE) {
                             // some phones refuse the uninstall-with-result screen: use the plain one
                             try { launcher.launch(android.content.Intent(android.content.Intent.ACTION_DELETE, pending.data)) }
-                            catch (e2: Exception) { vm.showToast("Android non mi lascia disinstallare: usa ⚙️ sull'app ♡"); vm.uninstallQueue.clear() }
-                        } else { vm.showToast("Android non ha aperto la schermata richiesta"); vm.onSystemResult(false) }
+                            catch (e2: Exception) { vm.showToast(L.t("and.toast.noUninstall")); vm.uninstallQueue.clear() }
+                        } else { vm.showToast(L.t("and.toast.noScreen")); vm.onSystemResult(false) }
                     }
                 }
             }
