@@ -14,26 +14,26 @@ struct GitRepoPanel: View {
         let working = model.gitWorking.contains(item.url)
         VStack(alignment: .leading, spacing: 10) {
             if let d = d {
-                section("🌿 Rami", "\(d.branches.count) · principale: \(d.defaultBranch)")
+                section(t("mac.gitp.branches"), t("mac.gitp.branches.sub", d.branches.count, d.defaultBranch))
                 ForEach(d.branches) { b in branchRow(b) }
 
-                section("📦 Stash", d.stashes.isEmpty ? "nessuno ✨" : "\(d.stashes.count)")
+                section(t("mac.gitp.stash"), d.stashes.isEmpty ? t("mac.gitp.none") : "\(d.stashes.count)")
                 ForEach(d.stashes) { s in stashRow(s) }
 
-                section("🧰 Manutenzione", "cartella .git: \(Fmt.bytes(d.gitSize))")
+                section(t("mac.gitp.maint"), t("mac.gitp.gitsize", Fmt.bytes(d.gitSize)))
                 HStack(spacing: 10) {
-                    Text("Compatta il repo con git gc: riordina gli oggetti e butta via la spazzatura, senza perdere niente.")
+                    Text(t("mac.gitp.gc.text"))
                         .font(Theme.font(11.5, .medium)).opacity(0.65)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button("Compatta ✨") { model.runGit(.compact, on: item.url) }
+                    Button(t("mac.gitp.gc")) { model.runGit(.compact, on: item.url) }
                         .buttonStyle(BubblyButtonStyle(color: Theme.mint))
                         .disabled(working)
                 }
             } else {
                 HStack(spacing: 10) {
                     ProgressView().scaleEffect(0.7)
-                    Text("Leggo i rami e gli stash… ♡").font(Theme.font(12.5, .bold)).opacity(0.6)
+                    Text(t("mac.gitp.loading")).font(Theme.font(12.5, .bold)).opacity(0.6)
                 }
             }
         }
@@ -43,8 +43,8 @@ struct GitRepoPanel: View {
             if working && d != nil { ProgressView().scaleEffect(0.6).padding(8) }
         }
         .alert(confirmTitle, isPresented: $showConfirm) {
-            Button("Annulla", role: .cancel) { confirm = nil }
-            Button("Sì, pulisci ☆", role: .destructive) {
+            Button(t("mac.common.cancel"), role: .cancel) { confirm = nil }
+            Button(t("mac.gitp.ok"), role: .destructive) {
                 if let a = confirm { model.runGit(a, on: item.url) }
                 confirm = nil
             }
@@ -66,10 +66,10 @@ struct GitRepoPanel: View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.triangle.branch").font(.system(size: 11, weight: .bold)).foregroundColor(color.darker)
             Text(b.name).font(Theme.font(12.5, .bold)).lineLimit(1).truncationMode(.middle)
-            if b.isCurrent { Pill(text: "📍 attuale", color: Theme.sky) }
-            if b.merged { Pill(text: "✅ unito", color: Theme.mint) }
-            if b.unpushed == 0 { Pill(text: "☁️ tutto sul remote", color: Theme.mint) }
-            else { Pill(text: "⬆️ \(b.unpushed) solo qui", color: Theme.coral) }
+            if b.isCurrent { Pill(text: t("mac.gitp.current"), color: Theme.sky) }
+            if b.merged { Pill(text: t("mac.gitp.merged"), color: Theme.mint) }
+            if b.unpushed == 0 { Pill(text: t("mac.gitp.pushed"), color: Theme.mint) }
+            else { Pill(text: t("mac.gitp.onlyhere", b.unpushed), color: Theme.coral) }
             Text(Fmt.relative(b.date)).font(Theme.font(10.5, .semibold)).opacity(0.5)
             Spacer()
             Button(action: { ask(.deleteBranch(b)) }) {
@@ -80,9 +80,9 @@ struct GitRepoPanel: View {
             }
             .buttonStyle(.plain)
             .disabled(!b.canDelete || model.gitWorking.contains(item.url))
-            .help(b.isCurrent ? "È il ramo attuale: non si può eliminare"
-                  : (b.canDelete ? "Elimina il ramo (il commit resta annotato per ricrearlo)"
-                     : "Ha commit che esistono solo qui: Suri non lo tocca"))
+            .help(b.isCurrent ? t("mac.gitp.h.current")
+                  : (b.canDelete ? t("mac.gitp.h.delete")
+                     : t("mac.gitp.h.unique")))
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.75)))
@@ -102,7 +102,7 @@ struct GitRepoPanel: View {
             }
             .buttonStyle(.plain)
             .disabled(model.gitWorking.contains(item.url))
-            .help("Elimina lo stash (prima ne salvo una copia .patch in Documenti)")
+            .help(t("mac.gitp.h.stash"))
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.75)))
@@ -116,19 +116,19 @@ struct GitRepoPanel: View {
 
     private var confirmTitle: String {
         switch confirm {
-        case .deleteBranch(let b)?: return "Eliminare il ramo «\(b.name)»?"
-        case .dropStash?: return "Eliminare questo stash?"
-        default: return "Confermi?"
+        case .deleteBranch(let b)?: return t("mac.gitp.q.branch", b.name)
+        case .dropStash?: return t("mac.gitp.q.stash")
+        default: return t("mac.gitp.q.confirm")
         }
     }
 
     private var confirmText: String {
         switch confirm {
         case .deleteBranch(let b)?:
-            return b.merged ? "È già unito al ramo principale. Annoto il commit in Documenti › SuriClean - backup git, così puoi ricrearlo con un comando."
-                : "Tutti i suoi commit sono già sul remote. Annoto il commit in Documenti › SuriClean - backup git per ricrearlo."
+            return b.merged ? t("mac.gitp.m.merged")
+                : t("mac.gitp.m.pushed")
         case .dropStash(let s)?:
-            return "«\(s.message)»: prima ne salvo una copia .patch in Documenti › SuriClean - backup git, poi lo elimino."
+            return t("mac.gitp.m.stash", s.message)
         default: return ""
         }
     }

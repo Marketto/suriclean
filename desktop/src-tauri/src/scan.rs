@@ -47,6 +47,20 @@ impl Reporter {
     }
 }
 
+// ───────────────────────── messages ─────────────────────────
+
+/// A message the UI translates: "\u{1}" + JSON [key, [args…]]. Args may be messages themselves,
+/// or byte counts made with `mb` ("\u{3}<n>") that the UI formats in the user's language.
+pub fn m(key: &str, args: &[&str]) -> String {
+    let a: Vec<&str> = args.to_vec();
+    format!("\u{1}{}", serde_json::to_string(&(key, a)).unwrap_or_default())
+}
+
+/// A byte count for a message argument.
+pub fn mb(b: u64) -> String {
+    format!("\u{3}{}", b)
+}
+
 // ───────────────────────── model ─────────────────────────
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -140,23 +154,23 @@ fn days_since(t: Option<SystemTime>) -> u64 {
 }
 
 pub fn rel_time(t: Option<SystemTime>) -> String {
-    let Some(t) = t else { return "mai".to_string() };
+    let Some(t) = t else { return m("web.rs.never", &[]) };
     let s = SystemTime::now().duration_since(t).map(|d| d.as_secs()).unwrap_or(0);
     let d = s / 86_400;
     if s < 3_600 {
-        "poco fa".into()
+        m("web.rs.just_now", &[])
     } else if d < 1 {
-        "oggi".into()
+        m("web.rs.today", &[])
     } else if d < 2 {
-        "ieri".into()
+        m("web.rs.yesterday", &[])
     } else if d < 30 {
-        format!("{} giorni fa", d)
+        m("web.rs.days_ago", &[&d.to_string()])
     } else if d < 365 {
-        let m = d / 30;
-        if m == 1 { "1 mese fa".into() } else { format!("{} mesi fa", m) }
+        let mo = d / 30;
+        m(if mo == 1 { "web.rs.months_ago.one" } else { "web.rs.months_ago.other" }, &[&mo.to_string()])
     } else {
         let y = d / 365;
-        if y == 1 { "1 anno fa".into() } else { format!("{} anni fa", y) }
+        m(if y == 1 { "web.rs.years_ago.one" } else { "web.rs.years_ago.other" }, &[&y.to_string()])
     }
 }
 
@@ -285,29 +299,29 @@ fn ai_targets() -> Vec<T> {
     let h = home();
     let c = config();
     let mut v = vec![
-        per_child(h.join(".claude/projects"), "Claude Code · sessioni", 30),
-        t(h.join(".claude/file-history"), "Claude Code · storico file modificati"),
-        t(h.join(".claude/shell-snapshots"), "Claude Code · snapshot della shell"),
-        t(h.join(".claude/todos"), "Claude Code · liste todo vecchie"),
-        t(h.join(".claude/debug"), "Claude Code · log di debug"),
-        t(h.join(".claude/statsig"), "Claude Code · cache telemetria"),
-        t(h.join(".claude/paste-cache"), "Claude Code · cache incolla"),
-        t(cache().join("claude-cli-nodejs"), "Claude Code · log MCP e cache"),
-        per_child(h.join(".codex/sessions"), "Codex · sessioni", 30),
-        review(h.join(".codex/archived_sessions"), "Codex · sessioni archiviate"),
-        t(h.join(".codex/log"), "Codex · log"),
-        t(h.join(".gemini/tmp"), "Gemini CLI · temporanei"),
-        review(c.join("Claude/vm_bundles"), "Claude Desktop · immagini VM"),
-        review(h.join(".cache/huggingface"), "Hugging Face · modelli scaricati"),
-        review(h.join(".ollama/models"), "Ollama · modelli"),
-        review(h.join(".lmstudio/models"), "LM Studio · modelli"),
-        review(h.join(".cache/lm-studio"), "LM Studio · cache"),
-        review(h.join(".cache/whisper"), "Whisper · modelli"),
-        review(h.join(".cache/torch"), "PyTorch · cache modelli"),
+        per_child(h.join(".claude/projects"), &m("web.rs.ai.cc_sessions", &[]), 30),
+        t(h.join(".claude/file-history"), &m("web.rs.ai.cc_file_history", &[])),
+        t(h.join(".claude/shell-snapshots"), &m("web.rs.ai.cc_shell_snapshots", &[])),
+        t(h.join(".claude/todos"), &m("web.rs.ai.cc_todos", &[])),
+        t(h.join(".claude/debug"), &m("web.rs.ai.cc_debug", &[])),
+        t(h.join(".claude/statsig"), &m("web.rs.ai.cc_statsig", &[])),
+        t(h.join(".claude/paste-cache"), &m("web.rs.ai.cc_paste", &[])),
+        t(cache().join("claude-cli-nodejs"), &m("web.rs.ai.cc_mcp", &[])),
+        per_child(h.join(".codex/sessions"), &m("web.rs.ai.codex_sessions", &[]), 30),
+        review(h.join(".codex/archived_sessions"), &m("web.rs.ai.codex_archived", &[])),
+        t(h.join(".codex/log"), &m("web.rs.ai.codex_log", &[])),
+        t(h.join(".gemini/tmp"), &m("web.rs.ai.gemini_tmp", &[])),
+        review(c.join("Claude/vm_bundles"), &m("web.rs.ai.claude_vm", &[])),
+        review(h.join(".cache/huggingface"), &m("web.rs.ai.hf", &[])),
+        review(h.join(".ollama/models"), &m("web.rs.ai.ollama", &[])),
+        review(h.join(".lmstudio/models"), &m("web.rs.ai.lmstudio", &[])),
+        review(h.join(".cache/lm-studio"), &m("web.rs.ai.lmstudio_cache", &[])),
+        review(h.join(".cache/whisper"), &m("web.rs.ai.whisper", &[])),
+        review(h.join(".cache/torch"), &m("web.rs.ai.torch", &[])),
     ];
     if cfg!(windows) {
-        v.push(review(local().join("AnthropicClaude/packages"), "Claude Desktop · pacchetti di aggiornamento"));
-        v.push(t(local().join("cursor-updater"), "Cursor · aggiornamenti scaricati"));
+        v.push(review(local().join("AnthropicClaude/packages"), &m("web.rs.ai.claude_pkgs", &[])));
+        v.push(t(local().join("cursor-updater"), &m("web.rs.ai.cursor_updates", &[])));
     }
     v.extend(electron(c.join("Claude"), "Claude Desktop"));
     v.extend(electron(c.join("Cursor"), "Cursor"));
@@ -320,53 +334,53 @@ fn dev_targets() -> Vec<T> {
     let h = home();
     let l = local();
     let mut v = vec![
-        t(h.join(".npm/_cacache"), "npm · cache"),
-        t(h.join(".npm/_npx"), "npx · pacchetti temporanei"),
-        t(h.join(".yarn/berry/cache"), "Yarn Berry · cache"),
-        t(h.join(".bun/install/cache"), "Bun · cache"),
-        t(h.join(".gradle/caches"), "Gradle · cache"),
-        t(h.join(".gradle/wrapper/dists"), "Gradle · distribuzioni"),
-        t(h.join(".m2/repository"), "Maven · repository locale"),
-        t(h.join(".cargo/registry"), "Cargo · registry"),
-        t(h.join(".cargo/git"), "Cargo · dipendenze git"),
-        review(h.join(".rustup/toolchains"), "Rust · toolchain installate"),
-        t(h.join("go/pkg/mod"), "Go · moduli"),
-        t(h.join(".nuget/packages"), "NuGet · pacchetti"),
-        t(h.join(".android/cache"), "Android · cache"),
-        review(h.join(".android/avd"), "Android · emulatori"),
-        t(h.join(".cache/puppeteer"), "Puppeteer · browser"),
-        t(h.join(".cache/pre-commit"), "pre-commit · ambienti"),
+        t(h.join(".npm/_cacache"), &m("web.rs.dev.npm", &[])),
+        t(h.join(".npm/_npx"), &m("web.rs.dev.npx", &[])),
+        t(h.join(".yarn/berry/cache"), &m("web.rs.dev.yarn_berry", &[])),
+        t(h.join(".bun/install/cache"), &m("web.rs.dev.bun", &[])),
+        t(h.join(".gradle/caches"), &m("web.rs.dev.gradle", &[])),
+        t(h.join(".gradle/wrapper/dists"), &m("web.rs.dev.gradle_dists", &[])),
+        t(h.join(".m2/repository"), &m("web.rs.dev.maven", &[])),
+        t(h.join(".cargo/registry"), &m("web.rs.dev.cargo_registry", &[])),
+        t(h.join(".cargo/git"), &m("web.rs.dev.cargo_git", &[])),
+        review(h.join(".rustup/toolchains"), &m("web.rs.dev.rustup", &[])),
+        t(h.join("go/pkg/mod"), &m("web.rs.dev.go_mod", &[])),
+        t(h.join(".nuget/packages"), &m("web.rs.dev.nuget", &[])),
+        t(h.join(".android/cache"), &m("web.rs.dev.android_cache", &[])),
+        review(h.join(".android/avd"), &m("web.rs.dev.android_avd", &[])),
+        t(h.join(".cache/puppeteer"), &m("web.rs.dev.puppeteer", &[])),
+        t(h.join(".cache/pre-commit"), &m("web.rs.dev.precommit", &[])),
     ];
     if cfg!(windows) {
         v.extend([
-            t(l.join("npm-cache/_cacache"), "npm · cache"),
-            t(l.join("npm-cache/_npx"), "npx · pacchetti temporanei"),
-            t(l.join("Yarn/Cache"), "Yarn · cache"),
-            t(l.join("pnpm/store"), "pnpm · store"),
-            t(l.join("pnpm-cache"), "pnpm · cache"),
-            t(l.join("pip/cache"), "Python pip · cache"),
-            t(l.join("uv/cache"), "uv · cache Python"),
-            t(l.join("go-build"), "Go · cache di build"),
-            t(l.join("NuGet/v3-cache"), "NuGet · cache HTTP"),
-            t(l.join("NuGet/Cache"), "NuGet · cache"),
-            t(l.join("Pub/Cache"), "Dart/Flutter · pub cache"),
-            t(l.join("node-gyp/Cache"), "node-gyp · header"),
-            t(l.join("ms-playwright"), "Playwright · browser di test"),
-            review(l.join("JetBrains"), "JetBrains IDE · cache e indici"),
-            T { path: l.join("Docker/wsl"), name: "Docker · disco della VM".into(), risk: "careful", rec: false, per_child: false, older: None },
+            t(l.join("npm-cache/_cacache"), &m("web.rs.dev.npm", &[])),
+            t(l.join("npm-cache/_npx"), &m("web.rs.dev.npx", &[])),
+            t(l.join("Yarn/Cache"), &m("web.rs.dev.yarn", &[])),
+            t(l.join("pnpm/store"), &m("web.rs.dev.pnpm_store", &[])),
+            t(l.join("pnpm-cache"), &m("web.rs.dev.pnpm_cache", &[])),
+            t(l.join("pip/cache"), &m("web.rs.dev.pip", &[])),
+            t(l.join("uv/cache"), &m("web.rs.dev.uv", &[])),
+            t(l.join("go-build"), &m("web.rs.dev.go_build", &[])),
+            t(l.join("NuGet/v3-cache"), &m("web.rs.dev.nuget_http", &[])),
+            t(l.join("NuGet/Cache"), &m("web.rs.dev.nuget_cache", &[])),
+            t(l.join("Pub/Cache"), &m("web.rs.dev.pub", &[])),
+            t(l.join("node-gyp/Cache"), &m("web.rs.dev.nodegyp", &[])),
+            t(l.join("ms-playwright"), &m("web.rs.dev.playwright", &[])),
+            review(l.join("JetBrains"), &m("web.rs.dev.jetbrains", &[])),
+            T { path: l.join("Docker/wsl"), name: m("web.rs.dev.docker_vm", &[]), risk: "careful", rec: false, per_child: false, older: None },
         ]);
     } else {
         let c = cache();
         v.extend([
-            t(c.join("yarn"), "Yarn · cache"),
-            t(l.join("pnpm/store"), "pnpm · store"),
-            t(c.join("pip"), "Python pip · cache"),
-            t(c.join("uv"), "uv · cache Python"),
-            t(c.join("go-build"), "Go · cache di build"),
-            t(h.join(".pub-cache"), "Dart/Flutter · pub cache"),
-            t(c.join("node-gyp"), "node-gyp · header"),
-            t(c.join("ms-playwright"), "Playwright · browser di test"),
-            review(c.join("JetBrains"), "JetBrains IDE · cache e indici"),
+            t(c.join("yarn"), &m("web.rs.dev.yarn", &[])),
+            t(l.join("pnpm/store"), &m("web.rs.dev.pnpm_store", &[])),
+            t(c.join("pip"), &m("web.rs.dev.pip", &[])),
+            t(c.join("uv"), &m("web.rs.dev.uv", &[])),
+            t(c.join("go-build"), &m("web.rs.dev.go_build", &[])),
+            t(h.join(".pub-cache"), &m("web.rs.dev.pub", &[])),
+            t(c.join("node-gyp"), &m("web.rs.dev.nodegyp", &[])),
+            t(c.join("ms-playwright"), &m("web.rs.dev.playwright", &[])),
+            review(c.join("JetBrains"), &m("web.rs.dev.jetbrains", &[])),
         ]);
     }
     v
@@ -392,10 +406,10 @@ fn fixed(list: Vec<T>, rep: &Reporter) -> Vec<Item> {
                 let d = newest(&ch, &[]);
                 let old = days_since(d) > t.older.unwrap_or(30);
                 let label = pretty_child(&file_name(&ch));
-                if let Some(it) = make_item(&ch, format!("{} · {}", t.name, label),
-                    Some(format!("{} · ultima modifica {}", pretty(&ch), rel_time(d))),
+                if let Some(it) = make_item(&ch, m("web.rs.join", &[&t.name, &label]),
+                    Some(m("web.rs.last_modified", &[&pretty(&ch), &rel_time(d)])),
                     t.risk, old, rep, 100 * 1024,
-                    vec![if old { "💤 vecchia".into() } else { "🔥 recente".into() }], d) {
+                    vec![if old { m("web.rs.badge.old", &[]) } else { m("web.rs.badge.recent", &[]) }], d) {
                     out.push(it);
                 }
             }
@@ -457,24 +471,24 @@ fn caches(rep: &Reporter) -> Vec<Item> {
     if cfg!(windows) {
         let l = local();
         for (p, n) in [
-            (l.join("Microsoft/Windows/INetCache"), "Windows · cache Internet"),
-            (l.join("D3DSCache"), "DirectX · cache shader"),
-            (l.join("NVIDIA/DXCache"), "NVIDIA · cache shader"),
-            (l.join("NVIDIA/GLCache"), "NVIDIA · cache OpenGL"),
-            (l.join("AMD/DxCache"), "AMD · cache shader"),
-            (l.join("Microsoft/Edge/User Data/ShaderCache"), "Edge · cache shader"),
+            (l.join("Microsoft/Windows/INetCache"), m("web.rs.cache.inet", &[])),
+            (l.join("D3DSCache"), m("web.rs.cache.d3d", &[])),
+            (l.join("NVIDIA/DXCache"), m("web.rs.cache.nv_dx", &[])),
+            (l.join("NVIDIA/GLCache"), m("web.rs.cache.nv_gl", &[])),
+            (l.join("AMD/DxCache"), m("web.rs.cache.amd", &[])),
+            (l.join("Microsoft/Edge/User Data/ShaderCache"), m("web.rs.cache.edge_shader", &[])),
         ] {
-            if let Some(it) = make_item(&p, n.to_string(), None, "safe", true, rep, MB, vec![], None) {
+            if let Some(it) = make_item(&p, n.clone(), None, "safe", true, rep, MB, vec![], None) {
                 out.push(it);
             }
         }
-        rep.report("Browser…", Some(0.3));
+        rep.report(&m("web.rs.p.browsers", &[]), Some(0.3));
         let subs = ["Cache", "Code Cache", "GPUCache", "Service Worker/CacheStorage"];
         browser_profiles(&l.join("Google/Chrome/User Data"), "Chrome", &subs, rep, &mut out);
         browser_profiles(&l.join("Microsoft/Edge/User Data"), "Edge", &subs, rep, &mut out);
         browser_profiles(&l.join("BraveSoftware/Brave-Browser/User Data"), "Brave", &subs, rep, &mut out);
         browser_profiles(&l.join("Mozilla/Firefox/Profiles"), "Firefox", &["cache2"], rep, &mut out);
-        rep.report("App…", Some(0.6));
+        rep.report(&m("web.rs.p.apps", &[]), Some(0.6));
         electron_caches(&config(), rep, &mut out);
         for pkg in children(&l.join("Packages")) {
             if rep.cancelled() {
@@ -482,8 +496,8 @@ fn caches(rep: &Reporter) -> Vec<Item> {
             }
             let name = file_name(&pkg);
             let short = name.split('_').next().unwrap_or(&name).to_string();
-            for (s, lab) in [("LocalCache", "cache"), ("AC/INetCache", "cache web")] {
-                if let Some(it) = make_item(&pkg.join(s), format!("{} · {} (Store)", short, lab), None, "safe", true, rep, 5 * MB, vec![], None) {
+            for (s, lab) in [("LocalCache", "web.rs.store_cache"), ("AC/INetCache", "web.rs.store_webcache")] {
+                if let Some(it) = make_item(&pkg.join(s), m(lab, &[&short]), None, "safe", true, rep, 5 * MB, vec![], None) {
                     out.push(it);
                 }
             }
@@ -504,14 +518,14 @@ fn caches(rep: &Reporter) -> Vec<Item> {
                 continue;
             }
             rep.report(&pretty(k), Some(i as f64 / n as f64 * 0.7));
-            if let Some(it) = make_item(k, format!("Cache · {}", name), None, "safe", true, rep, MB, vec![], None) {
+            if let Some(it) = make_item(k, m("web.rs.cache_of", &[&name]), None, "safe", true, rep, MB, vec![], None) {
                 out.push(it);
             }
         }
-        if let Some(it) = make_item(&home().join(".thumbnails"), "Miniature delle immagini".into(), None, "safe", true, rep, MB, vec![], None) {
+        if let Some(it) = make_item(&home().join(".thumbnails"), m("web.rs.thumbnails", &[]), None, "safe", true, rep, MB, vec![], None) {
             out.push(it);
         }
-        rep.report("App Electron…", Some(0.8));
+        rep.report(&m("web.rs.p.electron", &[]), Some(0.8));
         electron_caches(&config(), rep, &mut out);
     }
     out
@@ -545,7 +559,7 @@ fn logs_temp(rep: &Reporter) -> Vec<Item> {
             if days_since(d) < 3 {
                 continue;
             }
-            if let Some(it) = make_item(&k, format!("Temporaneo · {}", file_name(&k)), Some(format!("File temporaneo · {}", rel_time(d))),
+            if let Some(it) = make_item(&k, m("web.rs.temp_item", &[&file_name(&k)]), Some(m("web.rs.temp_detail", &[&rel_time(d)])),
                 "safe", true, rep, 256 * 1024, vec![], d) {
                 out.push(it);
             }
@@ -554,22 +568,22 @@ fn logs_temp(rep: &Reporter) -> Vec<Item> {
     if cfg!(windows) {
         let l = local();
         for (p, n) in [
-            (l.join("CrashDumps"), "Dump dei crash"),
-            (l.join("Microsoft/Windows/WER"), "Report errori di Windows"),
-            (l.join("Microsoft/Windows/WebCache.old"), "Vecchia cache web"),
+            (l.join("CrashDumps"), m("web.rs.crash_dumps", &[])),
+            (l.join("Microsoft/Windows/WER"), m("web.rs.wer_user", &[])),
+            (l.join("Microsoft/Windows/WebCache.old"), m("web.rs.webcache_old", &[])),
         ] {
-            if let Some(it) = make_item(&p, n.into(), None, "safe", true, rep, 256 * 1024, vec![], None) {
+            if let Some(it) = make_item(&p, n.clone(), None, "safe", true, rep, 256 * 1024, vec![], None) {
                 out.push(it);
             }
         }
     } else {
         let h = home();
         for (p, n) in [
-            (h.join(".xsession-errors.old"), "Log sessione grafica (vecchio)"),
-            (h.join(".local/share/xorg"), "Log di Xorg"),
-            (h.join(".local/share/recently-used.xbel.bak"), "Backup dei file recenti"),
+            (h.join(".xsession-errors.old"), m("web.rs.xsession_old", &[])),
+            (h.join(".local/share/xorg"), m("web.rs.xorg_log", &[])),
+            (h.join(".local/share/recently-used.xbel.bak"), m("web.rs.recent_bak", &[])),
         ] {
-            if let Some(it) = make_item(&p, n.into(), None, "safe", true, rep, 256 * 1024, vec![], None) {
+            if let Some(it) = make_item(&p, n.clone(), None, "safe", true, rep, 256 * 1024, vec![], None) {
                 out.push(it);
             }
         }
@@ -613,29 +627,29 @@ fn get_index(rep: &Reporter) -> Option<Arc<HomeIndex>> {
     Some(idx)
 }
 
-fn dep_kind(dir: &Path) -> Option<&'static str> {
+fn dep_kind(dir: &Path) -> Option<String> {
     let name = file_name(dir);
     let parent = dir.parent()?;
     let has = |f: &str| parent.join(f).exists();
     match name.as_str() {
-        "node_modules" if has("package.json") => Some("Node.js (npm/yarn/pnpm)"),
-        ".venv" | "venv" | "env" if dir.join("pyvenv.cfg").exists() => Some("Python virtualenv"),
-        "target" if has("Cargo.toml") => Some("Rust (cargo)"),
-        "target" if has("pom.xml") => Some("Maven"),
-        ".build" if has("Package.swift") => Some("Swift Package Manager"),
-        "Pods" if has("Podfile") => Some("CocoaPods"),
-        ".gradle" if has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") => Some("Gradle (cache progetto)"),
-        "build" if has("build.gradle") || has("build.gradle.kts") => Some("Gradle (build)"),
-        "build" if has("pubspec.yaml") => Some("Flutter (build)"),
-        ".next" if has("package.json") => Some("Next.js (build)"),
-        ".nuxt" | ".output" if has("nuxt.config.ts") || has("nuxt.config.js") => Some("Nuxt (build)"),
-        ".dart_tool" if has("pubspec.yaml") => Some("Dart/Flutter"),
-        "vendor" if has("composer.json") => Some("PHP Composer"),
-        ".turbo" | ".parcel-cache" | ".angular" if has("package.json") => Some("Cache di build JS"),
+        "node_modules" if has("package.json") => Some("Node.js (npm/yarn/pnpm)".into()),
+        ".venv" | "venv" | "env" if dir.join("pyvenv.cfg").exists() => Some("Python virtualenv".into()),
+        "target" if has("Cargo.toml") => Some("Rust (cargo)".into()),
+        "target" if has("pom.xml") => Some("Maven".into()),
+        ".build" if has("Package.swift") => Some("Swift Package Manager".into()),
+        "Pods" if has("Podfile") => Some("CocoaPods".into()),
+        ".gradle" if has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") => Some(m("web.rs.dep.gradle_cache", &[])),
+        "build" if has("build.gradle") || has("build.gradle.kts") => Some("Gradle (build)".into()),
+        "build" if has("pubspec.yaml") => Some("Flutter (build)".into()),
+        ".next" if has("package.json") => Some("Next.js (build)".into()),
+        ".nuxt" | ".output" if has("nuxt.config.ts") || has("nuxt.config.js") => Some("Nuxt (build)".into()),
+        ".dart_tool" if has("pubspec.yaml") => Some("Dart/Flutter".into()),
+        "vendor" if has("composer.json") => Some("PHP Composer".into()),
+        ".turbo" | ".parcel-cache" | ".angular" if has("package.json") => Some(m("web.rs.dep.js_build", &[])),
         "bin" | "obj" if fs::read_dir(parent).map(|rd| rd.flatten().any(|e| {
             let n = e.file_name().to_string_lossy().to_lowercase();
             n.ends_with(".csproj") || n.ends_with(".fsproj") || n.ends_with(".vbproj")
-        })).unwrap_or(false) => Some(".NET (bin/obj)"),
+        })).unwrap_or(false) => Some(".NET (bin/obj)".into()),
         _ => None,
     }
 }
@@ -681,7 +695,7 @@ fn build_index(rep: &Reporter) -> HomeIndex {
         }).unwrap_or(true);
         if !inside_hidden {
             if let Some(k) = dep_kind(p) {
-                deps.borrow_mut().push((p.to_path_buf(), k.to_string()));
+                deps.borrow_mut().push((p.to_path_buf(), k));
                 return false;
             }
         }
@@ -693,7 +707,7 @@ fn build_index(rep: &Reporter) -> HomeIndex {
             if rep.cancelled() {
                 break;
             }
-            rep.report(&format!("{} elementi annusati · {}", count, pretty(e.path())), None);
+            rep.report(&m("web.rs.p.sniffed", &[&count.to_string(), &pretty(e.path())]), None);
         }
         if e.file_type().is_file() {
             if let Ok(m) = e.metadata() {
@@ -703,7 +717,7 @@ fn build_index(rep: &Reporter) -> HomeIndex {
             }
         }
     }
-    rep.report_force(&format!("Esplorazione finita: {} elementi", count), None);
+    rep.report_force(&m("web.rs.p.explored", &[&count.to_string()]), None);
     HomeIndex { files, repos: repos.into_inner(), deps: deps.into_inner() }
 }
 
@@ -729,8 +743,8 @@ fn build_deps(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
         let active = project_activity(project, &file_name(p));
         let old = days_since(active) > 60;
         if let Some(it) = make_item(p, format!("{} · {}", file_name(project), file_name(p)),
-            Some(format!("{} · {} · progetto toccato {}", kind, pretty(project), rel_time(active))),
-            "safe", old, rep, MB, vec![if old { "💤 progetto fermo".into() } else { "🔥 progetto attivo".into() }], active) {
+            Some(m("web.rs.dep_detail", &[kind, &pretty(project), &rel_time(active)])),
+            "safe", old, rep, MB, vec![if old { m("web.rs.badge.project_idle", &[]) } else { m("web.rs.badge.project_active", &[]) }], active) {
             out.push(it);
         }
     }
@@ -854,16 +868,16 @@ fn git_repos(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
         }
         let days = days_since(activity);
         let mut badges = vec![];
-        if safe { badges.push("☁️ al sicuro sul remote".to_string()); }
-        if remote.is_none() { badges.push("🏠 solo locale".into()); }
-        if dirty { badges.push("✏️ modifiche non salvate".into()); }
-        if unpushed > 0 { badges.push(format!("⬆️ {} commit non pushati", unpushed)); }
+        if safe { badges.push(m("web.rs.git.safe", &[])); }
+        if remote.is_none() { badges.push(m("web.rs.git.local_only", &[])); }
+        if dirty { badges.push(m("web.rs.git.dirty", &[])); }
+        if unpushed > 0 { badges.push(m(if unpushed == 1 { "web.rs.git.unpushed.one" } else { "web.rs.git.unpushed.other" }, &[&unpushed.to_string()])); }
         if !stash.is_empty() { badges.push("📦 stash".into()); }
-        if days > 365 { badges.push("🦕 fermo da 1+ anno".into()); }
+        if days > 365 { badges.push(m("web.rs.git.idle_year", &[])); }
         let risk = if safe { "safe" } else if remote.is_some() { "review" } else { "careful" };
-        let mut detail = format!("{} · ultima attività {}", pretty(repo), rel_time(activity));
+        let mut detail = m("web.rs.git.detail", &[&pretty(repo), &rel_time(activity)]);
         if let Some(r) = &remote {
-            detail += &format!(" · {}", short_remote(r));
+            detail = m("web.rs.join", &[&detail, &short_remote(r)]);
         }
         let mut it = new_item(repo, file_name(repo), detail, size, activity, risk, safe && days > 180, badges);
         it.copy_text = remote.map(|r| format!("git clone {} \"{}\"", r, repo.to_string_lossy()));
@@ -950,7 +964,7 @@ fn duplicates(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
         if rep.cancelled() {
             return vec![];
         }
-        rep.report(&format!("Confronto impronte: {}", file_name(&g[0].path)), Some(i as f64 / n as f64 * 0.4));
+        rep.report(&m("web.rs.p.fingerprints", &[&file_name(&g[0].path)]), Some(i as f64 / n as f64 * 0.4));
         let mut by_p: HashMap<String, Vec<&Indexed>> = HashMap::new();
         for f in g {
             if let Some(h) = partial_hash(&f.path) {
@@ -965,7 +979,7 @@ fn duplicates(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
         if rep.cancelled() {
             return vec![];
         }
-        rep.report(&format!("SHA-256 di {}", file_name(&g[0].path)), Some(0.4 + i as f64 / n as f64 * 0.6));
+        rep.report(&m("web.rs.p.sha", &[&file_name(&g[0].path)]), Some(0.4 + i as f64 / n as f64 * 0.6));
         let mut by_f: HashMap<String, Vec<&Indexed>> = HashMap::new();
         for f in g {
             if let Some(h) = full_hash(&f.path, rep) {
@@ -978,13 +992,13 @@ fn duplicates(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
     let mut out = vec![];
     for (gid, mut g) in finals.into_iter().enumerate() {
         g.sort_by_key(|f| keep_score(&f.path));
-        let label = format!("{} · {} copie da {}", file_name(&g[0].path), g.len(), fmt_bytes(g[0].size));
+        let label = m("web.rs.dup_label", &[&file_name(&g[0].path), &g.len().to_string(), &mb(g[0].size)]);
         for (j, f) in g.iter().enumerate() {
             let keep = j == 0;
             let mut it = new_item(&f.path, file_name(&f.path),
                 f.path.parent().map(pretty).unwrap_or_default(), f.size, f.modified,
                 if keep { "careful" } else { "safe" }, !keep,
-                vec![if keep { "💎 da tenere".into() } else { "👯 copia".into() }]);
+                vec![if keep { m("web.rs.badge.keep", &[]) } else { m("web.rs.badge.copy", &[]) }]);
             it.group = Some(gid as u32);
             it.group_label = Some(label.clone());
             out.push(it);
@@ -995,16 +1009,17 @@ fn duplicates(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
 
 // ───────────────────────── big files, installers, downloads ─────────────────────────
 
-fn badge_for_ext(ext: &str) -> Option<&'static str> {
-    match ext {
-        "mov" | "mp4" | "mkv" | "avi" | "m4v" | "webm" => Some("🎬 video"),
-        "zip" | "rar" | "7z" | "tar" | "gz" | "tgz" | "bz2" | "xz" | "zst" => Some("📦 archivio"),
-        "iso" | "img" | "dmg" => Some("💿 immagine disco"),
-        "vmdk" | "vdi" | "vhd" | "vhdx" | "qcow2" => Some("🖥️ macchina virtuale"),
-        "psd" | "ai" | "blend" | "kra" => Some("🎨 grafica"),
-        "wav" | "flac" | "aiff" => Some("🎵 audio"),
-        _ => None,
-    }
+fn badge_for_ext(ext: &str) -> Option<String> {
+    let k = match ext {
+        "mov" | "mp4" | "mkv" | "avi" | "m4v" | "webm" => "web.rs.ext.video",
+        "zip" | "rar" | "7z" | "tar" | "gz" | "tgz" | "bz2" | "xz" | "zst" => "web.rs.ext.archive",
+        "iso" | "img" | "dmg" => "web.rs.ext.disk_image",
+        "vmdk" | "vdi" | "vhd" | "vhdx" | "qcow2" => "web.rs.ext.vm",
+        "psd" | "ai" | "blend" | "kra" => "web.rs.ext.graphics",
+        "wav" | "flac" | "aiff" => "web.rs.ext.audio",
+        _ => return None,
+    };
+    Some(m(k, &[]))
 }
 
 fn ext_of(p: &Path) -> String {
@@ -1015,9 +1030,9 @@ fn big_files(idx: &HomeIndex) -> Vec<Item> {
     let mut big: Vec<&Indexed> = idx.files.iter().filter(|f| f.size >= 100 * MB).collect();
     big.sort_by(|a, b| b.size.cmp(&a.size));
     big.into_iter().take(250).map(|f| {
-        let badges = badge_for_ext(&ext_of(&f.path)).map(|b| vec![b.to_string()]).unwrap_or_default();
+        let badges = badge_for_ext(&ext_of(&f.path)).map(|b| vec![b]).unwrap_or_default();
         new_item(&f.path, file_name(&f.path),
-            format!("{} · modificato {}", f.path.parent().map(pretty).unwrap_or_default(), rel_time(f.modified)),
+            m("web.rs.modified", &[&f.path.parent().map(pretty).unwrap_or_default(), &rel_time(f.modified)]),
             f.size, f.modified, "careful", false, badges)
     }).collect()
 }
@@ -1048,10 +1063,10 @@ fn installers(idx: &HomeIndex) -> Vec<Item> {
             continue;
         }
         let rec = if image { in_dl && days_since(f.modified) > 30 } else if ext == "appimage" { false } else { in_dl || in_desk };
-        let badge = if image { "💿 immagine disco" } else if ext == "appimage" { "📲 AppImage (forse la usi?)" } else { "📦 installer" };
+        let badge = m(if image { "web.rs.ext.disk_image" } else if ext == "appimage" { "web.rs.badge.appimage" } else { "web.rs.badge.installer" }, &[]);
         out.push(new_item(&f.path, file_name(&f.path),
-            format!("{} · {}", f.path.parent().map(pretty).unwrap_or_default(), rel_time(f.modified)),
-            f.size, f.modified, if rec { "safe" } else { "review" }, rec, vec![badge.into()]));
+            m("web.rs.join", &[&f.path.parent().map(pretty).unwrap_or_default(), &rel_time(f.modified)]),
+            f.size, f.modified, if rec { "safe" } else { "review" }, rec, vec![badge]));
     }
     out
 }
@@ -1074,8 +1089,8 @@ fn old_downloads(rep: &Reporter) -> Vec<Item> {
         if days < 90 {
             continue;
         }
-        if let Some(it) = make_item(k, name, Some(format!("Scaricato {}", rel_time(d))), "review", false, rep, 100 * 1024,
-            if days > 365 { vec!["🦕 più di un anno".into()] } else { vec![] }, d) {
+        if let Some(it) = make_item(k, name, Some(m("web.rs.downloaded", &[&rel_time(d)])), "review", false, rep, 100 * 1024,
+            if days > 365 { vec![m("web.rs.badge.over_year", &[])] } else { vec![] }, d) {
             out.push(it);
         }
     }
@@ -1090,7 +1105,7 @@ pub fn fresh_id() -> u64 {
 }
 
 fn disk_map(rep: &Reporter) -> Vec<Item> {
-    disk_map_at(&home(), "La tua cartella Inizio", "~", "🏡 la tana", rep)
+    disk_map_at(&home(), &m("web.rs.map.home", &[]), "~", &m("web.rs.map.home_badge", &[]), rep)
 }
 
 /// The whole system drive (needs the administrator to see everything).
@@ -1101,7 +1116,7 @@ fn disk_map_full(rep: &Reporter) -> Vec<Item> {
         PathBuf::from("/")
     };
     let label = root.to_string_lossy().to_string();
-    disk_map_at(&root, "Tutto il disco", &label, "💽 tutto il disco", rep)
+    disk_map_at(&root, &m("web.rs.map.disk", &[]), &label, &m("web.rs.map.disk_badge", &[]), rep)
 }
 
 fn disk_map_at(h: &Path, title: &str, detail: &str, badge: &str, rep: &Reporter) -> Vec<Item> {
@@ -1118,7 +1133,7 @@ fn disk_map_at(h: &Path, title: &str, detail: &str, badge: &str, rep: &Reporter)
             if rep.cancelled() {
                 return vec![];
             }
-            rep.report(&format!("{} elementi misurati · {}", n, pretty(e.path())), None);
+            rep.report(&m("web.rs.p.measured", &[&n.to_string(), &pretty(e.path())]), None);
         }
         if !e.file_type().is_file() {
             continue;
@@ -1245,7 +1260,7 @@ pub fn open_url(u: &str) {
 
 fn admin_item(mut it: Item) -> Item {
     it.admin = true;
-    it.badges.push("🔐 admin".into());
+    it.badges.push(m("web.rs.sys.badge_admin", &[]));
     it
 }
 
@@ -1257,7 +1272,7 @@ fn sys_item(p: &Path, name: &str, detail: &str, risk: &str, rec: bool, rep: &Rep
     let unreadable = p.is_dir() && fs::read_dir(p).is_err();
     let mut b: Vec<String> = badges.iter().map(|s| s.to_string()).collect();
     if unreadable {
-        b.push("🔒 misurabile solo da admin".into());
+        b.push(m("web.rs.sys.badge_locked", &[]));
         return Some(admin_item(new_item(p, name.into(), detail.into(), 0, mtime(p), risk, rec, b)));
     }
     make_item(p, name.into(), Some(detail.into()), risk, rec, rep, min, b, None).map(admin_item)
@@ -1270,7 +1285,7 @@ fn grouped(files: Vec<PathBuf>, name: String, detail: String, risk: &str, rec: b
         return None;
     }
     let newest_t = files.iter().filter_map(|f| mtime(f)).max();
-    let mut it = new_item(&files[0], format!("{} ({} file)", name, files.len()), detail, size, newest_t, risk, rec,
+    let mut it = new_item(&files[0], m("web.rs.sys.n_files", &[&name, &files.len().to_string()]), detail, size, newest_t, risk, rec,
         badges.iter().map(|s| s.to_string()).collect());
     it.extra = files[1..].iter().map(|f| f.to_string_lossy().to_string()).collect();
     Some(admin_item(it))
@@ -1315,91 +1330,91 @@ fn system_windows(rep: &Reporter, out: &mut Vec<Item>) {
     let drive = PathBuf::from(std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into()) + "\\");
     let pdata = PathBuf::from(std::env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".into()));
 
-    rep.report_force("Temporanei di Windows", Some(0.0));
+    rep.report_force(&m("web.rs.sys.p_win_temp", &[]), Some(0.0));
     let wtemp = win.join("Temp");
     if fs::read_dir(&wtemp).is_ok() {
         for k in children(&wtemp) {
             if rep.cancelled() { return; }
             if days_since(newest(&k, &[])) < 1 { continue; }
-            if let Some(it) = make_item(&k, format!("Temporaneo di Windows · {}", file_name(&k)), Some(pretty(&k)), "safe", true, rep, 256 * 1024, vec!["⏳ temporaneo".into()], None) {
+            if let Some(it) = make_item(&k, m("web.rs.sys.win_temp_item", &[&file_name(&k)]), Some(pretty(&k)), "safe", true, rep, 256 * 1024, vec![m("web.rs.sys.badge_temp", &[])], None) {
                 out.push(admin_item(it));
             }
         }
-    } else if let Some(it) = sys_item(&wtemp, "Temporanei di Windows", "C:\\Windows\\Temp · file usa-e-getta di installazioni e servizi", "safe", true, rep, 0, &["⏳ temporaneo"]) {
+    } else if let Some(it) = sys_item(&wtemp, &m("web.rs.sys.p_win_temp", &[]), &m("web.rs.sys.win_temp_detail", &[]), "safe", true, rep, 0, &[m("web.rs.sys.badge_temp", &[]).as_str()]) {
         out.push(it);
     }
 
-    rep.report_force("Aggiornamenti già installati", Some(0.15));
+    rep.report_force(&m("web.rs.sys.p_updates", &[]), Some(0.15));
     let sd = win.join("SoftwareDistribution").join("Download");
     for k in children(&sd) {
         if rep.cancelled() { return; }
-        if let Some(it) = sys_item(&k, &format!("Aggiornamento di Windows scaricato · {}", file_name(&k)), "Windows Update lo riscarica se mai servisse", "safe", true, rep, MB, &["⬇️ riscaricabile"]) {
+        if let Some(it) = sys_item(&k, &m("web.rs.sys.wu_item", &[&file_name(&k)]), &m("web.rs.sys.wu_detail", &[]), "safe", true, rep, MB, &[m("web.rs.sys.badge_redownload", &[]).as_str()]) {
             out.push(it);
         }
     }
     let dopt = win.join("ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Windows\\DeliveryOptimization\\Cache");
-    if let Some(mut it) = sys_item(&dopt, "Cache di Ottimizzazione recapito", "Pezzi di aggiornamenti condivisi con altri PC: si riscaricano", "safe", true, rep, MB, &["⬇️ riscaricabile"]) {
+    if let Some(mut it) = sys_item(&dopt, &m("web.rs.sys.dopt", &[]), &m("web.rs.sys.dopt_detail", &[]), "safe", true, rep, MB, &[m("web.rs.sys.badge_redownload", &[]).as_str()]) {
         it.cmd = Some("powershell -NoProfile -Command \"Delete-DeliveryOptimizationCache -Force\"".into());
         out.push(it);
     }
 
-    rep.report_force("Log e report di errore", Some(0.35));
+    rep.report_force(&m("web.rs.sys.p_logs", &[]), Some(0.35));
     let logs = files_where(&win.join("Logs"), 6, |_, m| old_enough(m, 7));
     if !logs.is_empty() {
-        if let Some(it) = grouped(logs, "Log di Windows vecchi".into(), "C:\\Windows\\Logs · più vecchi di una settimana".into(), "safe", true, &["📜 log"]) {
+        if let Some(it) = grouped(logs, m("web.rs.sys.win_logs", &[]), m("web.rs.sys.win_logs_detail", &[]), "safe", true, &[m("web.rs.sys.badge_log", &[]).as_str()]) {
             out.push(it);
         }
     }
-    for (sub, name) in [("ReportArchive", "Report errori archiviati"), ("ReportQueue", "Report errori in coda"), ("Temp", "Temporanei dei report errori")] {
+    for (sub, name) in [("ReportArchive", m("web.rs.sys.wer_archive", &[])), ("ReportQueue", m("web.rs.sys.wer_queue", &[])), ("Temp", m("web.rs.sys.wer_temp", &[]))] {
         let p = pdata.join("Microsoft\\Windows\\WER").join(sub);
-        if let Some(it) = sys_item(&p, name, &pretty(&p), "safe", true, rep, 256 * 1024, &["💥 crash"]) {
+        if let Some(it) = sys_item(&p, &name, &pretty(&p), "safe", true, rep, 256 * 1024, &[m("web.rs.sys.badge_crash", &[]).as_str()]) {
             out.push(it);
         }
     }
 
-    rep.report_force("Dump della memoria", Some(0.55));
+    rep.report_force(&m("web.rs.sys.p_dumps", &[]), Some(0.55));
     for (p, name) in [
-        (win.join("MEMORY.DMP"), "Dump completo della memoria (schermata blu)"),
-        (win.join("Minidump"), "Mini dump delle schermate blu"),
-        (win.join("LiveKernelReports"), "Report del kernel"),
+        (win.join("MEMORY.DMP"), m("web.rs.sys.memory_dmp", &[])),
+        (win.join("Minidump"), m("web.rs.sys.minidump", &[])),
+        (win.join("LiveKernelReports"), m("web.rs.sys.kernel_reports", &[])),
     ] {
-        if let Some(it) = sys_item(&p, name, &pretty(&p), "safe", true, rep, MB, &["💥 crash"]) {
+        if let Some(it) = sys_item(&p, &name, &pretty(&p), "safe", true, rep, MB, &[m("web.rs.sys.badge_crash", &[]).as_str()]) {
             out.push(it);
         }
     }
 
-    rep.report_force("Vecchie installazioni di Windows", Some(0.7));
+    rep.report_force(&m("web.rs.sys.p_old_windows", &[]), Some(0.7));
     let old = drive.join("Windows.old");
     if old.exists() {
         let size = size_of(&old, Some(rep));
-        let mut it = admin_item(new_item(&old, "Vecchia installazione di Windows (Windows.old)".into(),
-            "Serve solo per tornare alla versione precedente di Windows · la toglie Pulizia disco".into(), size, mtime(&old), "review", false, vec!["⏪ ritorno indietro".into()]));
+        let mut it = admin_item(new_item(&old, m("web.rs.sys.windows_old", &[]),
+            m("web.rs.sys.windows_old_detail", &[]), size, mtime(&old), "review", false, vec![m("web.rs.sys.badge_rollback", &[])]));
         it.cmd = Some("cleanmgr /autoclean".into());
         out.push(it);
     }
     let hib = drive.join("hiberfil.sys");
-    if let Ok(m) = fs::metadata(&hib) {
-        if m.len() > 512 * MB {
-            let mut it = admin_item(new_item(&hib, "File di ibernazione (hiberfil.sys)".into(),
-                "Spegne ibernazione e avvio rapido: il PC si accende un filo più lento".into(), m.len(), None, "careful", false, vec!["💤 ibernazione".into()]));
+    if let Ok(md) = fs::metadata(&hib) {
+        if md.len() > 512 * MB {
+            let mut it = admin_item(new_item(&hib, m("web.rs.sys.hiberfil", &[]),
+                m("web.rs.sys.hiberfil_detail", &[]), md.len(), None, "careful", false, vec![m("web.rs.sys.badge_hibernate", &[])]));
             it.cmd = Some("powercfg /hibernate off".into());
             out.push(it);
         }
     }
-    let mut it = admin_item(new_item(&win.join("WinSxS"), "Pulizia componenti di Windows (WinSxS)".into(),
-        "Toglie le vecchie versioni dei componenti sostituite dagli aggiornamenti · può metterci qualche minuto".into(), 0, None, "review", false, vec!["🧩 componenti".into()]));
+    let mut it = admin_item(new_item(&win.join("WinSxS"), m("web.rs.sys.winsxs", &[]),
+        m("web.rs.sys.winsxs_detail", &[]), 0, None, "review", false, vec![m("web.rs.sys.badge_components", &[])]));
     it.cmd = Some("Dism.exe /Online /Cleanup-Image /StartComponentCleanup /Quiet".into());
     out.push(it);
 }
 
 fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
-    rep.report_force("Log archiviati", Some(0.0));
+    rep.report_force(&m("web.rs.sys.p_rotated", &[]), Some(0.0));
     let logs = files_where(Path::new("/var/log"), 4, |p, m| {
         old_enough(m, 1) && is_rotated(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default())
             && !p.starts_with("/var/log/journal")
     });
     if !logs.is_empty() {
-        if let Some(it) = grouped(logs, "Log di sistema archiviati".into(), "/var/log · i vecchi log già ruotati o compressi".into(), "safe", true, &["📜 log"]) {
+        if let Some(it) = grouped(logs, m("web.rs.sys.rotated_logs", &[]), m("web.rs.sys.rotated_logs_detail", &[]), "safe", true, &[m("web.rs.sys.badge_log", &[]).as_str()]) {
             out.push(it);
         }
     }
@@ -1410,28 +1425,28 @@ fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
             (n.contains('@') || n.ends_with("~")) && old_enough(m, 7)
         }).iter().map(|f| fs::metadata(f).map(|m| m.len()).unwrap_or(0)).sum();
         if old > MB {
-            let mut it = admin_item(new_item(journal, "Diario di sistema più vecchio di 7 giorni".into(),
-                "journalctl --vacuum-time=7d · tiene l'ultima settimana".into(), old, mtime(journal), "safe", true, vec!["📜 log".into()]));
+            let mut it = admin_item(new_item(journal, m("web.rs.sys.journal", &[]),
+                m("web.rs.sys.journal_detail", &[]), old, mtime(journal), "safe", true, vec![m("web.rs.sys.badge_log", &[])]));
             it.cmd = Some("journalctl --vacuum-time=7d".into());
             out.push(it);
         }
     }
     if rep.cancelled() { return; }
 
-    rep.report_force("Pacchetti scaricati", Some(0.25));
+    rep.report_force(&m("web.rs.sys.p_packages", &[]), Some(0.25));
     let debs = files_where(Path::new("/var/cache/apt/archives"), 1, |p, _| p.extension().map_or(false, |e| e == "deb"));
     if !debs.is_empty() {
-        if let Some(it) = grouped(debs, "Pacchetti .deb già installati".into(), "/var/cache/apt/archives · come «apt clean»".into(), "safe", true, &["⬇️ riscaricabile"]) {
+        if let Some(it) = grouped(debs, m("web.rs.sys.debs", &[]), m("web.rs.sys.debs_detail", &[]), "safe", true, &[m("web.rs.sys.badge_redownload", &[]).as_str()]) {
             out.push(it);
         }
     }
     for k in children(Path::new("/var/cache/PackageKit")) {
-        if let Some(it) = sys_item(&k, &format!("Cache di Software/PackageKit · {}", file_name(&k)), &pretty(&k), "safe", true, rep, MB, &["⬇️ riscaricabile"]) {
+        if let Some(it) = sys_item(&k, &m("web.rs.sys.packagekit", &[&file_name(&k)]), &pretty(&k), "safe", true, rep, MB, &[m("web.rs.sys.badge_redownload", &[]).as_str()]) {
             out.push(it);
         }
     }
 
-    rep.report_force("Vecchie versioni degli snap", Some(0.45));
+    rep.report_force(&m("web.rs.sys.p_snaps", &[]), Some(0.45));
     if let Ok(o) = Command::new("snap").args(["list", "--all"]).output() {
         for line in String::from_utf8_lossy(&o.stdout).lines().skip(1) {
             let f: Vec<&str> = line.split_whitespace().collect();
@@ -1439,29 +1454,29 @@ fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
             let (name, rev) = (f[0], f[2]);
             let file = PathBuf::from(format!("/var/lib/snapd/snaps/{}_{}.snap", name, rev));
             let size = fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
-            let mut it = admin_item(new_item(&file, format!("Snap · {} (revisione {} vecchia)", name, rev),
-                "Versione precedente tenuta da snap per tornare indietro".into(), size, mtime(&file), "safe", true, vec!["📦 snap".into()]));
+            let mut it = admin_item(new_item(&file, m("web.rs.sys.snap", &[name, rev]),
+                m("web.rs.sys.snap_detail", &[]), size, mtime(&file), "safe", true, vec!["📦 snap".into()]));
             it.cmd = Some(format!("snap remove {} --revision={}", name, rev));
             out.push(it);
         }
     }
     if rep.cancelled() { return; }
 
-    rep.report_force("Crash e dump", Some(0.65));
-    for (dir, label) in [("/var/crash", "Report di crash"), ("/var/lib/systemd/coredump", "Core dump")] {
+    rep.report_force(&m("web.rs.sys.p_crash", &[]), Some(0.65));
+    for (dir, label) in [("/var/crash", "web.rs.sys.crash_report"), ("/var/lib/systemd/coredump", "web.rs.sys.core_dump")] {
         for k in children(Path::new(dir)) {
-            if let Some(it) = sys_item(&k, &format!("{} · {}", label, file_name(&k)), &pretty(&k), "safe", true, rep, 256 * 1024, &["💥 crash"]) {
+            if let Some(it) = sys_item(&k, &m(label, &[&file_name(&k)]), &pretty(&k), "safe", true, rep, 256 * 1024, &[m("web.rs.sys.badge_crash", &[]).as_str()]) {
                 out.push(it);
             }
         }
     }
 
-    rep.report_force("Temporanei e backup di sistema", Some(0.8));
+    rep.report_force(&m("web.rs.sys.p_tmp_backups", &[]), Some(0.8));
     for k in children(Path::new("/var/tmp")) {
         if rep.cancelled() { return; }
         let d = newest(&k, &[]);
         if days_since(d) < 3 { continue; }
-        if let Some(it) = sys_item(&k, &format!("Temporaneo di sistema · {}", file_name(&k)), &format!("/var/tmp · toccato {}", rel_time(d)), "safe", true, rep, 256 * 1024, &["⏳ temporaneo"]) {
+        if let Some(it) = sys_item(&k, &m("web.rs.sys.var_tmp", &[&file_name(&k)]), &m("web.rs.sys.var_tmp_detail", &[&rel_time(d)]), "safe", true, rep, 256 * 1024, &[m("web.rs.sys.badge_temp", &[]).as_str()]) {
             out.push(it);
         }
     }
@@ -1469,7 +1484,7 @@ fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
         old_enough(m, 7) && is_rotated(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default())
     });
     if !backups.is_empty() {
-        if let Some(it) = grouped(backups, "Backup vecchi di sistema".into(), "/var/backups · copie ruotate di dpkg, apt e password".into(), "safe", true, &["🗄️ backup"]) {
+        if let Some(it) = grouped(backups, m("web.rs.sys.backups", &[]), m("web.rs.sys.backups_detail", &[]), "safe", true, &[m("web.rs.sys.badge_backup", &[]).as_str()]) {
             out.push(it);
         }
     }
@@ -1487,7 +1502,7 @@ pub fn run_elevated(lines: &[String]) -> Result<(), String> {
         let ps = format!("Start-Process -FilePath '{}' -Verb RunAs -Wait -WindowStyle Hidden",
             script.to_string_lossy().replace('\'', "''"));
         let st = hidden_cmd("powershell").args(["-NoProfile", "-NonInteractive", "-Command", &ps]).status().map_err(|e| e.to_string())?;
-        if st.success() { Ok(()) } else { Err("Hai annullato la richiesta di amministratore".to_string()) }
+        if st.success() { Ok(()) } else { Err(m("web.rs.err.uac_cancelled", &[])) }
     } else {
         let script = dir.join("suri.sh");
         fs::write(&script, format!("#!/bin/sh\n{}\nexit 0\n", lines.join("\n"))).map_err(|e| e.to_string())?;
@@ -1497,9 +1512,9 @@ pub fn run_elevated(lines: &[String]) -> Result<(), String> {
             let _ = fs::set_permissions(&dir, fs::Permissions::from_mode(0o700));
         }
         match Command::new("pkexec").arg("/bin/sh").arg(&script).status() {
-            Ok(st) if st.code() == Some(126) || st.code() == Some(127) => Err("Hai annullato la richiesta della password".to_string()),
+            Ok(st) if st.code() == Some(126) || st.code() == Some(127) => Err(m("web.rs.err.pw_cancelled", &[])),
             Ok(_) => Ok(()),
-            Err(_) => Err("Manca pkexec: installa policykit-1 per pulire le aree di sistema".to_string()),
+            Err(_) => Err(m("web.rs.err.no_pkexec", &[])),
         }
     };
     res

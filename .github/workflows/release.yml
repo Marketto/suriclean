@@ -37,6 +37,14 @@ jobs:
           if pgrep -x SuriClean >/dev/null; then echo "✅ SuriClean is running"; else echo "❌ SuriClean is not running"; exit 1; fi
           screencapture -x dist/screenshot-mac.png || true
           pkill -x SuriClean || true
+          # same screen in a right-to-left and in a CJK language
+          for L in ar ja; do
+            defaults write com.suriclean.app suri.lang "$L"
+            open dist/SuriClean.app; sleep 12
+            screencapture -x "dist/screenshot-mac-$L.png" || true
+            pkill -x SuriClean || true; sleep 2
+          done
+          defaults delete com.suriclean.app suri.lang || true
 
       - name: Helper mode test (scan a home folder without UI)
         continue-on-error: true
@@ -65,6 +73,7 @@ jobs:
           path: |
             dist/SuriClean.dmg
             dist/screenshot-mac.png
+            dist/screenshot-mac-*.png
           if-no-files-found: warn
 
   desktop:
@@ -96,7 +105,8 @@ jobs:
       - name: Prepare sources and version
         shell: bash
         run: |
-          cp shared/suri.js shared/chiptune.js shared/audio/remix.mp3 desktop/ui/
+          cp shared/suri.js shared/chiptune.js shared/i18n.js shared/audio/remix.mp3 desktop/ui/
+          mkdir -p desktop/ui/i18n && cp i18n/*.json desktop/ui/i18n/
           V="${SURI_VERSION}.0"
           node -e "const f='desktop/src-tauri/tauri.conf.json';const j=require('./'+f);j.version='$V';require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
           sed -i.bak "0,/^version = .*/s//version = \"$V\"/" desktop/src-tauri/Cargo.toml && rm desktop/src-tauri/Cargo.toml.bak
@@ -230,7 +240,8 @@ jobs:
 
   release:
     needs: [mac, desktop, android]
-    if: always() && needs.mac.result == 'success'
+    # only main publishes; other branches just build and test
+    if: always() && needs.mac.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -258,7 +269,8 @@ jobs:
       - name: Build site
         run: |
           mkdir -p _site
-          cp site/index.html shared/suri.js shared/chiptune.js shared/audio/remix.mp3 _site/
+          cp site/index.html shared/suri.js shared/chiptune.js shared/i18n.js shared/audio/remix.mp3 _site/
+          mkdir -p _site/i18n && cp i18n/*.json _site/i18n/
           cp Resources/AppIcon.png _site/icon.png
           if [ -f art/screenshot-mac.png ]; then cp art/screenshot-mac.png _site/screenshot.png; fi
       - uses: actions/upload-pages-artifact@v3

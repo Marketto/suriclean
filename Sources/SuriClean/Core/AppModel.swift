@@ -19,6 +19,17 @@ final class AppModel: ObservableObject {
     @Published var askEmptyTrash = false
     @Published var snapshotCount: Int?
     @Published var toast: String?
+    /// Current UI language (see L10n); the whole window is rebuilt when it changes.
+    @Published var lang: String = L10n.shared.code
+    @Published var langChoice: String? = L10n.shared.chosen
+
+    func setLanguage(_ code: String?) {
+        L10n.shared.set(code: code)
+        langChoice = code
+        lang = L10n.shared.code
+        Chiptune.shared.sfx(.pop)
+    }
+
     @Published var remix: Bool = UserDefaults.standard.bool(forKey: "suri.remix") {
         didSet {
             UserDefaults.standard.set(remix, forKey: "suri.remix")
@@ -124,19 +135,20 @@ final class AppModel: ObservableObject {
         Chiptune.shared.sfx(.whoosh)
         Task {
             let message: String
+            var failed = false
             switch action {
             case .deleteBranch(let b):
                 let r = await Task.detached { GitTools.deleteBranch(repo, b) }.value
-                message = (try? r.get()) ?? "Ehh… \((r.failureMessage))"
+                if let m = try? r.get() { message = m } else { message = t("mac.toast.ehh", r.failureMessage); failed = true }
             case .dropStash(let s):
                 let r = await Task.detached { GitTools.dropStash(repo, s) }.value
-                message = (try? r.get()) ?? "Ehh… \((r.failureMessage))"
+                if let m = try? r.get() { message = m } else { message = t("mac.toast.ehh", r.failureMessage); failed = true }
             case .compact:
                 let r = await Task.detached { GitTools.compact(repo) }.value
                 if let saved = try? r.get() {
                     totalFreed += saved
-                    message = saved > 0 ? "Repo compattato! Risparmiati \(Fmt.bytes(saved)) ✨" : "Il repo era già bello compatto ☆"
-                } else { message = "Ehh… \((r.failureMessage))" }
+                    message = saved > 0 ? t("mac.git.compacted", Fmt.bytes(saved)) : t("mac.git.alreadycompact")
+                } else { message = t("mac.toast.ehh", r.failureMessage); failed = true }
             }
             // refresh the row (badges, size, recommendation) and the details
             let updated = await Task.detached { Scanners.repoItem(repo, rep: nil) }.value
@@ -156,7 +168,7 @@ final class AppModel: ObservableObject {
             let d = await Task.detached { GitTools.details(repo) }.value
             gitDetails[repo] = d
             gitWorking.remove(repo)
-            Chiptune.shared.sfx(message.hasPrefix("Ehh") ? .error : .coin)
+            Chiptune.shared.sfx(failed ? .error : .coin)
             showToast(message)
         }
     }
@@ -169,7 +181,7 @@ final class AppModel: ObservableObject {
         updateState = .checking
         guard let info = await Updater.check() else {
             updateState = manual ? .upToDate : .idle
-            if manual { showToast("Sei già all'ultima versione (\(Updater.currentVersion)) ✨") }
+            if manual { showToast(t("mac.upd.latest", Updater.currentVersion)) }
             return
         }
         update = info
@@ -186,7 +198,7 @@ final class AppModel: ObservableObject {
             updateState = .ready
             Updater.pendingApply = { Updater.apply(staged: staged, relaunch: false) }
             Chiptune.shared.sfx(.coin)
-            showToast("Kyaa~! SuriClean \(info.version) è pronta ✨ Si installa quando chiudi l'app")
+            showToast(t("mac.upd.ready", info.version))
         } catch {
             updateState = .failed(error.localizedDescription)
         }
@@ -219,7 +231,7 @@ final class AppModel: ObservableObject {
 
     func recheckFDA() {
         hasFDA = FS.hasFullDiskAccess()
-        showToast(hasFDA ? "Yatta! Ora vedo tutte le stanze ✨" : "Ancora niente accesso completo: dopo averlo concesso riapri l'app")
+        showToast(hasFDA ? t("mac.fda.yatta") : t("mac.fda.still"))
     }
 
     // MARK: administrator password (see Admin)
@@ -250,7 +262,7 @@ final class AppModel: ObservableObject {
                 passwordWaiter = nil
             } else {
                 passwordPrompt?.checking = false
-                passwordPrompt?.error = "Ehh… password sbagliata, riprova ♡"
+                passwordPrompt?.error = t("mac.pw.wrong")
                 Chiptune.shared.sfx(.error)
             }
         }
@@ -290,7 +302,7 @@ final class AppModel: ObservableObject {
     func fdaGrantedContinue() {
         hasFDA = FS.hasFullDiskAccess()
         showFDAGuide = false
-        showToast("Yatta! Ora vedo tutte le stanze ✨")
+        showToast(t("mac.fda.yatta"))
         if fullScanAfterFDA { fullScanAfterFDA = false; scanAll(full: true, askedFDA: true) }
         if fullDiskAfterFDA { fullDiskAfterFDA = false; scanFullDisk(askedFDA: true) }
     }
@@ -334,27 +346,27 @@ final class AppModel: ObservableObject {
         let pct = Int(disk.usedFraction * 100)
         if results.isEmpty {
             if pct >= 90 {
-                return "Kyaa~! Sono Suri-chan 🐾 Il tuo disco è pieno al \(pct)%… è un'emergenza kawaii!! Premi il bottone e lo faccio tornare pika-pika ✨"
+                return t("mac.greet.full", pct)
             } else if pct >= 70 {
-                return "Konnichiwa~! Sono Suri-chan 🐾 Il disco è al \(pct)%. Andiamo a caccia di spazio insieme? Ganbarō! ☆"
+                return t("mac.greet.mid", pct)
             }
-            return "Yahoo~! Sono Suri-chan 🐾 Il disco sta benino (\(pct)%), ma un po' di brillantezza in più non guasta mai ✧"
+            return t("mac.greet.ok", pct)
         }
-        return "Sugoi!! Ho scovato \(Fmt.bytes(foundTotal)) di roba ✨ e \(Fmt.bytes(recommendedTotal)) puoi buttarli senza pensieri! Tocca una zona e diamo un'occhiatina~ ♡"
+        return t("mac.greet.found", Fmt.bytes(foundTotal), Fmt.bytes(recommendedTotal))
     }
 
     var level: (title: String, emoji: String, progress: Double, next: String) {
         let gb = Double(totalFreed) / 1_000_000_000
         let steps: [(Double, String, String)] = [
-            (1, "Cucciola curiosa", "🐣"), (5, "Scavatrice in erba", "🌱"),
-            (20, "Sentinella del disco", "👀"), (50, "Regina delle dune", "👑")
+            (1, t("mac.level.1"), "🐣"), (5, t("mac.level.2"), "🌱"),
+            (20, t("mac.level.3"), "👀"), (50, t("mac.level.4"), "👑")
         ]
         var prev = 0.0
         for s in steps {
-            if gb < s.0 { return (s.1, s.2, (gb - prev) / (s.0 - prev), "prossimo livello a \(Int(s.0)) GB") }
+            if gb < s.0 { return (s.1, s.2, (gb - prev) / (s.0 - prev), t("mac.level.next", Int(s.0))) }
             prev = s.0
         }
-        return ("Leggenda del deserto", "🌟", 1, "livello MAX!! Sugoi~")
+        return (t("mac.level.5"), "🌟", 1, t("mac.level.max"))
     }
 
     // MARK: selection
@@ -431,7 +443,7 @@ final class AppModel: ObservableObject {
 
     func cancel() {
         reporter?.cancel()
-        updateBusy { $0.title = "Okke~ mi fermo! ✋" }
+        updateBusy { $0.title = t("mac.busy.stop") }
         Chiptune.shared.sfx(.error)
     }
 
@@ -472,7 +484,7 @@ final class AppModel: ObservableObject {
                     updateBusy {
                         $0.step = i
                         $0.activity = .digging
-                        $0.title = "Esplorazione della tana, tan-tan! 🏡"
+                        $0.title = t("mac.busy.index")
                         $0.progress = cats.count > 1 ? Double(i) / Double(cats.count) : nil
                     }
                     let idx = await Task.detached(priority: .userInitiated) { HomeIndex.build(reporter: rep) }.value
@@ -495,10 +507,10 @@ final class AppModel: ObservableObject {
                 Chiptune.shared.sfx(.coin)
             }
             if thenFull && !rep.isCancelled {
-                updateBusy { $0.activity = .lookout; $0.title = "Ora tutto il disco e gli altri utenti! 🔐"; $0.progress = nil; $0.detail = "Serve la password una volta sola" }
+                updateBusy { $0.activity = .lookout; $0.title = t("mac.busy.nowfull"); $0.progress = nil; $0.detail = t("mac.busy.onepwonly") }
                 Chiptune.shared.mood = .scanning
-                let allowed = await ensureAdmin("Per misurare tutto il disco e le cartelle degli altri utenti.")
-                var full = HelperMode.FullResult(error: "Hai annullato: guardo solo la tua cartella ♡")
+                let allowed = await ensureAdmin(t("mac.pw.reason.full"))
+                var full = HelperMode.FullResult(error: t("mac.err.cancelfull"))
                 if allowed { full = await Task.detached(priority: .userInitiated) { HelperMode.fullScan(rep) }.value }
                 if let e = full.error { showToast(e) }
                 if !full.map.isEmpty {
@@ -522,7 +534,7 @@ final class AppModel: ObservableObject {
             Chiptune.shared.intensity = 0
             Chiptune.shared.mood = cancelled ? .menu : .results
             refreshDisk()
-            if !cancelled && cats.count > 1 { showToast("Missione compiuta!! Bottino: \(Fmt.bytes(foundTotal)) ☆ Sugoi~!") }
+            if !cancelled && cats.count > 1 { showToast(t("mac.toast.mission", Fmt.bytes(foundTotal))) }
         }
     }
 
@@ -546,14 +558,14 @@ final class AppModel: ObservableObject {
                     safe += g.filter { selection.contains($0.id) }
                 }
             }
-            if safe.count < items.count { showToast("Tranquillo~ ho tenuto almeno un gemellino di ogni file 💎") }
+            if safe.count < items.count { showToast(t("mac.toast.keptdup")) }
             items = safe
         }
         guard !items.isEmpty else { return }
         let toTrash = items
         let rep = Reporter()
         reporter = rep
-        busy = BusyState(activity: .sweeping, title: "Suri spazza via \(items.count) \(items.count == 1 ? "elemento" : "elementi")…", progress: 0)
+        busy = BusyState(activity: .sweeping, title: tp("mac.busy.sweep", items.count, items.count), progress: 0)
         rep.onUpdate = { [weak self] text, p in
             guard let self = self, var b = self.busy else { return }
             b.detail = text
@@ -566,7 +578,7 @@ final class AppModel: ObservableObject {
         let fm = FileManager.default
         let needsAdmin = toTrash.contains { !$0.owner.isEmpty || !fm.isWritableFile(atPath: $0.url.deletingLastPathComponent().path) }
         Task {
-            if needsAdmin { _ = await ensureAdmin("Alcuni elementi sono di macOS o di altri utenti: per spostarli nel Cestino.") }
+            if needsAdmin { _ = await ensureAdmin(t("mac.pw.reason.trash")) }
             let o = await Task.detached(priority: .userInitiated) { Cleaner.trash(toTrash, reporter: rep) }.value
             let removed = Set(o.removed)
             for key in Array(results.keys) {
@@ -581,10 +593,10 @@ final class AppModel: ObservableObject {
             refreshTrash()
             var msg = ""
             if !o.failed.isEmpty {
-                msg = "\(o.failed.count) elementi non si sono lasciati spostare (in uso, protetti o di proprietà del sistema): \(o.failed.prefix(3).joined(separator: ", "))\(o.failed.count > 3 ? "…" : "")"
+                msg = t("mac.clean.failed", o.failed.count, o.failed.prefix(3).joined(separator: ", ") + (o.failed.count > 3 ? "…" : ""))
             }
             if toTrash.contains(where: { $0.copyText != nil }) && o.bytes > 0 {
-                msg += (msg.isEmpty ? "" : "\n") + "I comandi per riclonare i repo sono in Documenti › «SuriClean - repo rimossi.txt»."
+                msg += (msg.isEmpty ? "" : "\n") + t("mac.clean.repolog")
             }
             celebrate(Celebration(kind: .trashed, bytes: o.bytes, failed: o.failed.count, message: msg))
         }
@@ -593,7 +605,7 @@ final class AppModel: ObservableObject {
     func emptyTrash() {
         guard busy == nil else { return }
         celebration = nil
-        busy = BusyState(activity: .sweeping, title: "Pulizia finale, pika-pika! 🗑️✨", progress: nil)
+        busy = BusyState(activity: .sweeping, title: t("mac.busy.emptytrash"), progress: nil)
         Chiptune.shared.mood = .cleaning
         Chiptune.shared.sfx(.whoosh)
         let before = DiskInfo.current().availableImportant
@@ -606,7 +618,7 @@ final class AppModel: ObservableObject {
             refreshDisk()
             let freed = max(trashBefore - after, max(0, disk.availableImportant - before))
             celebrate(Celebration(kind: .emptied, bytes: freed,
-                                  message: after > 0 ? "Qualcosa è rimasto: forse serve l'Accesso completo al disco o un file è in uso." : ""))
+                                  message: after > 0 ? t("mac.trash.left") : ""))
         }
     }
 
@@ -619,11 +631,11 @@ final class AppModel: ObservableObject {
         }
         let rep = Reporter()
         reporter = rep
-        busy = BusyState(activity: .lookout, title: "Misuro tutto il disco, kira-kira! 💽", progress: nil)
+        busy = BusyState(activity: .lookout, title: t("mac.busy.diskfull"), progress: nil)
         rep.onUpdate = { [weak self] text, _ in self?.updateBusy { $0.detail = text } }
         Chiptune.shared.mood = .scanning
         Task {
-            guard await ensureAdmin("Per misurare tutto il disco, compresi gli altri utenti.") else {
+            guard await ensureAdmin(t("mac.pw.reason.disk")) else {
                 busy = nil
                 reporter = nil
                 Chiptune.shared.mood = .menu
@@ -640,7 +652,7 @@ final class AppModel: ObservableObject {
                 refreshBreakdown()
                 Chiptune.shared.mood = .results
                 Chiptune.shared.sfx(.coin)
-                showToast("Ecco tutto il disco, anche gli altri utenti ☆")
+                showToast(t("mac.toast.fulldisk"))
             case .failure(let e):
                 Chiptune.shared.mood = .menu
                 Chiptune.shared.sfx(.error)
@@ -651,7 +663,7 @@ final class AppModel: ObservableObject {
 
     func refreshBreakdown() {
         let measured = displayTotal(.diskMap)
-        let label = diskMapIsFull ? "Dati misurati (tutti gli utenti)" : "La tua cartella Inizio"
+        let label = diskMapIsFull ? t("mac.slice.measuredall") : t("mac.slice.home")
         let purgeable = DiskInfo.current().purgeable
         let denied = diskMapIsFull ? deniedPaths.count : 0
         if !diskMapIsFull { deniedPaths = [] }
@@ -670,16 +682,16 @@ final class AppModel: ObservableObject {
         guard busy == nil else { return }
         let names = snapshotNames.filter { !$0.hasPrefix("com.apple.os.update") }
         guard !names.isEmpty else { return }
-        busy = BusyState(activity: .sweeping, title: "Via le istantanee, pika-pika! ⏳", progress: nil)
+        busy = BusyState(activity: .sweeping, title: t("mac.busy.snaps"), progress: nil)
         Chiptune.shared.mood = .cleaning
         let before = DiskInfo.current().availableImportant
         Task {
-            guard await ensureAdmin("Per eliminare le istantanee locali del disco.") else { busy = nil; Chiptune.shared.mood = .menu; return }
+            guard await ensureAdmin(t("mac.pw.reason.snaps")) else { busy = nil; Chiptune.shared.mood = .menu; return }
             let ok = await Task.detached(priority: .userInitiated) { () -> Bool in
                 func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
                 var lines = ["/usr/bin/tmutil deletelocalsnapshots / >/dev/null 2>&1"]
                 for n in names { lines.append("/usr/sbin/diskutil apfs deleteSnapshot /System/Volumes/Data -name \(q(n)) >/dev/null 2>&1") }
-                return Admin.run(lines, prompt: "SuriClean vuole eliminare le istantanee locali del disco.").ok
+                return Admin.run(lines, prompt: t("mac.prompt.snaps")).ok
             }.value
             busy = nil
             try? await Task.sleep(nanoseconds: 2_000_000_000)   // APFS frees space asynchronously
@@ -688,17 +700,17 @@ final class AppModel: ObservableObject {
             refreshBreakdown()
             let freed = max(0, disk.availableImportant - before)
             if ok {
-                celebrate(Celebration(kind: .info, bytes: freed, message: "Istantanee locali eliminate. macOS potrebbe impiegare qualche minuto a restituire tutto lo spazio."))
+                celebrate(Celebration(kind: .info, bytes: freed, message: t("mac.snaps.done")))
             } else {
                 Chiptune.shared.mood = .menu
-                showToast("Non sono riuscita a eliminare le istantanee")
+                showToast(t("mac.snaps.fail"))
             }
         }
     }
 
     func thinSnapshots() {
         guard busy == nil else { return }
-        busy = BusyState(activity: .sweeping, title: "Dieta per Time Machine! ⏳", progress: nil)
+        busy = BusyState(activity: .sweeping, title: t("mac.busy.tmthin"), progress: nil)
         Chiptune.shared.mood = .cleaning
         let before = DiskInfo.current().availableImportant
         Task {
@@ -708,10 +720,10 @@ final class AppModel: ObservableObject {
             refreshSnapshots()
             if r.status == 0 {
                 celebrate(Celebration(kind: .info, bytes: max(0, disk.availableImportant - before),
-                                      message: "Istantanee locali di Time Machine assottigliate."))
+                                      message: t("mac.tm.thinned")))
             } else {
                 Chiptune.shared.mood = .menu
-                showToast("tmutil non ha potuto procedere: \(r.output.prefix(120))")
+                showToast(t("mac.tm.fail", String(r.output.prefix(120))))
             }
         }
     }

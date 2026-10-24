@@ -71,6 +71,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     private var index: StorageIndex? = null
 
     init {
+        L.init(app)
         Chiptune.attach(app)
         Chiptune.muted = muted
         Chiptune.remix = remix
@@ -135,7 +136,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         remix = !remix; Chiptune.remix = remix; prefs.edit().putBoolean("remix", remix).apply()
         if (muted) toggleMute()
         Chiptune.sfx(Sfx.POP)
-        showToast(if (remix) "🎧 Remix ON! «Arcade Sparkle» ♪" else "🎵 Torna la musica originale ♪")
+        showToast(if (remix) L.t("and.toast.remixOn") else L.t("and.toast.remixOff"))
     }
 
     fun toggleMute() { muted = !muted; Chiptune.muted = muted; prefs.edit().putBoolean("muted", muted).apply() }
@@ -143,21 +144,21 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     fun level(): Triple<String, Float, String> {
         val gb = freed / 1e9
-        val steps = listOf(1.0 to "🐣 Cucciolina curiosa", 5.0 to "🌱 Scavatrice in erba", 20.0 to "👀 Sentinella del disco", 50.0 to "👑 Regina delle dune")
+        val steps = listOf(1.0 to L.t("and.level.1"), 5.0 to L.t("and.level.2"), 20.0 to L.t("and.level.3"), 50.0 to L.t("and.level.4"))
         var prev = 0.0
-        for ((lim, name) in steps) { if (gb < lim) return Triple(name, ((gb - prev) / (lim - prev)).toFloat(), "prossimo livello a ${lim.toInt()} GB"); prev = lim }
-        return Triple("🌟 Leggenda del deserto", 1f, "livello MAX!! Sugoi~")
+        for ((lim, name) in steps) { if (gb < lim) return Triple(name, ((gb - prev) / (lim - prev)).toFloat(), L.t("and.level.next", lim.toInt())); prev = lim }
+        return Triple(L.t("and.level.5"), 1f, L.t("and.level.max"))
     }
 
     fun greeting(): String {
         val (tot, free) = storage
         val pct = if (tot > 0) ((tot - free) * 100 / tot).toInt() else 0
         if (results.isEmpty()) return when {
-            pct >= 90 -> "Kyaa~! Sono Suri-chan 🐾 La memoria è piena al $pct%… emergenza kawaii!! Premi il bottone e la faccio tornare pika-pika ✨"
-            pct >= 70 -> "Konnichiwa~! Sono Suri-chan 🐾 La memoria è al $pct%. Andiamo a caccia di spazio insieme? Ganbarō! ☆"
-            else -> "Yahoo~! Sono Suri-chan 🐾 La memoria sta benino ($pct%), ma un po' di brillantezza non guasta mai ✧"
+            pct >= 90 -> L.t("and.greet.full", pct)
+            pct >= 70 -> L.t("and.greet.mid", pct)
+            else -> L.t("and.greet.ok", pct)
         }
-        return "Sugoi!! Ho scovato ${Fs.bytes(foundTotal)} di roba ✨ e ${Fs.bytes(recommendedTotal)} puoi buttarli senza pensieri! Tocca una zona~ ♡"
+        return L.t("and.greet.found", Fs.bytes(foundTotal), Fs.bytes(recommendedTotal))
     }
 
     // ───────── selection ─────────
@@ -203,19 +204,19 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         when {
             !hasFiles && "files" !in permAsked && Build.VERSION.SDK_INT >= 30 -> {
                 permAsked += "files"
-                showToast("Cerca SuriClean e accendi l'interruttore ♡")
+                showToast(L.t("and.perm.filesHint"))
                 pendingIntent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}"))
             }
             !hasUsage && "usage" !in permAsked -> {
                 permAsked += "usage"
-                showToast("Tocca SuriClean e consenti l'accesso ♡")
+                showToast(L.t("and.perm.usageHint"))
                 pendingIntent = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
             }
             else -> {
                 permTour = false
                 refresh()
-                if (hasFiles && hasUsage) { Chiptune.sfx(Sfx.COIN); showToast("Yatta~! Ora vedo tutte le stanze 🔑✨") }
-                else showToast("Okke~ guardo quello che posso: puoi darmi i permessi quando vuoi dalla tana")
+                if (hasFiles && hasUsage) { Chiptune.sfx(Sfx.COIN); showToast(L.t("and.perm.allOk")) }
+                else showToast(L.t("and.perm.partial"))
                 if (permTourScan) { permTourScan = false; scan(Category.entries.toList()) }
             }
         }
@@ -223,13 +224,13 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     fun rescan(c: Category) { index = null; scan(listOf(c)) }
 
-    fun cancelJob() { cancel.set(true); busy = busy?.copy(title = "Okke~ mi fermo! ✋"); Chiptune.sfx(Sfx.ERROR) }
+    fun cancelJob() { cancel.set(true); busy = busy?.copy(title = L.t("and.busy.stopping")); Chiptune.sfx(Sfx.ERROR) }
 
     private fun needsIndex(c: Category) = c in setOf(Category.MAP, Category.DUPLICATES, Category.BIG, Category.APKS, Category.JUNK, Category.SYSTEM)
 
     fun scan(cats: List<Category>) {
         if (busy != null || cats.isEmpty()) return
-        if (!hasFiles && cats.any { it != Category.APPS }) { showToast("Prima dammi l'accesso a tutti i file ♡"); return }
+        if (!hasFiles && cats.any { it != Category.APPS }) { showToast(L.t("and.toast.needFiles")); return }
         cancel = AtomicBoolean(false)
         val flag = cancel
         busy = Busy(cats[0].act, cats[0].scanTitle, steps = cats.size)
@@ -247,7 +248,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                 }
                 val list = withContext(Dispatchers.IO) {
                     if (needsIndex(c) && (index == null || index!!.stale)) {
-                        withContext(Dispatchers.Main) { busy = busy?.copy(act = Act.DIGGING, title = "Esploro tutta la memoria, tan-tan! 🏡", progress = null) }
+                        withContext(Dispatchers.Main) { busy = busy?.copy(act = Act.DIGGING, title = L.t("and.busy.indexing"), progress = null) }
                         index = StorageIndex.build(rep)
                         withContext(Dispatchers.Main) { busy = busy?.copy(act = c.act, title = c.scanTitle) }
                     }
@@ -282,7 +283,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             Chiptune.intensity = 0.0
             Chiptune.setMood(if (cancelled) Mood.MENU else Mood.RESULTS)
             refresh()
-            if (!cancelled && cats.size > 1) showToast("Missione compiuta!! Bottino: ${Fs.bytes(foundTotal)} ☆ Sugoi~!")
+            if (!cancelled && cats.size > 1) showToast(L.t("and.toast.missionDone", Fs.bytes(foundTotal)))
         }
     }
 
@@ -299,13 +300,13 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                 if (kept.isNotEmpty()) safe += g.filter { it.id in selection }
                 else { val spare = g.firstOrNull { !it.recommended } ?: g[0]; safe += g.filter { it.id in selection && it.id != spare.id } }
             }
-            if (safe.size < sel.size) showToast("Tranquillo~ ho tenuto almeno un gemellino di ogni file 💎")
+            if (safe.size < sel.size) showToast(L.t("and.toast.keptTwin"))
             sel = safe
         }
         if (sel.isEmpty()) return
         cancel = AtomicBoolean(false)
         val flag = cancel
-        busy = Busy(Act.SWEEPING, "Suri spazza via ${sel.size} ${if (sel.size == 1) "elemento" else "elementi"}…")
+        busy = Busy(Act.SWEEPING, L.tp("and.busy.sweeping", sel.size, sel.size))
         Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
         viewModelScope.launch {
             val rep = Reporter(flag) { text, p -> viewModelScope.launch { busy = busy?.copy(detail = text, progress = p ?: busy?.progress); Chiptune.sfx(Sfx.COIN) } }
@@ -318,10 +319,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             freed += bytes; prefs.edit().putLong("freed", freed).apply()
             refresh()
             celebrate(Celebration(
-                if (bytes > 0) "Yatta~!! 🎉" else "Ehh… gomen! 🙈",
-                if (bytes > 0) "Ho spedito ${Fs.bytes(bytes)} nel Cestino di Suri ☆" else "Non sono riuscita a spostare niente, scusa~",
-                if (failed.isNotEmpty()) "${failed.size} elementi non si sono lasciati spostare: ${failed.take(3).joinToString()}" else
-                    "Psst~ lo spazio torna libero davvero quando svuoti il Cestino di Suri ♡",
+                if (bytes > 0) L.t("and.cele.yatta") else L.t("and.cele.gomen"),
+                if (bytes > 0) L.t("and.cele.trashed", Fs.bytes(bytes)) else L.t("and.cele.nothingMoved"),
+                if (failed.isNotEmpty()) L.t("and.cele.failedMove", failed.size, failed.take(3).joinToString()) else
+                    L.t("and.cele.trashHint"),
                 offerEmptyTrash = bytes > 0))
         }
     }
@@ -329,13 +330,13 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun emptyTrash() {
         if (busy != null) return
         celebration = null
-        busy = Busy(Act.SWEEPING, "Pulizia finale, pika-pika! 🗑️✨", progress = null)
+        busy = Busy(Act.SWEEPING, L.t("and.busy.emptying"), progress = null)
         Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
         viewModelScope.launch {
             val freedNow = withContext(Dispatchers.IO) { Trash.empty() }
             busy = null
             refresh()
-            celebrate(Celebration("Pika-pika! Cestino vuoto ✨", "Hai recuperato ${Fs.bytes(freedNow)} di spazio vero! Sugoi~ ♡"))
+            celebrate(Celebration(L.t("and.cele.trashEmpty"), L.t("and.cele.recovered", Fs.bytes(freedNow))))
         }
     }
 
@@ -343,10 +344,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         Chiptune.sfx(Sfx.POP)
         when (shizuku) {
             2 -> ShizukuBridge.request { ok -> viewModelScope.launch(Dispatchers.Main) {
-                refresh(); showToast(if (ok) "Yatta~! Con Shizuku vedo le stanze nascoste 🔑✨" else "Shizuku non ha dato il permesso")
+                refresh(); showToast(if (ok) L.t("and.shizuku.granted") else L.t("and.shizuku.denied"))
             } }
             1 -> ctx.packageManager.getLaunchIntentForPackage(ShizukuBridge.PACKAGE)?.let {
-                showToast("Avvia Shizuku (Debug wireless) e torna qui ♡"); pendingIntent = it
+                showToast(L.t("and.shizuku.startHint")); pendingIntent = it
             }
             0 -> pendingIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${ShizukuBridge.PACKAGE}"))
         }
@@ -357,7 +358,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun clearAllCaches() {
         if (ShizukuBridge.ready()) {
             if (busy != null) return
-            busy = Busy(Act.SWEEPING, "Suri svuota le cache di tutte le app! 🧽", progress = null)
+            busy = Busy(Act.SWEEPING, L.t("and.busy.cachesAll"), progress = null)
             Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
             viewModelScope.launch {
                 val before = Fs.storage().second
@@ -367,14 +368,14 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                 busy = null
                 freed += gained; prefs.edit().putLong("freed", freed).apply()
                 refresh()
-                if (ok) celebrate(Celebration("Pika-pika! Cache svuotate ✨", "Liberati ${Fs.bytes(gained)} in un colpo solo"))
-                else showToast("Shizuku non è riuscito a svuotare le cache")
+                if (ok) celebrate(Celebration(L.t("and.cele.cachesCleared"), L.t("and.cele.cachesFreed", Fs.bytes(gained))))
+                else showToast(L.t("and.toast.shizukuCacheFail"))
                 if (results[Category.APPS] != null) rescan(Category.APPS)
             }
             return
         }
         if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
-            showToast("Per pulire le cache serve l'«Accesso a tutti i file» ♡"); return
+            showToast(L.t("and.toast.cacheNeedFiles")); return
         }
         cacheRequestAt = System.currentTimeMillis()
         pendingIntent = if (Build.VERSION.SDK_INT >= 25) Intent(android.os.storage.StorageManager.ACTION_CLEAR_APP_CACHE)
@@ -388,10 +389,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             val quick = System.currentTimeMillis() - cacheRequestAt < 1500
             cacheRequestAt = 0
             if (resultOk) {
-                Chiptune.sfx(Sfx.COIN); showToast("Pika-pika! Cache di tutte le app svuotate ✨")
+                Chiptune.sfx(Sfx.COIN); showToast(L.t("and.toast.cachesCleared"))
             } else if (quick) {
                 // many phones (Samsung, Xiaomi…) disable this screen: fall back to the system storage settings
-                showToast("Questo telefono non permette la pulizia in un colpo: apro l'archiviazione di Android ♡")
+                showToast(L.t("and.toast.cacheFallback"))
                 pendingIntent = Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
                 return
             }
@@ -421,17 +422,17 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             ShizukuBridge.request { ok ->
                 viewModelScope.launch(Dispatchers.Main) {
                     if (ok) clearWithShizuku(apps)
-                    else { showToast("Shizuku non ha dato il permesso: faccio una scheda alla volta ♡"); clearGuidedStart(apps) }
+                    else { showToast(L.t("and.toast.shizukuDeniedGuided")); clearGuidedStart(apps) }
                 }
             }
         } else {
-            if (ShizukuBridge.installed(ctx)) showToast("Shizuku è installato ma spento: avvialo per fare tutto in un colpo. Intanto una scheda alla volta ♡")
+            if (ShizukuBridge.installed(ctx)) showToast(L.t("and.toast.shizukuOffGuided"))
             clearGuidedStart(apps)
         }
     }
 
     private fun clearWithShizuku(apps: List<Item>) {
-        busy = Busy(Act.SWEEPING, "Suri svuota i dati di ${apps.size} app… 🧽", progress = 0f)
+        busy = Busy(Act.SWEEPING, L.t("and.busy.clearingData", apps.size), progress = 0f)
         Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
         viewModelScope.launch {
             var bytes = 0L
@@ -446,27 +447,16 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             selection = selection - apps.map { it.id }.toSet()
             refresh()
             celebrate(Celebration(
-                if (failed.size < apps.size) "Pika-pika! Dati svuotati ✨" else "Ehh… gomen! 🙈",
-                if (failed.size < apps.size) "${apps.size - failed.size} app come appena installate, circa ${Fs.bytes(bytes)} liberati" else "Android non mi ha lasciato svuotare niente",
-                if (failed.isNotEmpty()) "Non svuotate: ${failed.take(3).joinToString()}${if (failed.size > 3) "…" else ""}" else ""))
+                if (failed.size < apps.size) L.t("and.cele.dataCleared") else L.t("and.cele.gomen"),
+                if (failed.size < apps.size) L.t("and.cele.dataClearedSub", apps.size - failed.size, Fs.bytes(bytes)) else L.t("and.cele.dataNone"),
+                if (failed.isNotEmpty()) L.t("and.cele.dataFailed", failed.take(3).joinToString() + if (failed.size > 3) "…" else "") else ""))
             delay(600)
             rescan(Category.APPS)
         }
     }
 
-    /** The data part of an app's size (total minus the program itself), from the badge we computed. */
-    private fun dataBytes(a: Item): Long {
-        val b = a.badges.firstOrNull { it.startsWith("📦 app") } ?: return a.size
-        val appPart = b.substringAfter("📦 app ").substringBefore(" ·")
-        return (a.size - parseBytes(appPart)).coerceAtLeast(0)
-    }
-
-    private fun parseBytes(s: String): Long {
-        val parts = s.trim().split(" ")
-        val n = parts.getOrNull(0)?.replace(",", ".")?.toDoubleOrNull() ?: return 0
-        val mult = when (parts.getOrNull(1)?.uppercase()) { "KB" -> 1e3; "MB" -> 1e6; "GB" -> 1e9; "TB" -> 1e12; else -> 1.0 }
-        return (n * mult).toLong()
-    }
+    /** The data part of an app's size (total minus the program itself). */
+    private fun dataBytes(a: Item): Long = (a.size - a.appBytes).coerceAtLeast(0)
 
     private fun clearGuidedStart(apps: List<Item>) {
         clearQueue.clear()
@@ -482,13 +472,13 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         if (next == null) {
             clearGuided = false
             refresh()
-            showToast("Fatto! Rimisuro le app ♡")
+            showToast(L.t("and.toast.remeasure"))
             viewModelScope.launch { delay(500); rescan(Category.APPS) }
             return
         }
         val n = clearTotal - clearQueue.size
         // a system toast stays visible on top of the Settings app
-        android.widget.Toast.makeText(ctx, "🐾 $n di $clearTotal · ${next.second}\nArchiviazione › Cancella dati, poi torna indietro", android.widget.Toast.LENGTH_LONG).show()
+        android.widget.Toast.makeText(ctx, L.t("and.toast.clearStep", n, clearTotal, next.second), android.widget.Toast.LENGTH_LONG).show()
         pendingIntent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${next.first}"))
     }
 
@@ -544,8 +534,8 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             update = found
             when {
                 found != null && (autoUpdate || manual) && busy == null && results.isEmpty() -> installUpdate()
-                found != null -> showToast("Kyaa~! È uscita SuriClean ${found.version} ✨ Tocca «Aggiorna» in alto")
-                manual -> showToast("Sei già all'ultima versione ($version) ✨")
+                found != null -> showToast(L.t("and.update.available", found.version))
+                manual -> showToast(L.t("and.update.latest", version))
             }
         }
     }
@@ -555,10 +545,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         if (busy != null) return
         if (Build.VERSION.SDK_INT >= 26 && !ctx.packageManager.canRequestPackageInstalls()) {
             pendingIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${ctx.packageName}"))
-            showToast("Permetti a SuriClean di installare aggiornamenti, poi tocca di nuovo «Aggiorna» ♡")
+            showToast(L.t("and.update.allowInstall"))
             return
         }
-        busy = Busy(Act.DIGGING, "Scarico SuriClean ${u.version}… ✨", "Poi Android ti chiede di confermare", progress = null)
+        busy = Busy(Act.DIGGING, L.t("and.update.downloading", u.version), L.t("and.update.confirmNote"), progress = null)
         viewModelScope.launch {
             val file = withContext(Dispatchers.IO) {
                 try {
@@ -571,7 +561,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                 } catch (e: Exception) { null }
             }
             busy = null
-            if (file == null) { showToast("Aggiornamento non riuscito, riprova più tardi~"); return@launch }
+            if (file == null) { showToast(L.t("and.update.failed")); return@launch }
             val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
             pendingIntent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

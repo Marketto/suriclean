@@ -15,6 +15,12 @@ android {
 
     // «Arcade Sparkle» for the remix, shared with the Mac, desktop and web versions
     sourceSets["main"].assets.srcDir("../../shared/audio")
+    // translations shared with the other platforms (one JSON per language)
+    sourceSets["main"].assets.srcDir("../../i18n")
+    androidResources {
+        // keep the default ignores, and leave the i18n tooling (merge.py, README, src/) out of the APK
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!*.py:!*.md:!src"
+    }
 
     defaultConfig {
         applicationId = "com.suriclean.app"

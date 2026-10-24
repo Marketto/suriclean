@@ -9,20 +9,21 @@ enum SystemAreas {
         if FS.isHelper { return [] }
         var out: [CleanItem] = []
         let steps: [(String, () -> [CleanItem])] = [
-            ("Log di sistema", { libraryLogs(rep) }),
-            ("Log archiviati di macOS", { rotatedLogs(rep) }),
-            ("Cache comuni", { sharedCaches(rep) }),
-            ("Temporanei di sistema", { oldTemp(rep) }),
-            ("Aggiornamenti e installer di macOS", { updates(rep) }),
-            ("Core dump", { coreDumps(rep) }),
-            ("Suoni e simulatori riscaricabili", { redownloadable(rep) }),
+            (t("mac.sys.step.logs"), { libraryLogs(rep) }),
+            (t("mac.sys.step.rotated"), { rotatedLogs(rep) }),
+            (t("mac.sys.step.caches"), { sharedCaches(rep) }),
+            (t("mac.sys.step.temp"), { oldTemp(rep) }),
+            (t("mac.sys.step.updates"), { updates(rep) }),
+            (t("mac.sys.step.cores"), { coreDumps(rep) }),
+            (t("mac.sys.step.redl"), { redownloadable(rep) }),
         ]
         for (i, s) in steps.enumerated() {
             if rep.isCancelled { break }
             rep.report(s.0, progress: Double(i) / Double(steps.count), force: true)
             out += s.1()
         }
-        for k in out.indices where !out[k].badges.contains("🔐 password") { out[k].badges.append("🔐 password") }
+        let pw = t("mac.badge.password")
+        for k in out.indices where !out[k].badges.contains(pw) { out[k].badges.append(pw) }
         return out
     }
 
@@ -37,8 +38,8 @@ enum SystemAreas {
         for k in FS.children(URL(fileURLWithPath: "/Library/Logs")) {
             if rep.isCancelled { break }
             let n = k.lastPathComponent
-            let name = n == "DiagnosticReports" ? "Report dei crash di tutto il Mac" : "Log di sistema · \(FS.friendlyName(n))"
-            if let it = item(k, name, "/Library/Logs/\(n)", badges: ["📜 log"], rep) { out.append(it) }
+            let name = n == "DiagnosticReports" ? t("mac.sys.crashall") : t("mac.sys.log", FS.friendlyName(n))
+            if let it = item(k, name, "/Library/Logs/\(n)", badges: [t("mac.badge.log")], rep) { out.append(it) }
         }
         return out
     }
@@ -64,9 +65,9 @@ enum SystemAreas {
             if let d = v.contentModificationDate, d > (newest ?? .distantPast) { newest = d }
         }
         guard size >= 512 * 1024, let first = files.first else { return [] }
-        var it = CleanItem(url: first, name: "Log di macOS archiviati (\(files.count) file)",
-                           detail: "/private/var/log · i vecchi log già compressi o ruotati", size: size, date: newest,
-                           risk: .safe, recommended: true, badges: ["📜 log"])
+        var it = CleanItem(url: first, name: t("mac.sys.rotated", files.count),
+                           detail: t("mac.sys.rotated.detail"), size: size, date: newest,
+                           risk: .safe, recommended: true, badges: [t("mac.badge.log")])
         it.extraURLs = Array(files.dropFirst())
         return [it]
     }
@@ -78,9 +79,9 @@ enum SystemAreas {
             if rep.isCancelled { break }
             let n = k.lastPathComponent
             let apple = n.hasPrefix("com.apple.")
-            if let it = item(k, "Cache comune · \(FS.friendlyName(n))", "/Library/Caches/\(n)",
+            if let it = item(k, t("mac.sys.cache", FS.friendlyName(n)), "/Library/Caches/\(n)",
                              risk: apple ? .review : .safe, rec: !apple, min: 1_048_576,
-                             badges: apple ? ["🍎 di macOS, si ricrea"] : ["🧽 si ricrea"], rep) { out.append(it) }
+                             badges: apple ? [t("mac.badge.applecache")] : [t("mac.badge.rebuilt")], rep) { out.append(it) }
         }
         return out
     }
@@ -92,8 +93,8 @@ enum SystemAreas {
             if rep.isCancelled { break }
             let d = FS.newestModDate(k)
             guard FS.daysSince(d) >= 3 else { continue }
-            if let it = item(k, "Temporaneo di sistema · \(k.lastPathComponent)", "/private/var/tmp · toccato \(Fmt.relative(d))",
-                             badges: ["⏳ temporaneo"], rep) { out.append(it) }
+            if let it = item(k, t("mac.sys.temp", k.lastPathComponent), t("mac.sys.temp.detail", Fmt.relative(d)),
+                             badges: [t("mac.badge.temp")], rep) { out.append(it) }
         }
         return out
     }
@@ -102,17 +103,17 @@ enum SystemAreas {
     static func updates(_ rep: Reporter) -> [CleanItem] {
         var out: [CleanItem] = []
         for k in FS.children(URL(fileURLWithPath: "/Library/Updates")) where k.pathExtension != "plist" {
-            if let it = item(k, "Aggiornamento di macOS scaricato · \(k.lastPathComponent)", "/Library/Updates · si riscarica da Aggiornamento Software",
-                             min: 1_048_576, badges: ["⬇️ riscaricabile"], rep) { out.append(it) }
+            if let it = item(k, t("mac.sys.update", k.lastPathComponent), t("mac.sys.update.detail"),
+                             min: 1_048_576, badges: [t("mac.badge.redl")], rep) { out.append(it) }
         }
-        if let it = item(URL(fileURLWithPath: "/macOS Install Data"), "Avanzi di un'installazione di macOS", "/macOS Install Data",
-                         min: 1_048_576, badges: ["🧹 avanzo"], rep) { out.append(it) }
+        if let it = item(URL(fileURLWithPath: "/macOS Install Data"), t("mac.sys.installdata"), "/macOS Install Data",
+                         min: 1_048_576, badges: [t("mac.badge.leftover")], rep) { out.append(it) }
         for k in FS.children(URL(fileURLWithPath: "/Applications")) {
             let n = k.lastPathComponent
             guard n.hasSuffix(".app"), n.hasPrefix("Install macOS") || n.hasPrefix("Install OS X") || n.hasPrefix("Installa macOS") else { continue }
-            if let it = item(k, "Installer · \(k.deletingPathExtension().lastPathComponent)",
-                             "Si riscarica dall'App Store · serve solo per creare una chiavetta",
-                             risk: .review, rec: false, min: 1_048_576, badges: ["⬇️ riscaricabile"], rep) { out.append(it) }
+            if let it = item(k, t("mac.sys.installer", k.deletingPathExtension().lastPathComponent),
+                             t("mac.sys.installer.detail"),
+                             risk: .review, rec: false, min: 1_048_576, badges: [t("mac.badge.redl")], rep) { out.append(it) }
         }
         return out
     }
@@ -120,8 +121,8 @@ enum SystemAreas {
     /// Memory dumps left by crashed programs.
     static func coreDumps(_ rep: Reporter) -> [CleanItem] {
         FS.children(URL(fileURLWithPath: "/cores")).compactMap {
-            item($0, "Core dump · \($0.lastPathComponent)", "/cores · fotografia della memoria di un programma andato in crash",
-                 min: 1_048_576, badges: ["💥 crash"], rep)
+            item($0, t("mac.sys.core", $0.lastPathComponent), t("mac.sys.core.detail"),
+                 min: 1_048_576, badges: [t("mac.badge.crash")], rep)
         }
     }
 
@@ -129,18 +130,18 @@ enum SystemAreas {
     static func redownloadable(_ rep: Reporter) -> [CleanItem] {
         var out: [CleanItem] = []
         let fixed: [(String, String, String)] = [
-            ("/Library/Audio/Apple Loops", "Loop di GarageBand e Logic", "Si riscaricano da GarageBand › Scarica suoni"),
-            ("/Library/Application Support/GarageBand", "Strumenti di GarageBand", "Si riscaricano da GarageBand"),
-            ("/Library/Application Support/Logic", "Contenuti di Logic Pro", "Si riscaricano da Logic Pro"),
+            ("/Library/Audio/Apple Loops", t("mac.sys.loops"), t("mac.sys.loops.detail")),
+            ("/Library/Application Support/GarageBand", t("mac.sys.gb"), t("mac.sys.gb.detail")),
+            ("/Library/Application Support/Logic", t("mac.sys.logic"), t("mac.sys.logic.detail")),
         ]
         for f in fixed {
             if let it = item(URL(fileURLWithPath: f.0), f.1, "\(f.0) · \(f.2)", risk: .review, rec: false, min: 10 * 1_048_576,
-                             badges: ["⬇️ riscaricabile"], rep) { out.append(it) }
+                             badges: [t("mac.badge.redl")], rep) { out.append(it) }
         }
         for dir in ["/Library/Developer/CoreSimulator/Profiles/Runtimes", "/Library/Developer/CoreSimulator/Images"] {
             for k in FS.children(URL(fileURLWithPath: dir)) where k.pathExtension != "plist" {
-                if let it = item(k, "Simulatore · \(k.deletingPathExtension().lastPathComponent)", "\(dir) · si riscarica da Xcode",
-                                 risk: .careful, rec: false, min: 10 * 1_048_576, badges: ["⬇️ riscaricabile"], rep) { out.append(it) }
+                if let it = item(k, t("mac.sys.sim", k.deletingPathExtension().lastPathComponent), t("mac.sys.sim.detail", dir),
+                                 risk: .careful, rec: false, min: 10 * 1_048_576, badges: [t("mac.badge.redl")], rep) { out.append(it) }
             }
         }
         return out

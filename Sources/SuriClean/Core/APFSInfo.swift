@@ -42,34 +42,34 @@ enum APFSInfo {
     static func breakdown(measured: Int64, measuredLabel: String, purgeable: Int64 = 0, snapshots: [String] = [], denied: Int = 0) -> [DiskSlice] {
         let vols = volumes()
         guard !vols.isEmpty else { return [] }
-        var out = [DiskSlice(name: measuredLabel, size: measured, note: "le cartelle che vedi qui sotto", kind: .measured)]
+        var out = [DiskSlice(name: measuredLabel, size: measured, note: t("mac.slice.measured.note"), kind: .measured)]
         var boot: Int64 = 0
         for v in vols {
             if v.roles.contains("Data") {
                 let hidden = max(0, v.used - measured)
                 let purge = min(hidden, max(0, purgeable))
                 if purge > 0 {
-                    out.append(DiskSlice(name: "Spazio purgeable", size: purge,
-                                         note: "copie locali di iCloud e cache che macOS libera da solo quando serve spazio", kind: .purgeable))
+                    out.append(DiskSlice(name: t("mac.slice.purge"), size: purge,
+                                         note: t("mac.slice.purge.note"), kind: .purgeable))
                 }
                 var why: [String] = []
-                if !snapshots.isEmpty { why.append("\(snapshots.count) istantanee APFS che tengono vivi file già cancellati") }
-                if denied > 0 { why.append("\(denied) cartelle protette che macOS non ha lasciato leggere") }
-                if measuredLabel.contains("Inizio") { why.append("gli altri utenti e le cartelle di sistema (usa «Misura tutto il disco»)") }
-                if why.isEmpty { why.append("metadati del file system e file aperti ma già cancellati") }
-                out.append(DiskSlice(name: "Non misurabile", size: hidden - purge,
+                if !snapshots.isEmpty { why.append(t("mac.slice.why.snaps", snapshots.count)) }
+                if denied > 0 { why.append(t("mac.slice.why.denied", denied)) }
+                if measuredLabel == t("mac.slice.home") { why.append(t("mac.slice.why.others")) }
+                if why.isEmpty { why.append(t("mac.slice.why.meta")) }
+                out.append(DiskSlice(name: t("mac.slice.hidden"), size: hidden - purge,
                                      note: why.joined(separator: " · "), kind: .hidden))
             } else if v.roles.contains("System") {
-                out.append(DiskSlice(name: "macOS (\(v.name))", size: v.used, note: "il sistema operativo, sigillato: non si tocca", kind: .system))
+                out.append(DiskSlice(name: "macOS (\(v.name))", size: v.used, note: t("mac.slice.system.note"), kind: .system))
             } else if v.roles.contains("VM") {
-                out.append(DiskSlice(name: "Memoria virtuale", size: v.used, note: "swap e file di sospensione, li gestisce macOS", kind: .vm))
+                out.append(DiskSlice(name: t("mac.slice.vm"), size: v.used, note: t("mac.slice.vm.note"), kind: .vm))
             } else if v.roles.contains("Preboot") || v.roles.contains("Recovery") || v.roles.contains("Update") {
                 boot += v.used
             } else if v.used > 0 {
-                out.append(DiskSlice(name: v.name, size: v.used, note: "un altro volume nello stesso disco", kind: .other))
+                out.append(DiskSlice(name: v.name, size: v.used, note: t("mac.slice.other.note"), kind: .other))
             }
         }
-        if boot > 0 { out.append(DiskSlice(name: "Avvio e ripristino", size: boot, note: "Preboot e Recovery di macOS", kind: .boot)) }
+        if boot > 0 { out.append(DiskSlice(name: t("mac.slice.boot"), size: boot, note: t("mac.slice.boot.note"), kind: .boot)) }
         return out.filter { $0.size > 0 }
     }
 }

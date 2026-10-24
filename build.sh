@@ -28,6 +28,32 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SuriClean"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 [ -f shared/audio/remix.mp3 ] && cp shared/audio/remix.mp3 "$APP/Contents/Resources/remix.mp3"
+# translations (i18n/README.md): the JSON files, plus an .lproj per language so macOS
+# shows its own menus and permission texts in the user's language
+mkdir -p "$APP/Contents/Resources/i18n"
+cp i18n/*.json "$APP/Contents/Resources/i18n/" 2>/dev/null || true
+if command -v python3 >/dev/null 2>&1; then
+  python3 - "$APP/Contents/Resources" <<'PY'
+import json, os, sys
+res = sys.argv[1]
+src = os.path.join(res, "i18n")
+for lang in json.load(open(os.path.join(src, "languages.json"), encoding="utf-8")):
+    code = lang["code"]
+    d = os.path.join(res, code + ".lproj")
+    os.makedirs(d, exist_ok=True)
+    text = ""
+    for c in (code, "en", "it"):
+        p = os.path.join(src, c + ".json")
+        if os.path.exists(p):
+            v = json.load(open(p, encoding="utf-8")).get("mac.plist.appleevents")
+            if v:
+                text = v
+                break
+    if text:
+        text = text.replace("\\", "\\\\").replace('"', '\\"')
+        open(os.path.join(d, "InfoPlist.strings"), "w", encoding="utf-8").write('"NSAppleEventsUsageDescription" = "%s";\n' % text)
+PY
+fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -35,6 +61,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key><string>SuriClean</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleAllowMixedLocalizations</key><true/>
   <key>CFBundleDisplayName</key><string>SuriClean</string>
   <key>CFBundleIdentifier</key><string>com.suriclean.app</string>
   <key>CFBundleExecutable</key><string>SuriClean</string>

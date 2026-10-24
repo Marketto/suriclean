@@ -16,6 +16,7 @@ enum HelperMode {
             return a[i + 1]
         }
         guard let homePath = value("--scan-user"), let outPath = value("--out") else { return }
+        if let lang = value("--lang") { L10n.shared.use(code: lang) }
         let home = URL(fileURLWithPath: homePath)
         FS.home = home
         FS.isHelper = true
@@ -75,19 +76,19 @@ enum HelperMode {
         let cats = helperCategories.map { $0.rawValue }.joined(separator: ",")
         for h in homes {
             let out = work.appendingPathComponent("user-\(h.lastPathComponent).json")
-            lines.append("\(q(exe)) --scan-user \(q(h.path)) --categories \(cats) --out \(q(out.path)) >/dev/null 2>&1")
+            lines.append("\(q(exe)) --scan-user \(q(h.path)) --categories \(cats) --lang \(q(L10n.shared.code)) --out \(q(out.path)) >/dev/null 2>&1")
         }
-        rep.report(homes.isEmpty ? "Misuro tutto il disco… 🔐" : "Misuro tutto il disco e le cartelle di \(homes.map { $0.lastPathComponent }.joined(separator: ", "))… 🔐", force: true)
-        let o = Admin.run(Array(lines.dropFirst()), prompt: "SuriClean vuole misurare tutto il disco e le cartelle di tutti gli utenti.")
+        rep.report(homes.isEmpty ? t("mac.busy.full") : t("mac.busy.fullusers", homes.map { $0.lastPathComponent }.joined(separator: ", ")), force: true)
+        let o = Admin.run(Array(lines.dropFirst()), prompt: t("mac.prompt.fullscan"))
         if o.cancelled {
-            r.error = "Hai annullato la richiesta della password"
+            r.error = t("mac.err.pwcancel")
             return r
         }
         if let text = try? String(contentsOf: duOut, encoding: .utf8), !text.isEmpty {
             r.map = Scanners.parseDu(text)
             r.denied = Scanners.parseDuErrors((try? String(contentsOf: duErr, encoding: .utf8)) ?? "")
         } else {
-            r.error = "Non sono riuscita a misurare il disco"
+            r.error = t("mac.err.measurefail")
         }
         for h in homes {
             let f = work.appendingPathComponent("user-\(h.lastPathComponent).json")

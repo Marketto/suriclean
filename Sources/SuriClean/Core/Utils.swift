@@ -9,16 +9,13 @@ enum Fmt {
         ByteCountFormatter.string(fromByteCount: max(0, b), countStyle: .file)
     }
 
-    static let relativeFormatter: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: "it_IT")
-        f.unitsStyle = .full
-        return f
-    }()
-
+    /// Follows the language chosen in SuriClean (not cached: the language can change while running).
     static func relative(_ d: Date?) -> String {
-        guard let d = d else { return "mai" }
-        return relativeFormatter.localizedString(for: d, relativeTo: Date())
+        guard let d = d else { return t("mac.time.never") }
+        let f = RelativeDateTimeFormatter()
+        f.locale = L10n.shared.locale
+        f.unitsStyle = .full
+        return f.localizedString(for: d, relativeTo: Date())
     }
 }
 
@@ -214,14 +211,14 @@ enum FS {
         "pip": "Python pip",
         "pypoetry": "Poetry",
         "Yarn": "Yarn",
-        "ms-playwright": "Playwright (browser di test)",
+        "ms-playwright": "mac.name.playwright",
         "node-gyp": "node-gyp",
         "typescript": "TypeScript",
         "pnpm": "pnpm",
-        "go-build": "Go · cache di build",
+        "go-build": "mac.name.gobuild",
         "JetBrains": "JetBrains IDE",
         "CocoaPods": "CocoaPods",
-        "Google": "Google (Chrome & co.)",
+        "Google": "mac.name.google",
         "Firefox": "Firefox",
         "Mozilla": "Mozilla",
         "com.spotify.client": "Spotify",
@@ -229,15 +226,15 @@ enum FS {
         "com.microsoft.VSCode": "VS Code",
         "com.apple.Safari": "Safari",
         "com.apple.dt.Xcode": "Xcode",
-        "SiriTTS": "Voci di Siri",
-        "GeoServices": "Mappe (cache)",
+        "SiriTTS": "mac.name.siri",
+        "GeoServices": "mac.name.maps",
         "electron": "Electron",
         "deno": "Deno",
         "bun": "Bun"
     ]
 
     static func friendlyName(_ raw: String) -> String {
-        if let k = knownNames[raw] { return k }
+        if let k = knownNames[raw] { return k.hasPrefix("mac.") ? t(k) : k }
         if raw.contains("."), let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: raw) {
             return appURL.deletingPathExtension().lastPathComponent
         }
@@ -260,7 +257,7 @@ enum FS {
             h.write(Data(text.utf8))
             try? h.close()
         } else {
-            let header = "# Repo spostati nel Cestino da SuriClean.\n# Per riaverli basta lanciare il comando git clone sotto ciascuno.\n\n"
+            let header = t("mac.repolog.header") + "\n\n"
             try? (header + text).write(to: log, atomically: true, encoding: .utf8)
         }
     }

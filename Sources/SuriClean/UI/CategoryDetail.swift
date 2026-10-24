@@ -83,11 +83,11 @@ struct CategoryDetailView: View {
             }
             if category == .diskMap { mapFooter } else { footer(selected: selected) }
         }
-        .alert("Spostare nel Cestino?", isPresented: $confirm) {
-            Button("Annulla", role: .cancel) {}
-            Button("Sì, spazza spazza! 🧹", role: .destructive) { model.clean(category) }
+        .alert(t("mac.confirm.trash"), isPresented: $confirm) {
+            Button(t("mac.common.cancel"), role: .cancel) {}
+            Button(t("mac.confirm.trash.ok"), role: .destructive) { model.clean(category) }
         } message: {
-            Text("\(selected.count) elementi per \(Fmt.bytes(selected.totalSize)) finiranno nel Cestino: potrai ancora recuperarli finché non lo svuoti.")
+            Text(t("mac.confirm.trash.msg", selected.count, Fmt.bytes(selected.totalSize)))
         }
     }
 
@@ -104,7 +104,7 @@ struct CategoryDetailView: View {
                         .font(Theme.font(12.5, .medium)).opacity(0.68)
                         .fixedSize(horizontal: false, vertical: true)
                     if model.results[category] != nil {
-                        Text("\(count) elementi · \(Fmt.bytes(model.displayTotal(category)))")
+                        Text(t("mac.detail.count", count, Fmt.bytes(model.displayTotal(category))))
                             .font(Theme.font(12.5, .heavy))
                             .foregroundColor(category.color.darker)
                             .padding(.top, 2)
@@ -114,14 +114,14 @@ struct CategoryDetailView: View {
                 VStack(alignment: .trailing, spacing: 10) {
                     if category == .diskMap {
                         Button(action: { model.scanFullDisk() }) {
-                            Label("Tutto il disco", systemImage: "lock.shield.fill")
+                            Label(t("mac.detail.fulldisk"), systemImage: "lock.shield.fill")
                         }
                         .buttonStyle(BubblyButtonStyle(color: Theme.orange))
                         .disabled(model.busy != nil)
-                        .help("Misura tutto il disco, compresi gli altri utenti e le cartelle di sistema (chiede la password una volta)")
+                        .help(t("mac.detail.fullhelp"))
                     }
                     Button(action: { model.rescan(category) }) {
-                        Label("Riscansiona", systemImage: "arrow.clockwise")
+                        Label(t("mac.detail.rescan"), systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(BubblyButtonStyle(color: Theme.sky))
                     .disabled(model.busy != nil)
@@ -132,19 +132,19 @@ struct CategoryDetailView: View {
             HStack(spacing: 10) {
                 if model.fullScanDone && category != .diskMap {
                     Picker("", selection: $model.scope) {
-                        Text("🐾 Io").tag(AppModel.Scope.me)
-                        Text("👥 Tutti").tag(AppModel.Scope.all)
+                        Text(t("mac.scope.me")).tag(AppModel.Scope.me)
+                        Text(t("mac.scope.everyone")).tag(AppModel.Scope.all)
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 140)
                     .labelsHidden()
                     .onChange(of: model.scope) { _ in Chiptune.shared.sfx(.pop) }
-                    .help("Mostra solo le tue cose o anche quelle degli altri utenti")
+                    .help(t("mac.scope.help"))
                 }
                 if category != .diskMap {
                 Picker("", selection: $treeView) {
-                    Label("Lista", systemImage: "list.bullet").tag(false)
-                    Label("Albero", systemImage: "list.bullet.indent").tag(true)
+                    Label(t("mac.view.list"), systemImage: "list.bullet").tag(false)
+                    Label(t("mac.view.tree"), systemImage: "list.bullet.indent").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 160)
@@ -152,14 +152,14 @@ struct CategoryDetailView: View {
                 .onChange(of: treeView) { _ in Chiptune.shared.sfx(.pop) }
                 }
                 Picker("", selection: $sort) {
-                    ForEach(SortMode.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(SortMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 250)
                 .labelsHidden()
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").opacity(0.5)
-                    TextField("Cerca…", text: $query).textFieldStyle(.plain).font(Theme.font(13, .medium))
+                    TextField(t("mac.search"), text: $query).textFieldStyle(.plain).font(Theme.font(13, .medium))
                 }
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(Capsule().fill(Color.white.opacity(0.85)))
@@ -177,10 +177,10 @@ struct CategoryDetailView: View {
         VStack(spacing: 14) {
             Spacer()
             MeerkatView(activity: scanned ? .celebrating : category.activity, size: 170)
-            Text(scanned ? "Pika-pika! Qui è tutto lucido ✨" : "Questa zona è ancora un mistero~ ♡")
+            Text(scanned ? t("mac.empty.clean") : t("mac.empty.mystery"))
                 .font(Theme.font(19, .heavy))
             if !scanned {
-                Button(action: { model.rescan(category) }) { Label("Esploriamo! ☆", systemImage: "pawprint.fill") }
+                Button(action: { model.rescan(category) }) { Label(t("mac.empty.explore"), systemImage: "pawprint.fill") }
                     .buttonStyle(BubblyButtonStyle(color: category.color, big: true))
             }
             Spacer()
@@ -191,10 +191,10 @@ struct CategoryDetailView: View {
     private var mapFooter: some View {
         HStack(spacing: 10) {
             Image(systemName: "info.circle.fill").foregroundColor(category.color.darker)
-            Text("La mappa serve solo a guardare ☆ Per liberare spazio usa le altre zone, oppure apri la cartella nel Finder con 📁")
+            Text(t("mac.map.hint"))
                 .font(Theme.font(12.5, .semibold)).opacity(0.7)
             Spacer()
-            Text("Disco usato: \(Fmt.bytes(model.disk.used))").font(Theme.font(13, .heavy))
+            Text(t("mac.map.used", Fmt.bytes(model.disk.used))).font(Theme.font(13, .heavy))
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 14)
@@ -204,15 +204,15 @@ struct CategoryDetailView: View {
     private func footer(selected: [CleanItem]) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("\(selected.count) selezionati").font(Theme.font(12, .bold)).opacity(0.6)
+                Text(t("mac.sel.count", selected.count)).font(Theme.font(12, .bold)).opacity(0.6)
                 AnimatedBytes(value: selected.totalSize).font(Theme.font(22, .heavy)).foregroundColor(category.color.darker)
             }
             Spacer()
-            Button("Consigliati") { model.selectRecommended(category) }.buttonStyle(BubblyButtonStyle(color: Theme.mint))
-            Button("Tutti") { model.selectAll(category) }.buttonStyle(BubblyButtonStyle(color: Theme.lilac))
-            Button("Nessuno") { model.selectNone(category) }.buttonStyle(BubblyButtonStyle(color: Theme.lilac))
+            Button(t("mac.sel.rec")) { model.selectRecommended(category) }.buttonStyle(BubblyButtonStyle(color: Theme.mint))
+            Button(t("mac.sel.all")) { model.selectAll(category) }.buttonStyle(BubblyButtonStyle(color: Theme.lilac))
+            Button(t("mac.sel.none")) { model.selectNone(category) }.buttonStyle(BubblyButtonStyle(color: Theme.lilac))
             Button(action: { Chiptune.shared.sfx(.pop); confirm = true }) {
-                Label("Spazza via! ☆", systemImage: "trash.fill")
+                Label(t("mac.sel.sweep"), systemImage: "trash.fill")
             }
             .buttonStyle(BubblyButtonStyle(color: Theme.coral, big: true))
             .disabled(selected.isEmpty || model.busy != nil)
@@ -254,7 +254,7 @@ struct ItemRow: View {
                         .frame(width: 18, height: 18)
                 }
                 .buttonStyle(.plain)
-                .help("Mostra rami e stash")
+                .help(t("mac.git.showdetails"))
             }
             KawaiiCheckbox(on: selected, color: color)
             FileIcon(url: item.url).frame(width: 32, height: 32)
@@ -277,14 +277,14 @@ struct ItemRow: View {
                 RoundIconButton(symbol: "doc.on.clipboard", color: color.darker) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(copy, forType: .string)
-                    model.showToast("Copiato! Il git clone è al sicuro ♡")
+                    model.showToast(t("mac.toast.copied"))
                 }
                 .help(copy)
             }
             RoundIconButton(symbol: "magnifyingglass", color: color.darker) {
                 NSWorkspace.shared.activateFileViewerSelecting([item.url])
             }
-            .help("Mostra nel Finder")
+            .help(t("mac.reveal"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -324,12 +324,12 @@ struct DiskBreakdownCard: View {
 
     var body: some View {
         let free = max(0, model.disk.available)
-        let slices = model.diskBreakdown + (free > 0 ? [DiskSlice(name: "Libero", size: free, note: "spazio davvero disponibile adesso", kind: .free)] : [])
+        let slices = model.diskBreakdown + (free > 0 ? [DiskSlice(name: t("mac.slice.free"), size: free, note: t("mac.slice.free.note"), kind: .free)] : [])
         let total = max(slices.reduce(Int64(0)) { $0 + $1.size }, 1)
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Dove sono tutti i GB? ☆").font(Theme.font(15, .heavy))
-                Text("disco da \(Fmt.bytes(model.disk.total)) · occupati \(Fmt.bytes(model.disk.used)) · liberi \(Fmt.bytes(free))").font(Theme.font(11.5, .bold)).opacity(0.55)
+                Text(t("mac.bd.title")).font(Theme.font(15, .heavy))
+                Text(t("mac.bd.sub", Fmt.bytes(model.disk.total), Fmt.bytes(model.disk.used), Fmt.bytes(free))).font(Theme.font(11.5, .bold)).opacity(0.55)
                 Spacer()
             }
             GeometryReader { g in
@@ -360,17 +360,17 @@ struct DiskBreakdownCard: View {
             }
             HStack(spacing: 10) {
                 if !model.diskMapIsFull {
-                    Button(action: { model.scanFullDisk() }) { Label("Misura tutto il disco", systemImage: "lock.shield.fill") }
+                    Button(action: { model.scanFullDisk() }) { Label(t("mac.bd.measureall"), systemImage: "lock.shield.fill") }
                         .buttonStyle(BubblyButtonStyle(color: Theme.orange))
                 }
                 if model.snapshotNames.contains(where: { !$0.hasPrefix("com.apple.os.update") }) {
                     Button(action: { Chiptune.shared.sfx(.pop); confirmSnaps = true }) {
-                        Label("Elimina \(model.snapshotNames.count) istantanee", systemImage: "clock.arrow.circlepath")
+                        Label(t("mac.bd.delsnaps", model.snapshotNames.count), systemImage: "clock.arrow.circlepath")
                     }
                     .buttonStyle(BubblyButtonStyle(color: Theme.sky))
                 }
                 if !model.hasFDA {
-                    Button(action: { model.showFDAGuide = true }) { Label("Accesso completo al disco", systemImage: "lock.open.fill") }
+                    Button(action: { model.showFDAGuide = true }) { Label(t("mac.bd.fda"), systemImage: "lock.open.fill") }
                         .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
                 }
                 Spacer()
@@ -381,7 +381,7 @@ struct DiskBreakdownCard: View {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.right").font(.system(size: 10, weight: .heavy))
                             .rotationEffect(.degrees(showDenied ? 90 : 0))
-                        Text("🔒 \(model.deniedPaths.count) cartelle che macOS non ha lasciato leggere")
+                        Text(t("mac.bd.denied", model.deniedPaths.count))
                             .font(Theme.font(12, .heavy))
                     }
                 }
@@ -392,9 +392,9 @@ struct DiskBreakdownCard: View {
                             Text(p).font(.system(size: 11, design: .monospaced)).opacity(0.7).lineLimit(1).truncationMode(.middle)
                         }
                         if model.deniedPaths.count > 15 {
-                            Text("…e altre \(model.deniedPaths.count - 15)").font(Theme.font(11, .bold)).opacity(0.5)
+                            Text(t("mac.bd.more", model.deniedPaths.count - 15)).font(Theme.font(11, .bold)).opacity(0.5)
                         }
-                        Text(model.hasFDA ? "Le cartelle rimaste sono blindate da macOS stesso (Protezione dell'integrità di sistema): nemmeno l'amministratore può aprirle, ed è giusto così. Se vedi ancora Scrivania o Documenti, rifai «Misura tutto il disco» e scrivi la password nella finestra di Suri." : "Sono protette dalla privacy di macOS: concedi a SuriClean l'«Accesso completo al disco» e rifai la misura.")
+                        Text(model.hasFDA ? t("mac.bd.denied.sip") : t("mac.bd.denied.fda"))
                             .font(Theme.font(11, .medium)).opacity(0.6).fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 4)
                     }
@@ -404,11 +404,11 @@ struct DiskBreakdownCard: View {
         }
         .padding(16)
         .kawaiiCard(color: Theme.lemon)
-        .alert("Eliminare le istantanee locali?", isPresented: $confirmSnaps) {
-            Button("Annulla", role: .cancel) {}
-            Button("Sì, eliminale", role: .destructive) { model.deleteSnapshots() }
+        .alert(t("mac.snaps.ask"), isPresented: $confirmSnaps) {
+            Button(t("mac.common.cancel"), role: .cancel) {}
+            Button(t("mac.snaps.ok"), role: .destructive) { model.deleteSnapshots() }
         } message: {
-            Text("Sono copie del disco fatte da Time Machine o da altri programmi di backup: tengono occupato lo spazio dei file che hai già cancellato. I tuoi file attuali non vengono toccati e i backup sul disco esterno restano. Lascio stare quelle degli aggiornamenti di macOS.\n\n" + model.snapshotNames.prefix(6).joined(separator: "\n") + (model.snapshotNames.count > 6 ? "\n…" : ""))
+            Text(t("mac.snaps.msg") + "\n\n" + model.snapshotNames.prefix(6).joined(separator: "\n") + (model.snapshotNames.count > 6 ? "\n…" : ""))
         }
     }
 }

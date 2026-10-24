@@ -59,7 +59,7 @@ final class HomeIndex {
         case "Pods":
             return has("Podfile") ? "CocoaPods" : nil
         case ".gradle":
-            return (has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") || has("settings.gradle.kts")) ? "Gradle (cache progetto)" : nil
+            return (has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") || has("settings.gradle.kts")) ? t("mac.dep.gradlecache") : nil
         case "build":
             return (has("build.gradle") || has("build.gradle.kts")) ? "Gradle (build)" : (has("pubspec.yaml") ? "Flutter (build)" : nil)
         case ".next":
@@ -71,9 +71,9 @@ final class HomeIndex {
         case "vendor":
             return has("composer.json") ? "PHP Composer" : nil
         case ".turbo", ".parcel-cache", ".angular":
-            return has("package.json") ? "Cache di build JS" : nil
+            return has("package.json") ? t("mac.dep.jsbuild") : nil
         case "DerivedData":
-            return "Xcode DerivedData (locale)"
+            return t("mac.dep.derived")
         default:
             return nil
         }
@@ -97,7 +97,7 @@ final class HomeIndex {
             idx.scannedCount += 1
             if idx.scannedCount % 400 == 0 {
                 if reporter.isCancelled { break }
-                reporter.report("\(idx.scannedCount) elementi annusati · \(FS.pretty(url))")
+                reporter.report(t("mac.busy.sniffed", idx.scannedCount, FS.pretty(url)))
             }
             guard let v = try? url.resourceValues(forKeys: keySet) else { continue }
             if v.isSymbolicLink == true { continue }
@@ -136,7 +136,7 @@ final class HomeIndex {
                 }
             }
         }
-        reporter.report("Esplorazione finita: \(idx.scannedCount) elementi", force: true)
+        reporter.report(t("mac.busy.explored", idx.scannedCount), force: true)
         return idx
     }
 }

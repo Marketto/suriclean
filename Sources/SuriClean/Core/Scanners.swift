@@ -16,89 +16,89 @@ enum Targets {
             .map { Target(path: "Library/Application Support/\(app)/\($0)", name: "\(label) · \($0)") }
     }
 
-    static let ai: [Target] = [
-        Target(path: ".claude/projects", name: "Claude Code · sessioni", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
-        Target(path: ".claude/file-history", name: "Claude Code · storico file modificati"),
-        Target(path: ".claude/shell-snapshots", name: "Claude Code · snapshot della shell"),
-        Target(path: ".claude/todos", name: "Claude Code · liste todo vecchie"),
-        Target(path: ".claude/debug", name: "Claude Code · log di debug"),
-        Target(path: ".claude/statsig", name: "Claude Code · cache telemetria"),
-        Target(path: ".claude/paste-cache", name: "Claude Code · cache incolla"),
-        Target(path: "Library/Caches/claude-cli-nodejs", name: "Claude Code · log MCP e cache"),
-        Target(path: ".codex/sessions", name: "Codex · sessioni", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
-        Target(path: ".codex/archived_sessions", name: "Codex · sessioni archiviate", risk: .review, recommended: false),
-        Target(path: ".codex/log", name: "Codex · log"),
-        Target(path: ".gemini/tmp", name: "Gemini CLI · temporanei"),
-        Target(path: "Library/Caches/com.anthropic.claudefordesktop", name: "Claude Desktop · cache"),
-        Target(path: "Library/Caches/com.anthropic.claudefordesktop.ShipIt", name: "Claude Desktop · aggiornamenti scaricati"),
-        Target(path: "Library/Application Support/Claude/vm_bundles", name: "Claude Desktop · immagini VM", risk: .review, recommended: false),
-        Target(path: "Library/Logs/Claude", name: "Claude Desktop · log"),
-        Target(path: "Library/Caches/com.openai.chat", name: "ChatGPT · cache"),
-        Target(path: "Library/Caches/com.todesktop.230313mzl4w4u92", name: "Cursor · cache"),
-        Target(path: "Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt", name: "Cursor · aggiornamenti scaricati"),
-        Target(path: ".cache/huggingface", name: "Hugging Face · modelli scaricati", risk: .review, recommended: false),
-        Target(path: ".ollama/models", name: "Ollama · modelli", risk: .review, recommended: false),
-        Target(path: ".lmstudio/models", name: "LM Studio · modelli", risk: .review, recommended: false),
-        Target(path: ".cache/lm-studio", name: "LM Studio · cache", risk: .review, recommended: false),
-        Target(path: ".cache/whisper", name: "Whisper · modelli", risk: .review, recommended: false),
-        Target(path: ".cache/torch", name: "PyTorch · cache modelli", risk: .review, recommended: false)
+    static var ai: [Target] {
+        let base: [Target] = [
+        Target(path: ".claude/projects", name: "Claude Code · \(t("mac.tg.sessioni"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".claude/file-history", name: "Claude Code · \(t("mac.tg.storico_file_modificati"))"),
+        Target(path: ".claude/shell-snapshots", name: "Claude Code · \(t("mac.tg.snapshot_della_shell"))"),
+        Target(path: ".claude/todos", name: "Claude Code · \(t("mac.tg.liste_todo_vecchie"))"),
+        Target(path: ".claude/debug", name: "Claude Code · \(t("mac.tg.log_di_debug"))"),
+        Target(path: ".claude/statsig", name: "Claude Code · \(t("mac.tg.cache_telemetria"))"),
+        Target(path: ".claude/paste-cache", name: "Claude Code · \(t("mac.tg.cache_incolla"))"),
+        Target(path: "Library/Caches/claude-cli-nodejs", name: "Claude Code · \(t("mac.tg.log_mcp_e_cache"))"),
+        Target(path: ".codex/sessions", name: "Codex · \(t("mac.tg.sessioni"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".codex/archived_sessions", name: "Codex · \(t("mac.tg.sessioni_archiviate"))", risk: .review, recommended: false),
+        Target(path: ".codex/log", name: "Codex · \(t("mac.tg.log"))"),
+        Target(path: ".gemini/tmp", name: "Gemini CLI · \(t("mac.tg.temporanei"))"),
+        Target(path: "Library/Caches/com.anthropic.claudefordesktop", name: "Claude Desktop · \(t("mac.tg.cache"))"),
+        Target(path: "Library/Caches/com.anthropic.claudefordesktop.ShipIt", name: "Claude Desktop · \(t("mac.tg.aggiornamenti_scaricati"))"),
+        Target(path: "Library/Application Support/Claude/vm_bundles", name: "Claude Desktop · \(t("mac.tg.immagini_vm"))", risk: .review, recommended: false),
+        Target(path: "Library/Logs/Claude", name: "Claude Desktop · \(t("mac.tg.log"))"),
+        Target(path: "Library/Caches/com.openai.chat", name: "ChatGPT · \(t("mac.tg.cache"))"),
+        Target(path: "Library/Caches/com.todesktop.230313mzl4w4u92", name: "Cursor · \(t("mac.tg.cache"))"),
+        Target(path: "Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt", name: "Cursor · \(t("mac.tg.aggiornamenti_scaricati"))"),
+        Target(path: ".cache/huggingface", name: "Hugging Face · \(t("mac.tg.modelli_scaricati"))", risk: .review, recommended: false),
+        Target(path: ".ollama/models", name: "Ollama · \(t("mac.tg.modelli"))", risk: .review, recommended: false),
+        Target(path: ".lmstudio/models", name: "LM Studio · \(t("mac.tg.modelli"))", risk: .review, recommended: false),
+        Target(path: ".cache/lm-studio", name: "LM Studio · \(t("mac.tg.cache"))", risk: .review, recommended: false),
+        Target(path: ".cache/whisper", name: "Whisper · \(t("mac.tg.modelli"))", risk: .review, recommended: false),
+        Target(path: ".cache/torch", name: "PyTorch · \(t("mac.tg.cache_modelli"))", risk: .review, recommended: false)
     ]
-    + electron("Claude", "Claude Desktop")
-    + electron("Cursor", "Cursor")
-    + electron("Code", "VS Code")
-    + electron("Windsurf", "Windsurf")
+        return base + electron("Claude", "Claude Desktop") + electron("Cursor", "Cursor")
+            + electron("Code", "VS Code") + electron("Windsurf", "Windsurf")
+    }
 
-    static let dev: [Target] = [
+    static var dev: [Target] { [
         Target(path: "Library/Developer/Xcode/DerivedData", name: "Xcode · DerivedData"),
         Target(path: "Library/Developer/Xcode/iOS DeviceSupport", name: "Xcode · iOS DeviceSupport"),
         Target(path: "Library/Developer/Xcode/watchOS DeviceSupport", name: "Xcode · watchOS DeviceSupport"),
-        Target(path: "Library/Developer/Xcode/Archives", name: "Xcode · archivi delle build", risk: .review, recommended: false),
-        Target(path: "Library/Developer/CoreSimulator/Caches", name: "Simulatori · cache"),
-        Target(path: ".npm/_cacache", name: "npm · cache"),
-        Target(path: ".npm/_npx", name: "npx · pacchetti temporanei"),
-        Target(path: ".npm/_logs", name: "npm · log"),
-        Target(path: ".yarn/berry/cache", name: "Yarn Berry · cache"),
-        Target(path: ".cache/yarn", name: "Yarn · cache"),
+        Target(path: "Library/Developer/Xcode/Archives", name: "Xcode · \(t("mac.tg.archivi_delle_build"))", risk: .review, recommended: false),
+        Target(path: "Library/Developer/CoreSimulator/Caches", name: "\(t("mac.tg.label.sims")) · \(t("mac.tg.cache"))"),
+        Target(path: ".npm/_cacache", name: "npm · \(t("mac.tg.cache"))"),
+        Target(path: ".npm/_npx", name: "npx · \(t("mac.tg.pacchetti_temporanei"))"),
+        Target(path: ".npm/_logs", name: "npm · \(t("mac.tg.log"))"),
+        Target(path: ".yarn/berry/cache", name: "Yarn Berry · \(t("mac.tg.cache"))"),
+        Target(path: ".cache/yarn", name: "Yarn · \(t("mac.tg.cache"))"),
         Target(path: "Library/pnpm/store", name: "pnpm · store"),
         Target(path: ".pnpm-store", name: "pnpm · store"),
-        Target(path: ".bun/install/cache", name: "Bun · cache"),
-        Target(path: ".nvm/.cache", name: "nvm · download di Node"),
-        Target(path: ".cache/node-gyp", name: "node-gyp · header"),
-        Target(path: ".electron-gyp", name: "electron-gyp · header"),
-        Target(path: ".gradle/caches", name: "Gradle · cache"),
-        Target(path: ".gradle/wrapper/dists", name: "Gradle · distribuzioni"),
-        Target(path: ".m2/repository", name: "Maven · repository locale"),
+        Target(path: ".bun/install/cache", name: "Bun · \(t("mac.tg.cache"))"),
+        Target(path: ".nvm/.cache", name: "nvm · \(t("mac.tg.download_di_node"))"),
+        Target(path: ".cache/node-gyp", name: "node-gyp · \(t("mac.tg.header"))"),
+        Target(path: ".electron-gyp", name: "electron-gyp · \(t("mac.tg.header"))"),
+        Target(path: ".gradle/caches", name: "Gradle · \(t("mac.tg.cache"))"),
+        Target(path: ".gradle/wrapper/dists", name: "Gradle · \(t("mac.tg.distribuzioni"))"),
+        Target(path: ".m2/repository", name: "Maven · \(t("mac.tg.repository_locale"))"),
         Target(path: ".cargo/registry", name: "Cargo · registry"),
-        Target(path: ".cargo/git", name: "Cargo · dipendenze git"),
-        Target(path: ".rustup/toolchains", name: "Rust · toolchain installate", risk: .review, recommended: false),
-        Target(path: "go/pkg/mod", name: "Go · moduli"),
-        Target(path: ".cocoapods/repos", name: "CocoaPods · repo delle spec"),
+        Target(path: ".cargo/git", name: "Cargo · \(t("mac.tg.dipendenze_git"))"),
+        Target(path: ".rustup/toolchains", name: "Rust · \(t("mac.tg.toolchain_installate"))", risk: .review, recommended: false),
+        Target(path: "go/pkg/mod", name: "Go · \(t("mac.tg.moduli"))"),
+        Target(path: ".cocoapods/repos", name: "CocoaPods · \(t("mac.tg.repo_delle_spec"))"),
         Target(path: ".pub-cache", name: "Dart/Flutter · pub cache"),
-        Target(path: ".android/cache", name: "Android · cache"),
-        Target(path: ".android/avd", name: "Android · emulatori", risk: .review, recommended: false),
-        Target(path: ".cache/uv", name: "uv · cache Python"),
-        Target(path: ".cache/pre-commit", name: "pre-commit · ambienti"),
-        Target(path: ".cache/puppeteer", name: "Puppeteer · browser"),
-        Target(path: "Library/Containers/com.docker.docker/Data/vms", name: "Docker · disco della VM", risk: .careful, recommended: false),
-        Target(path: "Library/Developer/CoreSimulator/Devices", name: "Simulatori iOS · dispositivi", risk: .review, recommended: false),
-        Target(path: "Library/Developer/Xcode/UserData/Previews", name: "Xcode · anteprime SwiftUI"),
-        Target(path: "Library/Developer/XCPGDevices", name: "Xcode · dispositivi dei Playground"),
-        Target(path: "Library/Developer/Xcode/Products", name: "Xcode · prodotti delle build"),
-        Target(path: "miniconda3/pkgs", name: "Conda · pacchetti scaricati"),
-        Target(path: "anaconda3/pkgs", name: "Anaconda · pacchetti scaricati"),
-        Target(path: "miniforge3/pkgs", name: "Miniforge · pacchetti scaricati"),
-        Target(path: "mambaforge/pkgs", name: "Mamba · pacchetti scaricati"),
-        Target(path: "opt/miniconda3/pkgs", name: "Conda · pacchetti scaricati"),
-        Target(path: "opt/anaconda3/pkgs", name: "Anaconda · pacchetti scaricati"),
-        Target(path: ".conda/pkgs", name: "Conda · pacchetti scaricati"),
-        Target(path: ".pyenv/cache", name: "pyenv · download"),
-        Target(path: ".gem/specs", name: "RubyGems · cache"),
-        Target(path: ".cache/pip", name: "Python pip · cache"),
+        Target(path: ".android/cache", name: "Android · \(t("mac.tg.cache"))"),
+        Target(path: ".android/avd", name: "Android · \(t("mac.tg.emulatori"))", risk: .review, recommended: false),
+        Target(path: ".cache/uv", name: "uv · \(t("mac.tg.cache_python"))"),
+        Target(path: ".cache/pre-commit", name: "pre-commit · \(t("mac.tg.ambienti"))"),
+        Target(path: ".cache/puppeteer", name: "Puppeteer · \(t("mac.tg.browser"))"),
+        Target(path: "Library/Containers/com.docker.docker/Data/vms", name: "Docker · \(t("mac.tg.disco_della_vm"))", risk: .careful, recommended: false),
+        Target(path: "Library/Developer/CoreSimulator/Devices", name: "\(t("mac.tg.label.iossims")) · \(t("mac.tg.dispositivi"))", risk: .review, recommended: false),
+        Target(path: "Library/Developer/Xcode/UserData/Previews", name: "Xcode · \(t("mac.tg.anteprime_swiftui"))"),
+        Target(path: "Library/Developer/XCPGDevices", name: "Xcode · \(t("mac.tg.dispositivi_dei_playground"))"),
+        Target(path: "Library/Developer/Xcode/Products", name: "Xcode · \(t("mac.tg.prodotti_delle_build"))"),
+        Target(path: "miniconda3/pkgs", name: "Conda · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: "anaconda3/pkgs", name: "Anaconda · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: "miniforge3/pkgs", name: "Miniforge · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: "mambaforge/pkgs", name: "Mamba · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: "opt/miniconda3/pkgs", name: "Conda · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: "opt/anaconda3/pkgs", name: "Anaconda · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: ".conda/pkgs", name: "Conda · \(t("mac.tg.pacchetti_scaricati"))"),
+        Target(path: ".pyenv/cache", name: "pyenv · \(t("mac.tg.download"))"),
+        Target(path: ".gem/specs", name: "RubyGems · \(t("mac.tg.cache"))"),
+        Target(path: ".cache/pip", name: "Python pip · \(t("mac.tg.cache"))"),
         Target(path: ".vagrant.d/boxes", name: "Vagrant · box", risk: .review, recommended: false),
-        Target(path: ".minikube/cache", name: "Minikube · cache"),
+        Target(path: ".minikube/cache", name: "Minikube · \(t("mac.tg.cache"))"),
         Target(path: ".colima", name: "Colima · VM", risk: .careful, recommended: false),
-        Target(path: ".orbstack", name: "OrbStack · dati", risk: .careful, recommended: false)
-    ]
+        Target(path: ".orbstack", name: "OrbStack · \(t("mac.tg.dati"))", risk: .careful, recommended: false)
+    ] }
 }
 
 enum Scanners {
@@ -146,28 +146,28 @@ enum Scanners {
 
     static func fixed(_ list: [Target], _ rep: Reporter) -> [CleanItem] {
         var out: [CleanItem] = []
-        for (i, t) in list.enumerated() {
+        for (i, tg) in list.enumerated() {
             if rep.isCancelled { break }
-            rep.report(t.name, progress: Double(i) / Double(max(list.count, 1)))
-            let url = FS.home.appendingPathComponent(t.path)
+            rep.report(tg.name, progress: Double(i) / Double(max(list.count, 1)))
+            let url = FS.home.appendingPathComponent(tg.path)
             guard FS.exists(url) else { continue }
-            if t.perChild {
+            if tg.perChild {
                 for child in FS.children(url) {
                     if rep.isCancelled { break }
                     let d = FS.newestModDate(child)
-                    var rec = t.recommended
+                    var rec = tg.recommended
                     var badges: [String] = []
-                    if let days = t.olderThanDays {
+                    if let days = tg.olderThanDays {
                         rec = FS.daysSince(d) > days
-                        badges = rec ? ["💤 vecchia"] : ["🔥 recente"]
+                        badges = rec ? [t("mac.badge.oldf")] : [t("mac.badge.recentf")]
                     }
-                    if let it = makeItem(child, name: "\(t.name) · \(prettyChild(child.lastPathComponent))",
-                                         detail: "\(FS.pretty(child)) · ultima modifica \(Fmt.relative(d))",
-                                         risk: t.risk, recommended: rec, rep: rep, minSize: 100 * 1024, badges: badges, date: d) {
+                    if let it = makeItem(child, name: "\(tg.name) · \(prettyChild(child.lastPathComponent))",
+                                         detail: t("mac.detail.lastmod", FS.pretty(child), Fmt.relative(d)),
+                                         risk: tg.risk, recommended: rec, rep: rep, minSize: 100 * 1024, badges: badges, date: d) {
                         out.append(it)
                     }
                 }
-            } else if let it = makeItem(url, name: t.name, risk: t.risk, recommended: t.recommended, rep: rep) {
+            } else if let it = makeItem(url, name: tg.name, risk: tg.risk, recommended: tg.recommended, rep: rep) {
                 out.append(it)
             }
         }
@@ -188,7 +188,7 @@ enum Scanners {
             let url = URL(fileURLWithPath: path)
             guard FS.exists(url), !url.path.contains("/Caches/") else { continue }
             let parent = url.deletingLastPathComponent().lastPathComponent
-            if let it = makeItem(url, name: "Homebrew · \(parent) \(url.lastPathComponent) (vecchia)", risk: .safe, recommended: true, rep: rep, minSize: 1_048_576, badges: ["🍺 brew cleanup"]) {
+            if let it = makeItem(url, name: t("mac.item.brewold", parent, url.lastPathComponent), risk: .safe, recommended: true, rep: rep, minSize: 1_048_576, badges: ["🍺 brew cleanup"]) {
                 out.append(it)
             }
         }
@@ -213,7 +213,7 @@ enum Scanners {
                 n += 1
                 if n % 500 == 0 {
                     if rep.isCancelled { return [] }
-                    rep.report("\(n) elementi misurati · \(FS.pretty(url))")
+                    rep.report(t("mac.busy.measured", n, FS.pretty(url)))
                 }
                 guard let v = try? url.resourceValues(forKeys: keySet), v.isRegularFile == true else { continue }
                 let sz = Int64(v.totalFileAllocatedSize ?? v.fileAllocatedSize ?? 0)
@@ -231,8 +231,8 @@ enum Scanners {
             }
         }
         var out: [CleanItem] = []
-        out.append(CleanItem(url: home, name: "La tua cartella Inizio", detail: "~", size: total, date: nil,
-                             risk: .careful, recommended: false, badges: ["🏡 la tana"]))
+        out.append(CleanItem(url: home, name: t("mac.item.home"), detail: "~", size: total, date: nil,
+                             risk: .careful, recommended: false, badges: [t("mac.badge.burrow")]))
         for (path, size) in sizes {
             let depth = URL(fileURLWithPath: path).pathComponents.count - homeDepth
             let threshold: Int64 = depth == 1 ? 50 * 1_048_576 : 300 * 1_048_576
@@ -241,7 +241,7 @@ enum Scanners {
             out.append(CleanItem(url: url, name: url.lastPathComponent, detail: FS.pretty(url), size: size, date: nil,
                                  risk: .careful, recommended: false))
         }
-        rep.report("Misuro le Applicazioni…", progress: 0.95, force: true)
+        rep.report(t("mac.busy.measureapps"), progress: 0.95, force: true)
         let apps = URL(fileURLWithPath: "/Applications")
         var appsTotal: Int64 = 0
         var appItems: [CleanItem] = []
@@ -253,7 +253,7 @@ enum Scanners {
                 appItems.append(CleanItem(url: a, name: a.deletingPathExtension().lastPathComponent, detail: a.path, size: s, date: nil, risk: .careful, recommended: false))
             }
         }
-        out.append(CleanItem(url: apps, name: "Applicazioni", detail: "/Applications", size: appsTotal, date: nil, risk: .careful, recommended: false, badges: ["📱 app"]))
+        out.append(CleanItem(url: apps, name: t("mac.item.applications"), detail: "/Applications", size: appsTotal, date: nil, risk: .careful, recommended: false, badges: [t("mac.badge.apps")]))
         out += appItems
         return out
     }
@@ -264,11 +264,11 @@ enum Scanners {
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-du-\(Int(Date().timeIntervalSince1970)).txt")
         let err = out.appendingPathExtension("err")
         let cmd = "/usr/bin/du -x -k -d 4 '\(root)' > '\(out.path)' 2> '\(err.path)'; /bin/chmod 644 '\(out.path)' '\(err.path)'"
-        rep.report("Misuro tutto il disco, anche gli altri utenti… (qualche minuto) 🔐", force: true)
-        let r = Admin.run([cmd], prompt: "SuriClean vuole misurare tutto il disco, compresi gli altri utenti.")
+        rep.report(t("mac.busy.measurefull"), force: true)
+        let r = Admin.run([cmd], prompt: t("mac.prompt.measurefull"))
         defer { try? FileManager.default.removeItem(at: out); try? FileManager.default.removeItem(at: err) }
         guard let text = try? String(contentsOf: out, encoding: .utf8), !text.isEmpty else {
-            let why = r.cancelled ? "Hai annullato la richiesta della password" : "Non sono riuscita a misurare il disco"
+            let why = r.cancelled ? t("mac.err.pwcancel") : t("mac.err.measurefail")
             return .failure(NSError(domain: "SuriClean", code: 2, userInfo: [NSLocalizedDescriptionKey: why]))
         }
         return .success((parseDu(text), parseDuErrors((try? String(contentsOf: err, encoding: .utf8)) ?? "")))
@@ -305,13 +305,13 @@ enum Scanners {
             let shown = path == root ? "/" : String(path.dropFirst(root.count))
             var badges: [String] = []
             if depth == 2 && shown.hasPrefix("/Users/") {
-                badges.append(("/System/Volumes/Data" + shown) == "/System/Volumes/Data" + me || shown == me ? "🐾 sei tu" : "👤 altro utente")
+                badges.append(("/System/Volumes/Data" + shown) == "/System/Volumes/Data" + me || shown == me ? t("mac.badge.you") : t("mac.badge.otheruser"))
             }
-            if shown.hasPrefix("/private/var/vm") { badges.append("🧠 memoria virtuale (macOS)") }
-            if shown.hasPrefix("/Library") || shown.hasPrefix("/private") || shown.hasPrefix("/usr") || shown.hasPrefix("/opt") { badges.append("⚙️ sistema") }
+            if shown.hasPrefix("/private/var/vm") { badges.append(t("mac.badge.vm")) }
+            if shown.hasPrefix("/Library") || shown.hasPrefix("/private") || shown.hasPrefix("/usr") || shown.hasPrefix("/opt") { badges.append(t("mac.badge.system")) }
             if depth == 0 {
-                items.append(CleanItem(url: url, name: "Disco intero (tutti gli utenti)", detail: "/", size: size, date: nil,
-                                       risk: .careful, recommended: false, badges: ["💽 tutto"]))
+                items.append(CleanItem(url: url, name: t("mac.item.wholedisk"), detail: "/", size: size, date: nil,
+                                       risk: .careful, recommended: false, badges: [t("mac.badge.all")]))
                 continue
             }
             let threshold: Int64 = depth == 1 ? 100 * 1_048_576 : 300 * 1_048_576
@@ -333,7 +333,7 @@ enum Scanners {
             candidates.append((d, FS.friendlyName(d.lastPathComponent)))
         }
         for c in FS.children(L.appendingPathComponent("Containers")) where !c.lastPathComponent.hasPrefix("com.apple.") || c.lastPathComponent == "com.apple.mail" {
-            candidates.append((c.appendingPathComponent("Data"), FS.friendlyName(c.lastPathComponent) + " (sandbox)"))
+            candidates.append((c.appendingPathComponent("Data"), FS.friendlyName(c.lastPathComponent) + " " + t("mac.suffix.sandbox")))
         }
         for g in FS.children(L.appendingPathComponent("Group Containers")) {
             let name = g.lastPathComponent
@@ -341,14 +341,14 @@ enum Scanners {
             if name.lowercased().contains("whatsapp") { label = "WhatsApp" }
             else if name.lowercased().contains("telegram") { label = "Telegram" }
             else if name.contains("com.apple.podcasts") || name.contains("UBF8T346G9.Office") || name.lowercased().contains("office") { label = name.contains("podcasts") ? "Podcast" : "Microsoft Office" }
-            candidates.append((g, label + " (gruppo)"))
+            candidates.append((g, label + " " + t("mac.suffix.group")))
         }
-        candidates.append((L.appendingPathComponent("Mail"), "Mail · messaggi e allegati"))
-        candidates.append((FS.home.appendingPathComponent("Library/Messages"), "Messaggi · chat e allegati"))
+        candidates.append((L.appendingPathComponent("Mail"), t("mac.item.mail")))
+        candidates.append((FS.home.appendingPathComponent("Library/Messages"), t("mac.item.messages")))
         for (i, c) in candidates.enumerated() {
             if rep.isCancelled { break }
             rep.report(FS.pretty(c.0), progress: Double(i) / Double(max(candidates.count, 1)))
-            if let it = makeItem(c.0, name: c.1, risk: .careful, recommended: false, rep: rep, minSize: 500 * 1_048_576, badges: ["🍰 app golosa"]) {
+            if let it = makeItem(c.0, name: c.1, risk: .careful, recommended: false, rep: rep, minSize: 500 * 1_048_576, badges: [t("mac.badge.greedy")]) {
                 out.append(it)
             }
         }
@@ -387,7 +387,7 @@ enum Scanners {
                 }
             }
         }
-        rep.report("Browser…", progress: 0.75)
+        rep.report(t("mac.busy.browsers"), progress: 0.75)
         for browser in ["Google/Chrome", "BraveSoftware/Brave-Browser", "Microsoft Edge", "Vivaldi", "Arc/User Data"] {
             let base = support.appendingPathComponent(browser)
             for profile in FS.children(base) where FS.isDir(profile) {
@@ -401,11 +401,11 @@ enum Scanners {
             }
         }
         // Caches inside sandboxed app containers
-        rep.report("Container delle app…", progress: 0.85)
+        rep.report(t("mac.busy.containers"), progress: 0.85)
         for c in FS.children(FS.library.appendingPathComponent("Containers")) {
             if rep.isCancelled { return out }
             let u = c.appendingPathComponent("Data/Library/Caches")
-            if let it = makeItem(u, name: "\(FS.friendlyName(c.lastPathComponent)) · cache (sandbox)", risk: .safe,
+            if let it = makeItem(u, name: t("mac.item.sandboxcache", FS.friendlyName(c.lastPathComponent)), risk: .safe,
                                  recommended: true, rep: rep, minSize: 5 * 1_048_576) {
                 out.append(it)
             }
@@ -418,20 +418,20 @@ enum Scanners {
         let logs = FS.library.appendingPathComponent("Logs")
         for k in FS.children(logs) where k.lastPathComponent != "Claude" {
             if rep.isCancelled { return out }
-            if let it = makeItem(k, name: "Log · \(FS.friendlyName(k.lastPathComponent))", risk: .safe, recommended: true, rep: rep, minSize: 256 * 1024) {
+            if let it = makeItem(k, name: t("mac.item.log", FS.friendlyName(k.lastPathComponent)), risk: .safe, recommended: true, rep: rep, minSize: 256 * 1024) {
                 out.append(it)
             }
         }
-        if let it = makeItem(FS.library.appendingPathComponent("Saved Application State"), name: "Stati delle finestre salvati",
+        if let it = makeItem(FS.library.appendingPathComponent("Saved Application State"), name: t("mac.item.savedstate"),
                              risk: .safe, recommended: true, rep: rep) { out.append(it) }
-        if let it = makeItem(FS.library.appendingPathComponent("Application Support/CrashReporter"), name: "Report dei crash",
+        if let it = makeItem(FS.library.appendingPathComponent("Application Support/CrashReporter"), name: t("mac.item.crashreports"),
                              risk: .safe, recommended: true, rep: rep) { out.append(it) }
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
         for k in (FS.isHelper ? [] : FS.children(tmp)) {
             if rep.isCancelled { return out }
             let d = FS.newestModDate(k)
             guard FS.daysSince(d) >= 3 else { continue }
-            if let it = makeItem(k, name: "Temporaneo · \(k.lastPathComponent)", detail: "File temporaneo · \(Fmt.relative(d))",
+            if let it = makeItem(k, name: t("mac.item.temp", k.lastPathComponent), detail: t("mac.detail.temp", Fmt.relative(d)),
                                  risk: .safe, recommended: true, rep: rep, minSize: 256 * 1024) {
                 out.append(it)
             }
@@ -458,9 +458,9 @@ enum Scanners {
             let days = FS.daysSince(active)
             let old = days > 60
             if let it = makeItem(d.url, name: "\(project.lastPathComponent) · \(d.url.lastPathComponent)",
-                                 detail: "\(d.kind) · \(FS.pretty(project)) · progetto toccato \(Fmt.relative(active))",
+                                 detail: t("mac.detail.dep", d.kind, FS.pretty(project), Fmt.relative(active)),
                                  risk: .safe, recommended: old, rep: rep, minSize: 1_048_576,
-                                 badges: [old ? "💤 progetto fermo" : "🔥 progetto attivo"], date: active) {
+                                 badges: [old ? t("mac.badge.projidle") : t("mac.badge.projactive")], date: active) {
                 out.append(it)
             }
         }
@@ -485,14 +485,14 @@ enum Scanners {
         guard size >= 1_048_576 else { return nil }
         let days = FS.daysSince(info.lastActivity)
         var badges: [String] = []
-        if info.safe { badges.append("☁️ al sicuro sul remote") }
-        if info.remote == nil { badges.append("🏠 solo locale") }
-        if info.dirty { badges.append("✏️ modifiche non salvate") }
-        if info.unpushed > 0 { badges.append("⬆️ \(info.unpushed) commit non pushati") }
-        if info.stashed { badges.append("📦 stash") }
-        if days > 365 { badges.append("🦕 fermo da 1+ anno") }
+        if info.safe { badges.append(t("mac.badge.gitsafe")) }
+        if info.remote == nil { badges.append(t("mac.badge.gitlocal")) }
+        if info.dirty { badges.append(t("mac.badge.gitdirty")) }
+        if info.unpushed > 0 { badges.append(t("mac.badge.gitunpushed", info.unpushed)) }
+        if info.stashed { badges.append(t("mac.badge.gitstash")) }
+        if days > 365 { badges.append(t("mac.badge.idleyear")) }
         let risk: Risk = info.safe ? .safe : (info.remote != nil ? .review : .careful)
-        var detail = "\(FS.pretty(repo)) · ultima attività \(Fmt.relative(info.lastActivity))"
+        var detail = t("mac.detail.repo", FS.pretty(repo), Fmt.relative(info.lastActivity))
         if let r = info.remote { detail += " · \(GitInspector.shortRemote(r))" }
         var it = CleanItem(url: repo, name: repo.lastPathComponent, detail: detail, size: size,
                            date: info.lastActivity, risk: risk, recommended: info.safe && days > 180,
@@ -504,13 +504,13 @@ enum Scanners {
 
     static func badge(forExt ext: String) -> String? {
         switch ext {
-        case "mov", "mp4", "mkv", "avi", "m4v", "webm": return "🎬 video"
-        case "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz": return "📦 archivio"
-        case "dmg", "iso", "img", "sparseimage": return "💿 immagine disco"
-        case "vmdk", "vdi", "qcow2", "utm", "pvm", "vmwarevm", "hdd": return "🖥️ macchina virtuale"
-        case "psd", "ai", "sketch", "fig": return "🎨 grafica"
-        case "wav", "aif", "aiff", "flac": return "🎵 audio"
-        case "photoslibrary", "musiclibrary", "tvlibrary", "imovielibrary", "fcpbundle", "aplibrary": return "📚 libreria"
+        case "mov", "mp4", "mkv", "avi", "m4v", "webm": return t("mac.badge.video")
+        case "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz": return t("mac.badge.archive")
+        case "dmg", "iso", "img", "sparseimage": return t("mac.badge.diskimage")
+        case "vmdk", "vdi", "qcow2", "utm", "pvm", "vmwarevm", "hdd": return t("mac.badge.vmimage")
+        case "psd", "ai", "sketch", "fig": return t("mac.badge.graphics")
+        case "wav", "aif", "aiff", "flac": return t("mac.badge.audio")
+        case "photoslibrary", "musiclibrary", "tvlibrary", "imovielibrary", "fcpbundle", "aplibrary": return t("mac.badge.library")
         default: return nil
         }
     }
@@ -522,7 +522,7 @@ enum Scanners {
         for f in big {
             let ext = f.url.pathExtension.lowercased()
             out.append(CleanItem(url: f.url, name: f.url.lastPathComponent,
-                                 detail: "\(FS.pretty(f.url.deletingLastPathComponent())) · modificato \(Fmt.relative(f.modified))",
+                                 detail: t("mac.detail.modified", FS.pretty(f.url.deletingLastPathComponent()), Fmt.relative(f.modified)),
                                  size: f.size, date: f.modified, risk: .careful, recommended: false,
                                  badges: badge(forExt: ext).map { [$0] } ?? []))
         }
@@ -531,7 +531,7 @@ enum Scanners {
             rep.report(FS.pretty(p), progress: Double(i) / Double(max(index.packages.count, 1)))
             if let it = makeItem(p, name: p.lastPathComponent, detail: FS.pretty(p.deletingLastPathComponent()),
                                  risk: .careful, recommended: false, rep: rep, minSize: 200 * 1_048_576,
-                                 badges: [badge(forExt: p.pathExtension.lowercased()) ?? "📚 pacchetto"]) {
+                                 badges: [badge(forExt: p.pathExtension.lowercased()) ?? t("mac.badge.package")]) {
                 out.append(it)
             }
         }
@@ -554,11 +554,11 @@ enum Scanners {
             out.append(CleanItem(url: f.url, name: f.url.lastPathComponent,
                                  detail: "\(FS.pretty(f.url.deletingLastPathComponent())) · \(Fmt.relative(f.modified))",
                                  size: f.size, date: f.modified, risk: rec ? .safe : .review,
-                                 recommended: rec, badges: [isImage ? "💿 immagine disco" : "📦 installer"]))
+                                 recommended: rec, badges: [isImage ? t("mac.badge.diskimage") : t("mac.badge.installer")]))
         }
         for app in index.downloadApps {
-            if let it = makeItem(app, name: app.lastPathComponent, detail: "App lasciata nei Download (non in Applicazioni)",
-                                 risk: .review, recommended: false, rep: rep, badges: ["📲 app nei Download"]) {
+            if let it = makeItem(app, name: app.lastPathComponent, detail: t("mac.detail.appindl"),
+                                 risk: .review, recommended: false, rep: rep, badges: [t("mac.badge.appindl")]) {
                 out.append(it)
             }
         }
@@ -578,9 +578,9 @@ enum Scanners {
             let d = v?.addedToDirectoryDate ?? v?.contentModificationDate
             let days = FS.daysSince(d)
             guard days >= 90 else { continue }
-            if let it = makeItem(k, name: k.lastPathComponent, detail: "Scaricato \(Fmt.relative(d))", risk: .review,
+            if let it = makeItem(k, name: k.lastPathComponent, detail: t("mac.detail.downloaded", Fmt.relative(d)), risk: .review,
                                  recommended: false, rep: rep, minSize: 100 * 1024,
-                                 badges: days > 365 ? ["🦕 più di un anno"] : [], date: d) {
+                                 badges: days > 365 ? [t("mac.badge.overyear")] : [], date: d) {
                 out.append(it)
             }
         }
@@ -615,16 +615,16 @@ enum Scanners {
             let extraSize = extras.reduce(Int64(0)) { $0 + FS.allocatedSize($1) }
             let days = FS.daysSince(last)
             var badges: [String] = []
-            if running.contains(id) { badges.append("▶️ aperta ora") }
-            if last == nil { badges.append("👻 mai aperta?") }
-            else if days > 365 { badges.append("😴 dorme da 1+ anno") }
-            else if days > 90 { badges.append("💤 dorme da mesi") }
-            if extraSize > 0 { badges.append("🧩 +\(Fmt.bytes(extraSize)) di dati") }
+            if running.contains(id) { badges.append(t("mac.badge.running")) }
+            if last == nil { badges.append(t("mac.badge.neveropened")) }
+            else if days > 365 { badges.append(t("mac.badge.sleepyear")) }
+            else if days > 90 { badges.append(t("mac.badge.sleepmonths")) }
+            if extraSize > 0 { badges.append(t("mac.badge.extradata", Fmt.bytes(extraSize))) }
             let version = (bundle?.infoDictionary?["CFBundleShortVersionString"] as? String).map { " · v\($0)" } ?? ""
-            let detail = (last.map { "Ultimo uso \(Fmt.relative($0))" } ?? "Nessun uso registrato da Spotlight") + version
+            let detail = (last.map { t("mac.detail.lastused", Fmt.relative($0)) } ?? t("mac.detail.nouse")) + version
             if isInstaller {
-                out.append(CleanItem(url: app, name: name, detail: "Installer di macOS: si riscarica dall'App Store quando serve", size: size, date: last,
-                                     risk: .safe, recommended: true, badges: ["💿 installer di macOS"]))
+                out.append(CleanItem(url: app, name: name, detail: t("mac.detail.macosinstaller"), size: size, date: last,
+                                     risk: .safe, recommended: true, badges: [t("mac.badge.macosinstaller")]))
                 continue
             }
             out.append(CleanItem(url: app, name: name, detail: detail, size: size + extraSize, date: last,
@@ -676,10 +676,10 @@ enum Scanners {
             let onlyCaches = urls.allSatisfy { $0.path.contains("/Library/Caches/") }
             let name = String(id.split(separator: ".").last ?? Substring(id))
             out.append(CleanItem(url: urls[0], name: name.capitalized,
-                                 detail: "\(id) · \(urls.count) \(urls.count == 1 ? "cartella" : "cartelle")",
+                                 detail: "\(id) · " + tp("mac.detail.folders", urls.count, urls.count),
                                  size: size, date: urls.compactMap { FS.modDate($0) }.max(),
                                  risk: onlyCaches ? .safe : .review, recommended: onlyCaches,
-                                 badges: ["🧩 app non trovata"], extraURLs: Array(urls.dropFirst())))
+                                 badges: [t("mac.badge.appnotfound")], extraURLs: Array(urls.dropFirst())))
         }
         return out
     }
@@ -692,21 +692,21 @@ enum Scanners {
         for b in FS.children(backups) where FS.isDir(b) {
             if rep.isCancelled { return out }
             let info = NSDictionary(contentsOf: b.appendingPathComponent("Info.plist"))
-            let device = info?["Device Name"] as? String ?? "dispositivo"
+            let device = info?["Device Name"] as? String ?? t("mac.word.device")
             let date = info?["Last Backup Date"] as? Date ?? FS.modDate(b)
-            if let it = makeItem(b, name: "Backup di \(device)", detail: "Ultimo backup \(Fmt.relative(date))",
-                                 risk: .careful, recommended: false, rep: rep, badges: ["📱 backup locale"], date: date) {
+            if let it = makeItem(b, name: t("mac.item.backup", device), detail: t("mac.detail.lastbackup", Fmt.relative(date)),
+                                 risk: .careful, recommended: false, rep: rep, badges: [t("mac.badge.localbackup")], date: date) {
                 out.append(it)
             }
         }
         let simple: [(String, String, Risk, Bool)] = [
-            ("Library/iTunes/iPhone Software Updates", "Aggiornamenti iOS scaricati", .safe, true),
-            ("Library/iTunes/iPad Software Updates", "Aggiornamenti iPadOS scaricati", .safe, true),
-            ("Library/iTunes/iPod Software Updates", "Aggiornamenti iPod scaricati", .safe, true),
-            ("Library/Containers/com.apple.mail/Data/Library/Mail Downloads", "Allegati di Mail già aperti", .safe, true),
-            ("Music/iTunes/iTunes Media/Mobile Applications", "Vecchie app iOS (.ipa)", .safe, true),
-            ("Library/Messages/Attachments", "Allegati di Messaggi", .careful, false),
-            ("Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache", "Podcast scaricati", .review, false)
+            ("Library/iTunes/iPhone Software Updates", t("mac.item.iosupd"), .safe, true),
+            ("Library/iTunes/iPad Software Updates", t("mac.item.ipadupd"), .safe, true),
+            ("Library/iTunes/iPod Software Updates", t("mac.item.ipodupd"), .safe, true),
+            ("Library/Containers/com.apple.mail/Data/Library/Mail Downloads", t("mac.item.mailatt"), .safe, true),
+            ("Music/iTunes/iTunes Media/Mobile Applications", t("mac.item.ipa"), .safe, true),
+            ("Library/Messages/Attachments", t("mac.item.msgatt"), .careful, false),
+            ("Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache", t("mac.item.podcasts"), .review, false)
         ]
         for (i, s) in simple.enumerated() {
             if rep.isCancelled { return out }
