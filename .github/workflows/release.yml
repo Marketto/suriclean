@@ -14,14 +14,14 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-env:
-  SURI_VERSION: 1.${{ github.run_number }}
-
 jobs:
   mac:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "SURI_VERSION=1.$((GITHUB_RUN_NUMBER + 10))" >> "$GITHUB_ENV"
 
       - name: Build app and DMG
         run: |
@@ -61,6 +61,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "SURI_VERSION=1.$((GITHUB_RUN_NUMBER + 10))" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -142,11 +145,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "SURI_VERSION=1.$((GITHUB_RUN_NUMBER + 10))" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           path: art
           merge-multiple: true
-      - name: Publish release v${{ env.SURI_VERSION }}
+      - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -154,7 +160,11 @@ jobs:
           NOTES=$(git log -1 --pretty=%B | grep -v -E '^(Co-Authored-By|Claude-Session):' )
           printf '%s\n\n---\n**Installazione:** Mac → apri il DMG e trascina Suri in Applicazioni (prima volta: tasto destro › Apri). Windows → esegui il Setup («Ulteriori informazioni» › «Esegui comunque»). Ubuntu → apri il .deb oppure usa l'\''AppImage.\n\nSito: https://marketto.github.io/suriclean/\n' "$NOTES" > notes.md
           FILES=$(ls art/SuriClean.dmg art/SuriClean-Windows-Setup.exe art/SuriClean-Linux.deb art/SuriClean-Linux.AppImage 2>/dev/null)
-          gh release create "v${SURI_VERSION}" $FILES --title "SuriClean ${SURI_VERSION} 🐾" --notes-file notes.md --latest
+          if gh release view "v${SURI_VERSION}" >/dev/null 2>&1; then
+            gh release upload "v${SURI_VERSION}" $FILES --clobber
+          else
+            gh release create "v${SURI_VERSION}" $FILES --title "SuriClean ${SURI_VERSION} 🐾" --notes-file notes.md --latest
+          fi
 
       - name: Build site
         run: |
