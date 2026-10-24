@@ -166,7 +166,7 @@ private fun ShizukuCard(vm: AppVM) {
         }, 12.sp, bold = false, alpha = 0.75f)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BubblyButton(when (vm.shizuku) { 2 -> "Concedi ☆"; 1 -> "Apri Shizuku"; else -> "Installa Shizuku" }, Kawaii.lilac) { vm.shizukuAction() }
-            BubblyButton("Non mi serve", Kawaii.sky) { vm.hideShizuku() }
+            BubblyButton("No, grazie", Kawaii.sky) { vm.hideShizuku() }
         }
     }
 }
