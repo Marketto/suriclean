@@ -111,9 +111,9 @@
       <div class="card level" style="--c:${C.mint}"><div class="t">${lv.e} ${lv.t}</div><div class="s">${esc(t("web.side.freed", bytes(S.freed)))}</div>
         <div class="progress" style="width:100%;height:9px;margin:6px 0"><i style="width:${Math.max(4, lv.p * 100)}%"></i></div><div class="s">${lv.next}</div></div>
       ${updatePill()}
-      <div class="music-row"><button class="music-toggle" data-act="mute">${esc(t(S.muted ? "web.music.paused" : "web.music.on"))}</button>
-      <button class="remix-toggle ${S.remix ? "on" : ""}" data-act="remix" title="${esc(t("web.remix.title"))}">${esc(t(S.remix ? "web.remix.on" : "web.remix.off"))}</button></div>
-      ${langPicker()}`;
+      <div class="music-row"><button class="music-toggle" data-act="mute" title="${esc(t(S.muted ? "web.music.paused" : "web.music.on"))}">${S.muted ? "🔇" : "🎵"}</button>
+      <button class="remix-toggle ${S.remix ? "on" : ""}" data-act="remix" title="${esc(t("web.remix.title"))}">${esc(t(S.remix ? "web.remix.on" : "web.remix.off"))}</button>
+      <span class="sp"></span>${langPicker()}</div>`;
     Suri.setActivity($("#suri-side"), S.busy ? S.busy.act : "idle");
   }
 

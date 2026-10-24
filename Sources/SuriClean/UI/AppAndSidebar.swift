@@ -162,13 +162,12 @@ struct Sidebar: View {
 
             HStack {
                 Button(action: { model.muted.toggle(); Chiptune.shared.sfx(.pop) }) {
-                    Label(model.muted ? t("mac.music.paused") : t("mac.music.on"),
-                          systemImage: model.muted ? "speaker.slash.fill" : "music.note")
-                        .font(Theme.font(12, .bold))
+                    Image(systemName: model.muted ? "speaker.slash.fill" : "music.note")
+                        .font(.system(size: 13, weight: .bold))
                 }
                 .buttonStyle(.plain)
                 .opacity(0.7)
-                Spacer()
+                .help(model.muted ? t("mac.music.paused") : t("mac.music.on"))
                 Button(action: { model.remix.toggle(); if model.muted { model.muted = false }; Chiptune.shared.sfx(.pop) }) {
                     Text(model.remix ? "🎧 Remix ON" : "🎧 Remix")
                         .font(Theme.font(11, .heavy))
@@ -178,11 +177,11 @@ struct Sidebar: View {
                 }
                 .buttonStyle(.plain)
                 .help(t("mac.music.remixhelp"))
+                Spacer(minLength: 4)
+                LanguagePicker()
             }
             .padding(.horizontal, 8)
-            LanguagePicker()
-                .padding(.horizontal, 8)
-                .padding(.bottom, 10)
+            .padding(.bottom, 10)
         }
         .padding(.horizontal, 12)
         .frame(width: 252)

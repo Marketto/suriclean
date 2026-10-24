@@ -37,6 +37,14 @@ jobs:
           if pgrep -x SuriClean >/dev/null; then echo "✅ SuriClean is running"; else echo "❌ SuriClean is not running"; exit 1; fi
           screencapture -x dist/screenshot-mac.png || true
           pkill -x SuriClean || true
+          # same screen in a right-to-left and in a CJK language
+          for L in ar ja; do
+            defaults write com.suriclean.app suri.lang "$L"
+            open dist/SuriClean.app; sleep 12
+            screencapture -x "dist/screenshot-mac-$L.png" || true
+            pkill -x SuriClean || true; sleep 2
+          done
+          defaults delete com.suriclean.app suri.lang || true
 
       - name: Helper mode test (scan a home folder without UI)
         continue-on-error: true
@@ -65,6 +73,7 @@ jobs:
           path: |
             dist/SuriClean.dmg
             dist/screenshot-mac.png
+            dist/screenshot-mac-*.png
           if-no-files-found: warn
 
   desktop:
