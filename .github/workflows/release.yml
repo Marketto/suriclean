@@ -231,7 +231,8 @@ jobs:
 
   release:
     needs: [mac, desktop, android]
-    if: always() && needs.mac.result == 'success'
+    # only main publishes; other branches just build and test
+    if: always() && needs.mac.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
