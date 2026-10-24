@@ -269,6 +269,12 @@ enum Scanners {
             let why = r.output.contains("-128") ? "Hai annullato la richiesta della password" : "Non sono riuscita a misurare il disco"
             return .failure(NSError(domain: "SuriClean", code: 2, userInfo: [NSLocalizedDescriptionKey: why]))
         }
+        return .success(parseDu(text))
+    }
+
+    /// Turns `du -k -d 4 /System/Volumes/Data` output into disk-map rows.
+    static func parseDu(_ text: String) -> [CleanItem] {
+        let root = "/System/Volumes/Data"
         let base = URL(fileURLWithPath: root).pathComponents.count
         let me = FS.home.path
         var items: [CleanItem] = []
@@ -296,7 +302,7 @@ enum Scanners {
             items.append(CleanItem(url: url, name: url.lastPathComponent, detail: shown, size: size, date: nil,
                                    risk: .careful, recommended: false, badges: badges))
         }
-        return .success(items)
+        return items
     }
 
     // MARK: app data
@@ -404,7 +410,7 @@ enum Scanners {
         if let it = makeItem(FS.library.appendingPathComponent("Application Support/CrashReporter"), name: "Report dei crash",
                              risk: .safe, recommended: true, rep: rep) { out.append(it) }
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-        for k in FS.children(tmp) {
+        for k in (FS.isHelper ? [] : FS.children(tmp)) {
             if rep.isCancelled { return out }
             let d = FS.newestModDate(k)
             guard FS.daysSince(d) >= 3 else { continue }

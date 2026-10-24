@@ -37,6 +37,10 @@ final class AppModel: ObservableObject {
     @Published var expandedRepos: Set<UUID> = []
     @Published var diskBreakdown: [DiskSlice] = []
     @Published var diskMapIsFull = false
+    enum Scope { case me, all }
+    @Published var scope: Scope = .all
+    @Published var fullScanDone = false
+    @Published var askScanScope = false
     @Published var gitDetails: [URL: GitDetails] = [:]
     @Published var gitWorking: Set<URL> = []
 
@@ -213,7 +217,12 @@ final class AppModel: ObservableObject {
 
     // MARK: derived
 
-    func items(_ c: CleanCategory) -> [CleanItem] { results[c] ?? [] }
+    /// Items of a zone, filtered by the «Io / Tutti» switch after a whole-disk scan.
+    func items(_ c: CleanCategory) -> [CleanItem] {
+        let l = results[c] ?? []
+        guard fullScanDone, scope == .me, c != .diskMap else { return l }
+        return l.filter { $0.owner.isEmpty }
+    }
     /// Size to show for a zone (the disk map's entries are nested, so use the biggest one).
     func displayTotal(_ c: CleanCategory) -> Int64 {
         let l = items(c)
@@ -305,7 +314,16 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func scanAll() { runScan(CleanCategory.allCases) }
+    func scanAll() { askScanScope = true; Chiptune.shared.sfx(.pop) }
+
+    /// full = also the whole disk and every other user's folder (one admin password).
+    func scanAll(full: Bool) {
+        if full {
+            runScan(CleanCategory.allCases.filter { $0 != .diskMap }, thenFull: true)
+        } else {
+            runScan(CleanCategory.allCases)
+        }
+    }
 
     func rescan(_ c: CleanCategory) {
         if c.needsIndex { homeIndex = nil }
@@ -322,13 +340,17 @@ final class AppModel: ObservableObject {
         if var b = busy { f(&b); busy = b }
     }
 
-    private func setResults(_ c: CleanCategory, _ items: [CleanItem]) {
-        if let old = results[c] { selection.subtract(old.map { $0.id }) }
-        results[c] = items
+    private func setResults(_ c: CleanCategory, _ items: [CleanItem], keepOthers: Bool = true) {
+        let old = results[c] ?? []
+        // a normal rescan only covers this user: keep what the whole-disk scan found for the others
+        let kept = (keepOthers && c != .diskMap) ? old.filter { !$0.owner.isEmpty } : []
+        let keptIDs = Set(kept.map { $0.id })
+        selection.subtract(old.map { $0.id }.filter { !keptIDs.contains($0) })
+        results[c] = items + kept
         selection.formUnion(items.filter { $0.recommended }.map { $0.id })
     }
 
-    private func runScan(_ cats: [CleanCategory]) {
+    private func runScan(_ cats: [CleanCategory], thenFull: Bool = false) {
         guard busy == nil, !cats.isEmpty else { return }
         let rep = Reporter()
         reporter = rep
@@ -372,6 +394,25 @@ final class AppModel: ObservableObject {
                 let bytes = found.totalSize
                 updateBusy { $0.foundCount += found.count; $0.foundBytes += bytes }
                 Chiptune.shared.sfx(.coin)
+            }
+            if thenFull && !rep.isCancelled {
+                updateBusy { $0.activity = .lookout; $0.title = "Ora tutto il disco e gli altri utenti! 🔐"; $0.progress = nil; $0.detail = "Serve la password una volta sola" }
+                Chiptune.shared.mood = .scanning
+                let full = await Task.detached(priority: .userInitiated) { HelperMode.fullScan(rep) }.value
+                if let e = full.error { showToast(e) }
+                if !full.map.isEmpty {
+                    setResults(.diskMap, full.map)
+                    diskMapIsFull = true
+                    refreshBreakdown()
+                }
+                if full.error == nil || !full.others.isEmpty {
+                    for (c, list) in full.others {
+                        let mine = (results[c] ?? []).filter { $0.owner.isEmpty }
+                        results[c] = mine + list
+                    }
+                    fullScanDone = true
+                    scope = .all
+                }
             }
             let cancelled = rep.isCancelled
             busy = nil

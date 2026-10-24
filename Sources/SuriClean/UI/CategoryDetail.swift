@@ -130,6 +130,17 @@ struct CategoryDetailView: View {
                 MeerkatView(activity: category.activity, size: 96)
             }
             HStack(spacing: 10) {
+                if model.fullScanDone && category != .diskMap {
+                    Picker("", selection: $model.scope) {
+                        Text("🐾 Io").tag(AppModel.Scope.me)
+                        Text("👥 Tutti").tag(AppModel.Scope.all)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 140)
+                    .labelsHidden()
+                    .onChange(of: model.scope) { _ in Chiptune.shared.sfx(.pop) }
+                    .help("Mostra solo le tue cose o anche quelle degli altri utenti")
+                }
                 if category != .diskMap {
                 Picker("", selection: $treeView) {
                     Label("Lista", systemImage: "list.bullet").tag(false)
@@ -222,7 +233,7 @@ struct ItemRow: View {
     var body: some View {
         VStack(spacing: 6) {
             row
-            if item.isGitRepo && model.expandedRepos.contains(item.id) {
+            if item.isGitRepo && item.owner.isEmpty && model.expandedRepos.contains(item.id) {
                 GitRepoPanel(item: item, color: color)
                     .padding(.leading, 34)
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -234,7 +245,7 @@ struct ItemRow: View {
         let selected = model.selection.contains(item.id)
         let expanded = model.expandedRepos.contains(item.id)
         return HStack(spacing: 12) {
-            if item.isGitRepo {
+            if item.isGitRepo && item.owner.isEmpty {
                 Button(action: { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.toggleRepo(item) } }) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .heavy))

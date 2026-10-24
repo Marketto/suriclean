@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum Risk: Int {
+enum Risk: Int, Codable {
     case safe, review, careful
 
     var label: String {
@@ -27,7 +27,7 @@ enum SortMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-struct CleanItem: Identifiable, Hashable {
+struct CleanItem: Identifiable, Hashable, Codable {
     let id = UUID()
     var url: URL
     var name: String
@@ -42,6 +42,8 @@ struct CleanItem: Identifiable, Hashable {
     var group: Int? = nil
     var groupLabel: String? = nil
     var isGitRepo = false
+    /// Empty for the current user, otherwise the account name the item belongs to.
+    var owner = ""
 }
 
 extension Array where Element == CleanItem {

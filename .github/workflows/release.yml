@@ -38,6 +38,12 @@ jobs:
           screencapture -x dist/screenshot-mac.png || true
           pkill -x SuriClean || true
 
+      - name: Helper mode test (scan a home folder without UI)
+        continue-on-error: true
+        run: |
+          dist/SuriClean.app/Contents/MacOS/SuriClean --scan-user "$HOME" --categories caches,devCaches,bigFiles --out /tmp/suri-helper.json
+          python3 -c "import json;d=json.load(open('/tmp/suri-helper.json'));print({k:len(v) for k,v in d.items()});print(next((i['badges'][:2],i['owner']) for v in d.values() for i in v))"
+
       - name: APFS layout (for the disk breakdown)
         continue-on-error: true
         run: |

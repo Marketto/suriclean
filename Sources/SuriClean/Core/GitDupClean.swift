@@ -43,7 +43,8 @@ enum GitInspector {
     static func inspect(_ repo: URL) -> RepoInfo {
         func g(_ args: [String]) -> ShellResult {
             Shell.run("/usr/bin/git", ["-C", repo.path] + args,
-                      env: ["GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C"])
+                      env: ["GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C",
+                            "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"])
         }
         var dates: [Date] = []
         let last = g(["log", "-1", "--format=%ct"])
@@ -203,7 +204,9 @@ enum Cleaner {
                 o.removed.append(item.id)        // already gone (e.g. inside a repo removed earlier)
                 continue
             }
-            if (try? fm.trashItem(at: item.url, resultingItemURL: nil)) != nil {
+            if !item.owner.isEmpty {
+                protected.append(item)           // another user's file: goes to *their* Trash, as admin
+            } else if (try? fm.trashItem(at: item.url, resultingItemURL: nil)) != nil {
                 done(item)
             } else {
                 protected.append(item)           // admin-owned: handled all together below
@@ -212,7 +215,7 @@ enum Cleaner {
 
         if !protected.isEmpty && !reporter.isCancelled {
             reporter.report("Una sola password per \(protected.count) \(protected.count == 1 ? "elemento protetto" : "elementi protetti")… 🔐", progress: 0.85, force: true)
-            adminTrash(protected.map { $0.url })
+            adminTrash(protected.flatMap { it in ([it.url] + it.extraURLs).map { ($0, it.owner) } })
             for item in protected {
                 if fm.fileExists(atPath: item.url.path) { o.failed.append(item.name) } else { done(item) }
             }
@@ -224,22 +227,25 @@ enum Cleaner {
 
     /// Moves admin-owned items into the user's Trash with ONE password prompt,
     /// giving them back to the user so the Trash can be emptied normally.
-    static func adminTrash(_ urls: [URL]) {
+    static func adminTrash(_ entries: [(URL, String)]) {
         func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        let trash = FS.trashURL.path
-        let user = NSUserName()
+        let me = NSUserName()
         let stamp = Int(Date().timeIntervalSince1970)
-        var lines = ["#!/bin/bash", "mkdir -p \(q(trash))"]
-        for (i, u) in urls.enumerated() {
+        var lines = ["#!/bin/bash"]
+        for (i, (u, owner)) in entries.enumerated() where FileManager.default.fileExists(atPath: u.path) {
+            let user = owner.isEmpty ? me : owner
+            let trash = owner.isEmpty ? FS.trashURL.path : "/Users/\(owner)/.Trash"
             let base = u.deletingPathExtension().lastPathComponent
             let dest = trash + "/" + base + " \(stamp)-\(i)" + (u.pathExtension.isEmpty ? "" : "." + u.pathExtension)
+            lines.append("mkdir -p \(q(trash)) && /usr/sbin/chown \(q(user)) \(q(trash))")
             lines.append("/usr/sbin/chown -R \(q(user)) \(q(u.path)) 2>/dev/null; /bin/mv \(q(u.path)) \(q(dest))")
         }
+        guard lines.count > 1 else { return }
         let script = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-admin-\(stamp).sh")
         guard (try? lines.joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)) != nil else { return }
         let cmd = "/bin/bash " + q(script.path)
         let escaped = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        _ = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(escaped)\" with administrator privileges with prompt \"SuriClean vuole spostare nel Cestino \(urls.count) elementi protetti.\""])
+        _ = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(escaped)\" with administrator privileges with prompt \"SuriClean vuole spostare nel Cestino \(entries.count) elementi protetti o di altri utenti.\""])
         try? FileManager.default.removeItem(at: script)
     }
 

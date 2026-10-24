@@ -105,7 +105,9 @@ struct DiskInfo {
 
 enum FS {
     static let fm = FileManager.default
-    static let home = FileManager.default.homeDirectoryForCurrentUser
+    /// Overridden when SuriClean runs as the admin helper for another user's folder.
+    static var home = FileManager.default.homeDirectoryForCurrentUser
+    static var isHelper = false
     static var library: URL { home.appendingPathComponent("Library") }
     static var trashURL: URL { home.appendingPathComponent(".Trash") }
     static let ownBundleID = "com.suriclean.app"

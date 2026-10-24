@@ -6,6 +6,11 @@ struct SuriCleanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var model = AppModel()
 
+    init() {
+        // Started as the admin helper for another user's folder? Do the job without UI and quit.
+        HelperMode.runIfRequested()
+    }
+
     var body: some Scene {
         WindowGroup("SuriClean") {
             ContentView().environmentObject(model)
@@ -87,6 +92,13 @@ struct ContentView: View {
         .preferredColorScheme(.light)
         .frame(minWidth: 1060, minHeight: 690)
         .onAppear { model.start() }
+        .confirmationDialog("Dove scaviamo? ☆", isPresented: $model.askScanScope, titleVisibility: .visible) {
+            Button("🐾 Solo la mia cartella") { model.scanAll(full: false) }
+            Button("💽 Tutto il disco, tutti gli utenti 🔐") { model.scanAll(full: true) }
+            Button("Annulla", role: .cancel) {}
+        } message: {
+            Text("«Tutto il disco» chiede la password una volta e guarda anche le cartelle degli altri utenti e di sistema. Poi in ogni zona potrai filtrare «Io» o «Tutti».")
+        }
         .alert("Svuotare il Cestino?", isPresented: $model.askEmptyTrash) {
             Button("Annulla", role: .cancel) {}
             Button("Svuota per sempre", role: .destructive) { model.emptyTrash() }
