@@ -67,6 +67,10 @@ pub struct Item {
     pub copy_text: Option<String>,
     pub group: Option<u32>,
     pub group_label: Option<String>,
+    /// Lives in a system area: removed for good by an administrator, not moved to the Trash.
+    pub admin: bool,
+    /// Removed by running this command as administrator instead of deleting the path.
+    pub cmd: Option<String>,
 }
 
 fn new_item(path: &Path, name: String, detail: String, size: u64, date: Option<SystemTime>, risk: &str, rec: bool, badges: Vec<String>) -> Item {
@@ -1143,6 +1147,7 @@ pub fn scan(category: &str, rep: &Reporter) -> Vec<Item> {
         ("diskMap", _) => disk_map(rep),
         ("caches", _) => caches(rep),
         ("logsTemp", _) => logs_temp(rep),
+        ("systemAreas", _) => system_areas(rep),
         ("aiTools", _) => fixed(ai_targets(), rep),
         ("devCaches", _) => fixed(dev_targets(), rep),
         ("oldDownloads", _) => old_downloads(rep),
@@ -1211,5 +1216,287 @@ pub fn open_url(u: &str) {
         let _ = hidden_cmd("explorer").arg(u).spawn();
     } else {
         let _ = Command::new("xdg-open").arg(u).spawn();
+    }
+}
+
+// ───────────────────────── system areas ─────────────────────────
+
+fn admin_item(mut it: Item) -> Item {
+    it.admin = true;
+    it.badges.push("🔐 admin".into());
+    it
+}
+
+/// Like make_item, but keeps folders we can't look into (their size is only known to the administrator).
+fn sys_item(p: &Path, name: &str, detail: &str, risk: &str, rec: bool, rep: &Reporter, min: u64, badges: &[&str]) -> Option<Item> {
+    if !p.exists() {
+        return None;
+    }
+    let unreadable = p.is_dir() && fs::read_dir(p).is_err();
+    let mut b: Vec<String> = badges.iter().map(|s| s.to_string()).collect();
+    if unreadable {
+        b.push("🔒 misurabile solo da admin".into());
+        return Some(admin_item(new_item(p, name.into(), detail.into(), 0, mtime(p), risk, rec, b)));
+    }
+    make_item(p, name.into(), Some(detail.into()), risk, rec, rep, min, b, None).map(admin_item)
+}
+
+/// Many small files shown as one row: the first is the path, the others go in `extra`.
+fn grouped(files: Vec<PathBuf>, name: String, detail: String, risk: &str, rec: bool, badges: &[&str]) -> Option<Item> {
+    let size: u64 = files.iter().map(|f| fs::symlink_metadata(f).map(|m| m.len()).unwrap_or(0)).sum();
+    if size < 512 * 1024 {
+        return None;
+    }
+    let newest_t = files.iter().filter_map(|f| mtime(f)).max();
+    let mut it = new_item(&files[0], format!("{} ({} file)", name, files.len()), detail, size, newest_t, risk, rec,
+        badges.iter().map(|s| s.to_string()).collect());
+    it.extra = files[1..].iter().map(|f| f.to_string_lossy().to_string()).collect();
+    Some(admin_item(it))
+}
+
+fn files_where(root: &Path, depth: usize, keep: impl Fn(&Path, &fs::Metadata) -> bool) -> Vec<PathBuf> {
+    WalkDir::new(root).max_depth(depth).follow_links(false).into_iter().flatten()
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| e.metadata().map(|m| keep(e.path(), &m)).unwrap_or(false))
+        .map(|e| e.path().to_path_buf())
+        .collect()
+}
+
+#[allow(dead_code)]
+fn is_rotated(name: &str) -> bool {
+    let n = name.to_lowercase();
+    if [".gz", ".xz", ".bz2", ".zip", ".old", ".zst"].iter().any(|e| n.ends_with(e)) {
+        return true;
+    }
+    match n.rsplit_once('.') {
+        Some((_, last)) => !last.is_empty() && last.chars().all(|c| c.is_ascii_digit()),
+        None => false,
+    }
+}
+
+fn old_enough(m: &fs::Metadata, days: u64) -> bool {
+    days_since(m.modified().ok()) >= days
+}
+
+fn system_areas(rep: &Reporter) -> Vec<Item> {
+    let mut out = vec![];
+    if cfg!(windows) {
+        system_windows(rep, &mut out);
+    } else {
+        system_linux(rep, &mut out);
+    }
+    out
+}
+
+fn system_windows(rep: &Reporter, out: &mut Vec<Item>) {
+    let win = PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into()));
+    let drive = PathBuf::from(std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into()) + "\\");
+    let pdata = PathBuf::from(std::env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".into()));
+
+    rep.report_force("Temporanei di Windows", Some(0.0));
+    let wtemp = win.join("Temp");
+    if fs::read_dir(&wtemp).is_ok() {
+        for k in children(&wtemp) {
+            if rep.cancelled() { return; }
+            if days_since(newest(&k, &[])) < 1 { continue; }
+            if let Some(it) = make_item(&k, format!("Temporaneo di Windows · {}", file_name(&k)), Some(pretty(&k)), "safe", true, rep, 256 * 1024, vec!["⏳ temporaneo".into()], None) {
+                out.push(admin_item(it));
+            }
+        }
+    } else if let Some(it) = sys_item(&wtemp, "Temporanei di Windows", "C:\\Windows\\Temp · file usa-e-getta di installazioni e servizi", "safe", true, rep, 0, &["⏳ temporaneo"]) {
+        out.push(it);
+    }
+
+    rep.report_force("Aggiornamenti già installati", Some(0.15));
+    let sd = win.join("SoftwareDistribution").join("Download");
+    for k in children(&sd) {
+        if rep.cancelled() { return; }
+        if let Some(it) = sys_item(&k, &format!("Aggiornamento di Windows scaricato · {}", file_name(&k)), "Windows Update lo riscarica se mai servisse", "safe", true, rep, MB, &["⬇️ riscaricabile"]) {
+            out.push(it);
+        }
+    }
+    let dopt = win.join("ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Windows\\DeliveryOptimization\\Cache");
+    if let Some(mut it) = sys_item(&dopt, "Cache di Ottimizzazione recapito", "Pezzi di aggiornamenti condivisi con altri PC: si riscaricano", "safe", true, rep, MB, &["⬇️ riscaricabile"]) {
+        it.cmd = Some("powershell -NoProfile -Command \"Delete-DeliveryOptimizationCache -Force\"".into());
+        out.push(it);
+    }
+
+    rep.report_force("Log e report di errore", Some(0.35));
+    let logs = files_where(&win.join("Logs"), 6, |_, m| old_enough(m, 7));
+    if !logs.is_empty() {
+        if let Some(it) = grouped(logs, "Log di Windows vecchi".into(), "C:\\Windows\\Logs · più vecchi di una settimana".into(), "safe", true, &["📜 log"]) {
+            out.push(it);
+        }
+    }
+    for (sub, name) in [("ReportArchive", "Report errori archiviati"), ("ReportQueue", "Report errori in coda"), ("Temp", "Temporanei dei report errori")] {
+        let p = pdata.join("Microsoft\\Windows\\WER").join(sub);
+        if let Some(it) = sys_item(&p, name, &pretty(&p), "safe", true, rep, 256 * 1024, &["💥 crash"]) {
+            out.push(it);
+        }
+    }
+
+    rep.report_force("Dump della memoria", Some(0.55));
+    for (p, name) in [
+        (win.join("MEMORY.DMP"), "Dump completo della memoria (schermata blu)"),
+        (win.join("Minidump"), "Mini dump delle schermate blu"),
+        (win.join("LiveKernelReports"), "Report del kernel"),
+    ] {
+        if let Some(it) = sys_item(&p, name, &pretty(&p), "safe", true, rep, MB, &["💥 crash"]) {
+            out.push(it);
+        }
+    }
+
+    rep.report_force("Vecchie installazioni di Windows", Some(0.7));
+    let old = drive.join("Windows.old");
+    if old.exists() {
+        let size = size_of(&old, Some(rep));
+        let mut it = admin_item(new_item(&old, "Vecchia installazione di Windows (Windows.old)".into(),
+            "Serve solo per tornare alla versione precedente di Windows · la toglie Pulizia disco".into(), size, mtime(&old), "review", false, vec!["⏪ ritorno indietro".into()]));
+        it.cmd = Some("cleanmgr /autoclean".into());
+        out.push(it);
+    }
+    let hib = drive.join("hiberfil.sys");
+    if let Ok(m) = fs::metadata(&hib) {
+        if m.len() > 512 * MB {
+            let mut it = admin_item(new_item(&hib, "File di ibernazione (hiberfil.sys)".into(),
+                "Spegne ibernazione e avvio rapido: il PC si accende un filo più lento".into(), m.len(), None, "careful", false, vec!["💤 ibernazione".into()]));
+            it.cmd = Some("powercfg /hibernate off".into());
+            out.push(it);
+        }
+    }
+    let mut it = admin_item(new_item(&win.join("WinSxS"), "Pulizia componenti di Windows (WinSxS)".into(),
+        "Toglie le vecchie versioni dei componenti sostituite dagli aggiornamenti · può metterci qualche minuto".into(), 0, None, "review", false, vec!["🧩 componenti".into()]));
+    it.cmd = Some("Dism.exe /Online /Cleanup-Image /StartComponentCleanup /Quiet".into());
+    out.push(it);
+}
+
+fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
+    rep.report_force("Log archiviati", Some(0.0));
+    let logs = files_where(Path::new("/var/log"), 4, |p, m| {
+        old_enough(m, 1) && is_rotated(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default())
+            && !p.starts_with("/var/log/journal")
+    });
+    if !logs.is_empty() {
+        if let Some(it) = grouped(logs, "Log di sistema archiviati".into(), "/var/log · i vecchi log già ruotati o compressi".into(), "safe", true, &["📜 log"]) {
+            out.push(it);
+        }
+    }
+    let journal = Path::new("/var/log/journal");
+    if journal.exists() {
+        let old: u64 = files_where(journal, 2, |p, m| {
+            let n = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            (n.contains('@') || n.ends_with("~")) && old_enough(m, 7)
+        }).iter().map(|f| fs::metadata(f).map(|m| m.len()).unwrap_or(0)).sum();
+        if old > MB {
+            let mut it = admin_item(new_item(journal, "Diario di sistema più vecchio di 7 giorni".into(),
+                "journalctl --vacuum-time=7d · tiene l'ultima settimana".into(), old, mtime(journal), "safe", true, vec!["📜 log".into()]));
+            it.cmd = Some("journalctl --vacuum-time=7d".into());
+            out.push(it);
+        }
+    }
+    if rep.cancelled() { return; }
+
+    rep.report_force("Pacchetti scaricati", Some(0.25));
+    let debs = files_where(Path::new("/var/cache/apt/archives"), 1, |p, _| p.extension().map_or(false, |e| e == "deb"));
+    if !debs.is_empty() {
+        if let Some(it) = grouped(debs, "Pacchetti .deb già installati".into(), "/var/cache/apt/archives · come «apt clean»".into(), "safe", true, &["⬇️ riscaricabile"]) {
+            out.push(it);
+        }
+    }
+    for k in children(Path::new("/var/cache/PackageKit")) {
+        if let Some(it) = sys_item(&k, &format!("Cache di Software/PackageKit · {}", file_name(&k)), &pretty(&k), "safe", true, rep, MB, &["⬇️ riscaricabile"]) {
+            out.push(it);
+        }
+    }
+
+    rep.report_force("Vecchie versioni degli snap", Some(0.45));
+    if let Ok(o) = Command::new("snap").args(["list", "--all"]).output() {
+        for line in String::from_utf8_lossy(&o.stdout).lines().skip(1) {
+            let f: Vec<&str> = line.split_whitespace().collect();
+            if f.len() < 3 || !line.contains("disabled") { continue; }
+            let (name, rev) = (f[0], f[2]);
+            let file = PathBuf::from(format!("/var/lib/snapd/snaps/{}_{}.snap", name, rev));
+            let size = fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
+            let mut it = admin_item(new_item(&file, format!("Snap · {} (revisione {} vecchia)", name, rev),
+                "Versione precedente tenuta da snap per tornare indietro".into(), size, mtime(&file), "safe", true, vec!["📦 snap".into()]));
+            it.cmd = Some(format!("snap remove {} --revision={}", name, rev));
+            out.push(it);
+        }
+    }
+    if rep.cancelled() { return; }
+
+    rep.report_force("Crash e dump", Some(0.65));
+    for (dir, label) in [("/var/crash", "Report di crash"), ("/var/lib/systemd/coredump", "Core dump")] {
+        for k in children(Path::new(dir)) {
+            if let Some(it) = sys_item(&k, &format!("{} · {}", label, file_name(&k)), &pretty(&k), "safe", true, rep, 256 * 1024, &["💥 crash"]) {
+                out.push(it);
+            }
+        }
+    }
+
+    rep.report_force("Temporanei e backup di sistema", Some(0.8));
+    for k in children(Path::new("/var/tmp")) {
+        if rep.cancelled() { return; }
+        let d = newest(&k, &[]);
+        if days_since(d) < 3 { continue; }
+        if let Some(it) = sys_item(&k, &format!("Temporaneo di sistema · {}", file_name(&k)), &format!("/var/tmp · toccato {}", rel_time(d)), "safe", true, rep, 256 * 1024, &["⏳ temporaneo"]) {
+            out.push(it);
+        }
+    }
+    let backups = files_where(Path::new("/var/backups"), 1, |p, m| {
+        old_enough(m, 7) && is_rotated(&p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default())
+    });
+    if !backups.is_empty() {
+        if let Some(it) = grouped(backups, "Backup vecchi di sistema".into(), "/var/backups · copie ruotate di dpkg, apt e password".into(), "safe", true, &["🗄️ backup"]) {
+            out.push(it);
+        }
+    }
+}
+
+/// Runs the given shell lines as administrator with ONE prompt (UAC on Windows, pkexec on Linux).
+pub fn run_elevated(lines: &[String]) -> Result<(), String> {
+    let dir = std::env::temp_dir().join(format!("suriclean-admin-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let res = if cfg!(windows) {
+        let script = dir.join("suri.cmd");
+        let body = format!("@echo off\r\nchcp 65001 >nul\r\n{}\r\n", lines.join("\r\n"));
+        fs::write(&script, body).map_err(|e| e.to_string())?;
+        let ps = format!("Start-Process -FilePath '{}' -Verb RunAs -Wait -WindowStyle Hidden",
+            script.to_string_lossy().replace('\'', "''"));
+        let st = hidden_cmd("powershell").args(["-NoProfile", "-NonInteractive", "-Command", &ps]).status().map_err(|e| e.to_string())?;
+        if st.success() { Ok(()) } else { Err("Hai annullato la richiesta di amministratore".to_string()) }
+    } else {
+        let script = dir.join("suri.sh");
+        fs::write(&script, format!("#!/bin/sh\n{}\nexit 0\n", lines.join("\n"))).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&dir, fs::Permissions::from_mode(0o700));
+        }
+        match Command::new("pkexec").arg("/bin/sh").arg(&script).status() {
+            Ok(st) if st.code() == Some(126) || st.code() == Some(127) => Err("Hai annullato la richiesta della password".to_string()),
+            Ok(_) => Ok(()),
+            Err(_) => Err("Manca pkexec: installa policykit-1 per pulire le aree di sistema".to_string()),
+        }
+    };
+    res
+}
+
+/// Quoted for the shell the elevated script runs in.
+pub fn shell_quote(p: &str) -> String {
+    if cfg!(windows) {
+        format!("\"{}\"", p.replace('"', ""))
+    } else {
+        format!("'{}'", p.replace('\'', "'\\''"))
+    }
+}
+
+pub fn delete_line(p: &Path) -> String {
+    let q = shell_quote(&p.to_string_lossy());
+    if cfg!(windows) {
+        if p.is_dir() { format!("rd /s /q {}", q) } else { format!("del /f /q /a {}", q) }
+    } else {
+        format!("rm -rf -- {}", q)
     }
 }

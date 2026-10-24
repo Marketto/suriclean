@@ -31,6 +31,7 @@ class StorageIndex(
     val emptyDirs: List<File>,
     val junkFiles: List<File>,
     val thumbDirs: List<File>,
+    val trashed: List<File> = emptyList(),      // .trashed-* / old .pending-* left by MediaStore
     val dirSizes: Map<String, Long>,             // folders down to 4 levels
     val total: Long,
     val built: Long = System.currentTimeMillis(),
@@ -51,6 +52,7 @@ class StorageIndex(
             val empty = ArrayList<File>()
             val junk = ArrayList<File>()
             val thumbs = ArrayList<File>()
+            val trashed = ArrayList<File>()
             val sizes = HashMap<String, Long>()
             var total = 0L
             var n = 0
@@ -85,10 +87,11 @@ class StorageIndex(
                     if (len >= 1_048_576) files.add(k to len)
                     if (name.endsWith(".apk") || name.endsWith(".xapk") || name.endsWith(".apks")) apks.add(k)
                     if (name.endsWith(".log") || name.endsWith(".tmp") || name.startsWith("~$") || name == ".ds_store") junk.add(k)
+                    if (name.startsWith(".trashed-") || (name.startsWith(".pending-") && Fs.daysSince(k.lastModified()) > 7)) trashed.add(k)
                 }
             }
             rep.report("Esplorazione finita: $n elementi", force = true)
-            return StorageIndex(files, apks, empty, junk, thumbs, sizes, total)
+            return StorageIndex(files, apks, empty, junk, thumbs, sizes, total, trashed = trashed)
         }
     }
 }
@@ -248,6 +251,75 @@ object Scanners {
         }
         for (d in idx.emptyDirs) {
             out.add(Item(Fs.nextId(), d.absolutePath, d.name, Fs.pretty(d.parentFile ?: d), 0, d.lastModified(), Risk.SAFE, true, listOf("📂 cartella vuota"), isDir = true))
+        }
+        return out
+    }
+}
+
+object SystemAreas {
+    private val dated = Regex("^msgstore-\\d{4}-\\d{2}-\\d{2}\\..*")
+
+    private fun installed(ctx: Context, pkg: String): Boolean = try {
+        ctx.packageManager.getPackageInfo(pkg, 0); true
+    } catch (e: Exception) { false }
+
+    fun scan(ctx: Context, idx: StorageIndex, rep: Reporter): List<Item> {
+        val root = Fs.root
+        val out = ArrayList<Item>()
+        fun add(it: Item?) { if (it != null && it.size > 0) out.add(it) }
+
+        rep.report("Vecchi backup delle chat", 0f, force = true)
+        for (path in listOf("Android/media/com.whatsapp/WhatsApp/Databases", "Android/media/com.whatsapp.w4b/WhatsApp Business/Databases",
+                "WhatsApp/Databases", "WhatsApp Business/Databases")) {
+            val app = if (path.contains("Business")) "WhatsApp Business" else "WhatsApp"
+            for (f in File(root, path).listFiles().orEmpty()) {
+                if (!f.isFile || !dated.matches(f.name)) continue
+                add(Scanners.item(f, "Backup vecchio di $app · ${f.name.substringAfter("msgstore-").take(10)}",
+                    "Il backup più recente (msgstore.db…) resta al suo posto", Risk.SAFE, true, listOf("🗄️ backup vecchio")))
+            }
+        }
+
+        rep.report("Aggiornamenti già installati", 0.2f, force = true)
+        for (name in listOf("downloaded_rom", ".Ota", "ota", "OTA", "fota", "SystemUpdate", ".ota_package")) {
+            add(Scanners.item(File(root, name), "Aggiornamento di sistema scaricato · $name", Fs.pretty(File(root, name)),
+                Risk.SAFE, true, listOf("⬇️ già installato"), rep = rep, minSize = 1_048_576))
+        }
+        for (f in root.listFiles().orEmpty()) {
+            val n = f.name.lowercase()
+            if (f.isFile && n.endsWith(".zip") && (n == "update.zip" || n.contains("ota") || n.startsWith("miui_") || n.contains("rom")))
+                add(Scanners.item(f, "Pacchetto di aggiornamento · ${f.name}", null, Risk.REVIEW, false, listOf("⬇️ aggiornamento")))
+        }
+
+        rep.report("Avanzi di app disinstallate", 0.4f, force = true)
+        for (d in File(root, "Android/obb").listFiles().orEmpty()) {
+            if (rep.cancelled) break
+            if (d.isDirectory && !installed(ctx, d.name))
+                add(Scanners.item(d, "Dati di gioco (OBB) · ${d.name}", "L'app non è più installata", Risk.SAFE, true, listOf("👻 app disinstallata"), rep = rep))
+        }
+        for (d in File(root, "Android/media").listFiles().orEmpty()) {
+            if (rep.cancelled) break
+            if (d.isDirectory && !installed(ctx, d.name))
+                add(Scanners.item(d, "Cartella media · ${d.name}", "L'app non è più installata: dentro possono esserci foto o file tuoi",
+                    Risk.REVIEW, false, listOf("👻 app disinstallata"), rep = rep, minSize = 256 * 1024))
+        }
+
+        rep.report("Log dei produttori", 0.6f, force = true)
+        for (name in listOf("MIUI/debug_log", "log", "logs", "Log", "bugreports", "mtklog", "debuglogger", "Android/log", "tombstones", "Huawei/log")) {
+            add(Scanners.item(File(root, name), "Log di sistema · $name", Fs.pretty(File(root, name)), Risk.SAFE, true, listOf("📜 log"), rep = rep, minSize = 64 * 1024))
+        }
+
+        rep.report("Backup di app", 0.75f, force = true)
+        for (name in listOf("TitaniumBackup", "SwiftBackup", "MIUI/backup", "Huawei/Backup", "Backups", "backups", "backup", "Smart Switch", "OnePlus Switch", "OPBackup")) {
+            add(Scanners.item(File(root, name), "Backup · $name", "Controlla di non averne più bisogno (o che sia già sul PC/cloud)",
+                Risk.CAREFUL, false, listOf("🗄️ backup"), rep = rep, minSize = 1_048_576))
+        }
+
+        rep.report("File già nel cestino di Android", 0.9f, force = true)
+        for (f in idx.trashed) {
+            val pending = f.name.startsWith(".pending-")
+            add(Scanners.item(f, f.name.substringAfter('-').substringAfter('-').ifEmpty { f.name },
+                (if (pending) "Download o salvataggio interrotto · " else "Già nel cestino di Android · ") + Fs.pretty(f.parentFile ?: f),
+                Risk.SAFE, true, listOf(if (pending) "⏸️ interrotto" else "🗑️ già cestinato")))
         }
         return out
     }

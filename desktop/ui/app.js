@@ -19,6 +19,9 @@
     { id: "logsTemp", title: "Log e temporanei", sub: "Diari di bordo e roba usa-e-getta", icon: "🧾", color: C.lilac, risk: "safe", act: "reading",
       scan: "Sfoglio i log, piku-piku! 📜",
       explain: "File temporanei più vecchi di 3 giorni, dump dei crash e report di errore. Nessuno ne sentirà la mancanza." },
+    { id: "systemAreas", title: "Aree di sistema", sub: "Log, temp, aggiornamenti e dump del sistema 🔐", icon: "⚙️", color: C.sky, risk: "review", act: "sweeping",
+      scan: "Suri esplora le stanze del sistema! 🏯",
+      explain: "Fuori dalla tua cartella: log e report di errore del sistema, temporanei di sistema, aggiornamenti già installati, dump della memoria, pacchetti scaricati, vecchie versioni e backup ruotati. Serve la password di amministratore, una volta sola, e vengono eliminati per sempre (non passano dal Cestino). Le voci con 🔒 si misurano solo da amministratore." },
     { id: "aiTools", title: "Claude, Codex & AI", sub: "Le briciole dei tuoi amici robot 🤖", icon: "🤖", color: C.pink, risk: "review", act: "hacking",
       scan: "Bip-bup! Missione robot AI ☆",
       explain: "Cronologie di Claude Code e Codex, cache di Claude Desktop, Cursor e VS Code, modelli scaricati (Hugging Face, Ollama, LM Studio). Le sessioni recenti e i modelli non sono preselezionati." },
@@ -254,7 +257,7 @@
       <div class="ficon">${fileIcon(it)}</div>
       <div class="info"><div class="name">${esc(it.name)}${it.risk === "careful" && selectable ? `<span class="pill risk-careful">Con cautela</span>` : ""}${it.badges.map(b => `<span class="pill">${esc(b)}</span>`).join("")}</div>
       <div class="det" title="${esc(it.detail)}">${esc(it.detail)}</div></div>
-      <div class="sz"><b>${bytes(it.size)}</b><div class="bar"><i style="--w:${Math.max(3, it.size / max * 100)}%"></i></div></div>
+      <div class="sz"><b>${it.size || !it.cmd ? bytes(it.size) : "?"}</b><div class="bar"><i style="--w:${Math.max(3, it.size / max * 100)}%"></i></div></div>
       ${it.copyText ? `<button class="rbtn" data-copy="${it.id}" title="${esc(it.copyText)}">📋</button>` : ""}
       <button class="rbtn" data-reveal="${esc(it.path)}" title="Mostra nella cartella">🔍</button></div>`;
   }
@@ -507,7 +510,7 @@
     Chiptune.setMood("cleaning"); sfx("whoosh"); showBusy();
     let out;
     try {
-      out = await invoke("trash_items", { items: sel.map(i => ({ id: i.id, path: i.path, name: i.name, size: i.size, extra: i.extra, copyText: i.copyText })) });
+      out = await invoke("trash_items", { items: sel.map(i => ({ id: i.id, path: i.path, name: i.name, size: i.size, extra: i.extra, copyText: i.copyText, admin: i.admin, cmd: i.cmd })) });
     } catch (e) { out = { removed: [], bytes: 0, failed: [String(e)] }; }
     const removed = new Set(out.removed);
     Object.keys(S.results).forEach(k => S.results[k] = S.results[k].filter(i => !removed.has(i.id)));
@@ -519,7 +522,7 @@
     await refreshDisk(); render();
     let msg = out.failed.length ? `${out.failed.length} elementi non si sono lasciati spostare (in uso o protetti): ${out.failed.slice(0, 3).join(", ")}${out.failed.length > 3 ? "…" : ""}` : "";
     if (out.repoLog) msg += `${msg ? " · " : ""}I comandi per riclonare i repo sono in «SuriClean - repo rimossi.txt» (Documenti).`;
-    celebrate({ kind: "trashed", bytes: out.bytes, message: msg });
+    celebrate({ kind: catId === "systemAreas" && out.removed.length ? "emptied" : "trashed", bytes: out.bytes, message: msg });
   }
 
   async function emptyTrash() {
@@ -606,7 +609,8 @@
       case "askClean": {
         const sel = items(cat.id).filter(i => S.sel.has(i.id));
         sfx("pop");
-        confirmBox("Spostare nel Cestino?", `${sel.length} elementi per ${bytes(total(sel))} finiranno nel Cestino: potrai ancora recuperarli finché non lo svuoti.`, "Sì, spazza spazza! 🧹", () => clean(cat.id));
+        if (cat.id === "systemAreas") confirmBox("Pulire le aree di sistema?", `${sel.length} elementi per ${bytes(total(sel))} verranno eliminati per sempre come amministratore. ${S.platform === "windows" ? "Windows" : "Ubuntu"} ti chiederà la password una volta sola.`, "Sì, pulisci 🔐", () => clean(cat.id));
+        else confirmBox("Spostare nel Cestino?", `${sel.length} elementi per ${bytes(total(sel))} finiranno nel Cestino: potrai ancora recuperarli finché non lo svuoti.`, "Sì, spazza spazza! 🧹", () => clean(cat.id));
         break;
       }
       case "expandAll": { const walk = ns => ns.forEach(n => { if (n.children.length) { S.expanded.add(n.id); walk(n.children); } }); walk(buildTree(items(cat.id))); sfx("pop"); renderList(); break; }

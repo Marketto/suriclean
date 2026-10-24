@@ -51,7 +51,7 @@ extension Array where Element == CleanItem {
 }
 
 enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
-    case diskMap, caches, logsTemp, aiTools, devCaches, buildDeps, gitRepos, duplicates, appData
+    case diskMap, caches, logsTemp, systemAreas, aiTools, devCaches, buildDeps, gitRepos, duplicates, appData
     case bigFiles, installers, oldDownloads, apps, leftovers, appleExtras
 
     var id: String { rawValue }
@@ -62,6 +62,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .appData: return "Dati delle app"
         case .caches: return "Cache delle app"
         case .logsTemp: return "Log e temporanei"
+        case .systemAreas: return "Aree di sistema"
         case .aiTools: return "Claude, Codex & AI"
         case .devCaches: return "Cache da sviluppatore"
         case .buildDeps: return "Dipendenze ricreabili"
@@ -82,6 +83,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .appData: return "Le app più golose di spazio, nyam~"
         case .caches: return "Briciole magiche che ricrescono da sole ✧"
         case .logsTemp: return "Diari di bordo e roba usa-e-getta"
+        case .systemAreas: return "Log, temp, aggiornamenti e dump di macOS 🔐"
         case .aiTools: return "Le briciole dei tuoi amici robot 🤖"
         case .devCaches: return "npm, Xcode, Gradle, Cargo, Go…"
         case .buildDeps: return "node_modules, venv, target… di progetti fermi"
@@ -106,6 +108,8 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
             return "Le cache servono solo a velocizzare: se le togli, le app le ricreano quando servono. Meglio chiudere le app prima di pulire."
         case .logsTemp:
             return "Log, report di crash, stati delle finestre e file temporanei vecchi di qualche giorno. Nessuno ne sentirà la mancanza."
+        case .systemAreas:
+            return "Fuori dalla tua cartella: log e report di crash di macOS, log archiviati, cache comuni a tutti gli utenti, temporanei vecchi, aggiornamenti di macOS già scaricati, installer di macOS, core dump e suoni di GarageBand riscaricabili. Per spostarli nel Cestino serve la password, una volta sola."
         case .aiTools:
             return "Cronologie di sessione di Claude Code e Codex, cache di Claude Desktop, Cursor e VS Code, modelli scaricati (Hugging Face, Ollama, LM Studio). Le sessioni recenti non sono preselezionate."
         case .devCaches:
@@ -137,6 +141,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .appData: return "tray.full.fill"
         case .caches: return "wind"
         case .logsTemp: return "clock.arrow.circlepath"
+        case .systemAreas: return "gearshape.2.fill"
         case .aiTools: return "brain.head.profile"
         case .devCaches: return "hammer.fill"
         case .buildDeps: return "shippingbox.fill"
@@ -157,6 +162,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .appData: return Theme.coral
         case .caches: return Theme.sky
         case .logsTemp: return Theme.lilac
+        case .systemAreas: return Theme.sky
         case .aiTools: return Theme.pink
         case .devCaches: return Theme.orange
         case .buildDeps: return Theme.mint
@@ -175,6 +181,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .diskMap, .appData: return .careful
         case .caches, .logsTemp, .devCaches, .buildDeps, .installers: return .safe
+        case .systemAreas: return .review
         case .aiTools, .gitRepos, .duplicates, .oldDownloads, .leftovers: return .review
         case .bigFiles, .apps, .appleExtras: return .careful
         }
@@ -185,6 +192,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .diskMap: return .digging
         case .caches, .leftovers, .appData: return .sniffing
         case .logsTemp: return .reading
+        case .systemAreas: return .sweeping
         case .aiTools, .devCaches: return .hacking
         case .buildDeps, .bigFiles: return .digging
         case .gitRepos: return .reading
@@ -200,6 +208,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .appData: return "Chi è l'app più golosa? Nyam~ 🍰"
         case .caches: return "Snif snif! Caccia alle cache~ ☆"
         case .logsTemp: return "Sfoglio i log, piku-piku! 📜"
+        case .systemAreas: return "Suri esplora le stanze di macOS! 🏯"
         case .aiTools: return "Bip-bup! Missione robot AI ☆"
         case .devCaches: return "Tic-tac! Hacker mode ON 💻"
         case .buildDeps: return "Scava-scava nei node_modules! ⛏️"

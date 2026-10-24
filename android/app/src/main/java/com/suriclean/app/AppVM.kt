@@ -151,7 +151,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     fun cancelJob() { cancel.set(true); busy = busy?.copy(title = "Okke~ mi fermo! ✋"); Chiptune.sfx(Sfx.ERROR) }
 
-    private fun needsIndex(c: Category) = c in setOf(Category.MAP, Category.DUPLICATES, Category.BIG, Category.APKS, Category.JUNK)
+    private fun needsIndex(c: Category) = c in setOf(Category.MAP, Category.DUPLICATES, Category.BIG, Category.APKS, Category.JUNK, Category.SYSTEM)
 
     fun scan(cats: List<Category>) {
         if (busy != null || cats.isEmpty()) return
@@ -186,6 +186,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                         Category.DOWNLOADS -> Scanners.downloads(rep)
                         Category.APKS -> idx?.let { Scanners.apks(it) } ?: emptyList()
                         Category.JUNK -> idx?.let { Scanners.junk(it) } ?: emptyList()
+                        Category.SYSTEM -> idx?.let { SystemAreas.scan(ctx, it, rep) } ?: emptyList()
                         Category.APPS -> if (AppsInfo.hasUsageAccess(ctx)) {
                             val (apps, cache) = AppsInfo.scan(ctx, rep)
                             withContext(Dispatchers.Main) { appCache = cache }

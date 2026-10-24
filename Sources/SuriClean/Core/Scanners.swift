@@ -108,6 +108,7 @@ enum Scanners {
         case .appData: return appData(reporter)
         case .caches: return caches(reporter)
         case .logsTemp: return logsTemp(reporter)
+        case .systemAreas: return SystemAreas.scan(reporter)
         case .aiTools: return fixed(Targets.ai, reporter)
         case .devCaches: return fixed(Targets.dev, reporter) + homebrewOld(reporter)
         case .buildDeps: return buildDeps(index, reporter)

@@ -36,6 +36,10 @@ struct TrashReq {
     extra: Vec<String>,
     #[serde(default)]
     copy_text: Option<String>,
+    #[serde(default)]
+    admin: bool,
+    #[serde(default)]
+    cmd: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -118,9 +122,14 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
         let mut out = TrashOutcome { removed: vec![], bytes: 0, failed: vec![], repo_log: None };
         let mut log: Vec<String> = vec![];
         let n = items.len().max(1);
+        let mut admin: Vec<&TrashReq> = vec![];
         for (i, it) in items.iter().enumerate() {
             if rep.cancelled() {
                 break;
+            }
+            if it.admin || it.cmd.is_some() {
+                admin.push(it);
+                continue;
             }
             rep.report_force(&it.name, Some(i as f64 / n as f64));
             let p = Path::new(&it.path);
@@ -143,6 +152,39 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
                     }
                 }
                 Err(_) => out.failed.push(it.name.clone()),
+            }
+        }
+        if !admin.is_empty() && !rep.cancelled() {
+            rep.report_force(&format!("Una sola password per {} elementi di sistema… 🔐", admin.len()), Some(0.85));
+            let done = std::env::temp_dir().join(format!("suriclean-done-{}.txt", std::process::id()));
+            let _ = std::fs::remove_file(&done);
+            let dq = scan::shell_quote(&done.to_string_lossy());
+            let mut lines: Vec<String> = vec![];
+            for it in &admin {
+                if let Some(c) = &it.cmd {
+                    lines.push(format!("{} && echo {} >> {}", c, it.id, dq));
+                } else {
+                    for p in std::iter::once(&it.path).chain(it.extra.iter()) {
+                        lines.push(scan::delete_line(Path::new(p)));
+                    }
+                }
+            }
+            match scan::run_elevated(&lines) {
+                Ok(()) => {
+                    let ok_cmds: Vec<u64> = std::fs::read_to_string(&done).unwrap_or_default()
+                        .lines().filter_map(|l| l.trim().parse().ok()).collect();
+                    let _ = std::fs::remove_file(&done);
+                    for it in &admin {
+                        let gone = if it.cmd.is_some() { ok_cmds.contains(&it.id) } else { !Path::new(&it.path).exists() };
+                        if gone {
+                            out.removed.push(it.id);
+                            out.bytes += it.size;
+                        } else {
+                            out.failed.push(it.name.clone());
+                        }
+                    }
+                }
+                Err(e) => out.failed.push(e),
             }
         }
         if !log.is_empty() {

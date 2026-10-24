@@ -50,6 +50,7 @@ Funziona su macOS 12 Monterey o successivi, sia su Mac Intel sia su Apple Silico
 |---|---|---|
 | Cache delle app | `~/Library/Caches`, cache di app Electron, browser e app sandbox | sì |
 | Log e temporanei | Log, report dei crash, stati delle finestre, `$TMPDIR` più vecchio di 3 giorni | sì |
+| Aree di sistema 🔐 | Mac: `/Library/Logs`, log archiviati di `/var/log`, `/Library/Caches`, `/var/tmp`, aggiornamenti e installer di macOS, `/cores`, loop di GarageBand e simulatori. Windows: `Windows\Temp`, aggiornamenti scaricati, Ottimizzazione recapito, log e report errori, dump, `Windows.old`, ibernazione, WinSxS. Ubuntu: log ruotati e journal, pacchetti `.deb`, vecchi snap, crash, `/var/tmp`, `/var/backups`. Android: vecchi backup di WhatsApp, aggiornamenti scaricati, OBB e cartelle di app disinstallate, log dei produttori, backup, file già cestinati. Una sola password | i sicuri |
 | Claude, Codex & AI | `~/.claude` (sessioni, file-history, snapshot…), `~/.codex`, Claude Desktop, Cursor, VS Code, Windsurf, Hugging Face, Ollama, LM Studio | solo cache e sessioni con più di 30 giorni |
 | Cache da sviluppatore | Xcode DerivedData e DeviceSupport, npm, Yarn, pnpm, Bun, Gradle, Maven, Cargo, Go, CocoaPods, uv, Docker | cache sì, toolchain, archivi e VM no |
 | Dipendenze ricreabili | `node_modules`, venv, `target`, `.build`, `Pods`, `.next`… | progetti fermi da più di 60 giorni |
