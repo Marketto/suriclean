@@ -38,6 +38,12 @@ jobs:
           screencapture -x dist/screenshot-mac.png || true
           pkill -x SuriClean || true
 
+      - name: APFS layout (for the disk breakdown)
+        continue-on-error: true
+        run: |
+          diskutil info -plist /System/Volumes/Data | plutil -extract APFSContainerReference raw -
+          diskutil apfs list -plist | plutil -p - | grep -E '"(ContainerReference|Name|Roles|CapacityInUse)"|=> "(System|Data|VM|Preboot|Recovery)"' | head -40
+
       - name: Mount test
         run: |
           hdiutil attach dist/SuriClean.dmg -nobrowse -mountpoint /tmp/suri

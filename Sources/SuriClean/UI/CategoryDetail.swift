@@ -48,6 +48,9 @@ struct CategoryDetailView: View {
         let maxSize = max(l.map { $0.size }.max() ?? 1, 1)
         VStack(spacing: 0) {
             header(count: l.count)
+            if category == .diskMap && !model.diskBreakdown.isEmpty && model.results[category] != nil {
+                DiskBreakdownCard().padding(.horizontal, 24).padding(.bottom, 4)
+            }
             if model.results[category] == nil {
                 emptyState(scanned: false)
             } else if l.isEmpty {
@@ -286,5 +289,77 @@ struct ItemRow: View {
         .contentShape(Rectangle())
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hover = h } }
         .onTapGesture { withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { model.toggle(item) } }
+    }
+}
+
+
+struct DiskBreakdownCard: View {
+    @EnvironmentObject var model: AppModel
+
+    private func color(_ k: DiskSlice.Kind) -> Color {
+        switch k {
+        case .measured: return Theme.lemon
+        case .system: return Theme.sky
+        case .vm: return Theme.lilac
+        case .boot: return Theme.mint
+        case .hidden: return Theme.coral
+        case .other: return Theme.orange
+        }
+    }
+
+    var body: some View {
+        let slices = model.diskBreakdown
+        let total = max(slices.reduce(Int64(0)) { $0 + $1.size }, 1)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Dove sono tutti i GB? ☆").font(Theme.font(15, .heavy))
+                Text("occupati sul disco: \(Fmt.bytes(model.disk.used))").font(Theme.font(11.5, .bold)).opacity(0.55)
+                Spacer()
+            }
+            GeometryReader { g in
+                HStack(spacing: 2) {
+                    ForEach(slices) { sl in
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(color(sl.kind))
+                            .frame(width: max(4, (g.size.width - CGFloat(slices.count) * 2) * CGFloat(Double(sl.size) / Double(total))))
+                            .help("\(sl.name): \(Fmt.bytes(sl.size))")
+                    }
+                }
+            }
+            .frame(height: 16)
+            .clipShape(Capsule())
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 10, alignment: .topLeading)], alignment: .leading, spacing: 8) {
+                ForEach(slices) { sl in
+                    HStack(alignment: .top, spacing: 8) {
+                        Circle().fill(color(sl.kind)).frame(width: 10, height: 10).padding(.top, 4)
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 6) {
+                                Text(sl.name).font(Theme.font(12.5, .heavy))
+                                Text(Fmt.bytes(sl.size)).font(Theme.font(12.5, .heavy)).foregroundColor(color(sl.kind).darker)
+                            }
+                            Text(sl.note).font(Theme.font(10.5, .medium)).opacity(0.6).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            HStack(spacing: 10) {
+                if !model.diskMapIsFull {
+                    Button(action: { model.scanFullDisk() }) { Label("Misura tutto il disco", systemImage: "lock.shield.fill") }
+                        .buttonStyle(BubblyButtonStyle(color: Theme.orange))
+                }
+                if (model.snapshotCount ?? 0) > 0 {
+                    Button(action: { model.thinSnapshots() }) { Label("Assottiglia \(model.snapshotCount ?? 0) istantanee", systemImage: "clock.arrow.circlepath") }
+                        .buttonStyle(BubblyButtonStyle(color: Theme.sky))
+                }
+                if !model.hasFDA {
+                    Button(action: { model.openFDASettings() }) { Label("Accesso completo al disco", systemImage: "lock.open.fill") }
+                        .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
+                }
+                Spacer()
+            }
+            .disabled(model.busy != nil)
+        }
+        .padding(16)
+        .kawaiiCard(color: Theme.lemon)
     }
 }

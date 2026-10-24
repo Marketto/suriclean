@@ -35,6 +35,8 @@ final class AppModel: ObservableObject {
     private var stagedUpdate: URL?
 
     @Published var expandedRepos: Set<UUID> = []
+    @Published var diskBreakdown: [DiskSlice] = []
+    @Published var diskMapIsFull = false
     @Published var gitDetails: [URL: GitDetails] = [:]
     @Published var gitWorking: Set<URL> = []
 
@@ -366,6 +368,7 @@ final class AppModel: ObservableObject {
                 let found = await Task.detached(priority: .userInitiated) { Scanners.scan(cat, index: index, reporter: rep) }.value
                 if rep.isCancelled { break }
                 setResults(cat, found)
+                if cat == .diskMap { diskMapIsFull = false; refreshBreakdown() }
                 let bytes = found.totalSize
                 updateBusy { $0.foundCount += found.count; $0.foundBytes += bytes }
                 Chiptune.shared.sfx(.coin)
@@ -475,6 +478,8 @@ final class AppModel: ObservableObject {
             switch r {
             case .success(let list):
                 setResults(.diskMap, list)
+                diskMapIsFull = true
+                refreshBreakdown()
                 Chiptune.shared.mood = .results
                 Chiptune.shared.sfx(.coin)
                 showToast("Ecco tutto il disco, anche gli altri utenti ☆")
@@ -483,6 +488,15 @@ final class AppModel: ObservableObject {
                 Chiptune.shared.sfx(.error)
                 showToast((e as NSError).localizedDescription)
             }
+        }
+    }
+
+    func refreshBreakdown() {
+        let measured = displayTotal(.diskMap)
+        let label = diskMapIsFull ? "Dati misurati (tutti gli utenti)" : "La tua cartella Inizio"
+        Task {
+            let slices = await Task.detached(priority: .utility) { APFSInfo.breakdown(measured: measured, measuredLabel: label) }.value
+            diskBreakdown = slices
         }
     }
 
