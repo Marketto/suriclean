@@ -100,8 +100,30 @@ struct CategoryDetailView: View {
                     Text(category.explain)
                         .font(Theme.font(12.5, .medium)).opacity(0.68)
                         .fixedSize(horizontal: false, vertical: true)
+                    if model.results[category] != nil {
+                        Text("\(count) elementi · \(Fmt.bytes(model.displayTotal(category)))")
+                            .font(Theme.font(12.5, .heavy))
+                            .foregroundColor(category.color.darker)
+                            .padding(.top, 2)
+                    }
                 }
                 Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 10) {
+                    if category == .diskMap {
+                        Button(action: { model.scanFullDisk() }) {
+                            Label("Tutto il disco", systemImage: "lock.shield.fill")
+                        }
+                        .buttonStyle(BubblyButtonStyle(color: Theme.orange))
+                        .disabled(model.busy != nil)
+                        .help("Misura tutto il disco, compresi gli altri utenti e le cartelle di sistema (chiede la password una volta)")
+                    }
+                    Button(action: { model.rescan(category) }) {
+                        Label("Riscansiona", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(BubblyButtonStyle(color: Theme.sky))
+                    .disabled(model.busy != nil)
+                }
+                .padding(.top, 4)
                 MeerkatView(activity: category.activity, size: 96)
             }
             HStack(spacing: 10) {
@@ -111,7 +133,7 @@ struct CategoryDetailView: View {
                     Label("Albero", systemImage: "list.bullet.indent").tag(true)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 170)
+                .frame(width: 160)
                 .labelsHidden()
                 .onChange(of: treeView) { _ in Chiptune.shared.sfx(.pop) }
                 }
@@ -119,7 +141,7 @@ struct CategoryDetailView: View {
                     ForEach(SortMode.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 280)
+                .frame(width: 250)
                 .labelsHidden()
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").opacity(0.5)
@@ -127,24 +149,9 @@ struct CategoryDetailView: View {
                 }
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(Capsule().fill(Color.white.opacity(0.85)))
-                .frame(maxWidth: 260)
-                Spacer()
-                if model.results[category] != nil {
-                    Text("\(count) elementi · \(Fmt.bytes(model.displayTotal(category)))").font(Theme.font(12.5, .bold)).opacity(0.6)
-                }
-                if category == .diskMap {
-                    Button(action: { model.scanFullDisk() }) {
-                        Label("Tutto il disco 🔐", systemImage: "internaldrive.fill")
-                    }
-                    .buttonStyle(BubblyButtonStyle(color: Theme.orange))
-                    .disabled(model.busy != nil)
-                    .help("Misura tutto il disco, compresi gli altri utenti e le cartelle di sistema (chiede la password una volta)")
-                }
-                Button(action: { model.rescan(category) }) {
-                    Label("Riscansiona", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(BubblyButtonStyle(color: Theme.sky))
-                .disabled(model.busy != nil)
+                .frame(minWidth: 110, maxWidth: 240)
+                .layoutPriority(-1)
+                Spacer(minLength: 8)
             }
         }
         .padding(.horizontal, 24)

@@ -65,6 +65,8 @@ private struct BubblyBody: View {
     var body: some View {
         let pressed = configuration.isPressed
         configuration.label
+            .lineLimit(1)
+            .fixedSize()
             .font(Theme.font(big ? 18 : 13.5, .heavy))
             .foregroundColor(.white)
             .padding(.horizontal, big ? 28 : 16)
