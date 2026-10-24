@@ -8,7 +8,7 @@ struct DiskSlice: Identifiable {
     let size: Int64
     let note: String
     let kind: Kind
-    enum Kind { case measured, system, vm, boot, hidden, other }
+    enum Kind { case measured, system, vm, boot, hidden, purgeable, other }
 }
 
 enum APFSInfo {
@@ -32,7 +32,14 @@ enum APFSInfo {
         }
     }
 
-    static func breakdown(measured: Int64, measuredLabel: String) -> [DiskSlice] {
+    /// APFS snapshots of the data volume (Time Machine and other backup tools).
+    static func snapshots() -> [String] {
+        guard let d = plist(["apfs", "listSnapshots", "-plist", "/System/Volumes/Data"]),
+              let list = d["Snapshots"] as? [[String: Any]] else { return [] }
+        return list.compactMap { $0["SnapshotName"] as? String }
+    }
+
+    static func breakdown(measured: Int64, measuredLabel: String, purgeable: Int64 = 0, snapshots: [String] = [], denied: Int = 0) -> [DiskSlice] {
         let vols = volumes()
         guard !vols.isEmpty else { return [] }
         var out = [DiskSlice(name: measuredLabel, size: measured, note: "le cartelle che vedi qui sotto", kind: .measured)]
@@ -40,9 +47,18 @@ enum APFSInfo {
         for v in vols {
             if v.roles.contains("Data") {
                 let hidden = max(0, v.used - measured)
-                out.append(DiskSlice(name: "Invisibile alla mappa", size: hidden,
-                                     note: "istantanee Time Machine locali, file protetti da macOS, spazio «purgeable» e (se hai misurato solo la tua cartella) gli altri utenti e il sistema",
-                                     kind: .hidden))
+                let purge = min(hidden, max(0, purgeable))
+                if purge > 0 {
+                    out.append(DiskSlice(name: "Spazio purgeable", size: purge,
+                                         note: "copie locali di iCloud e cache che macOS libera da solo quando serve spazio", kind: .purgeable))
+                }
+                var why: [String] = []
+                if !snapshots.isEmpty { why.append("\(snapshots.count) istantanee APFS che tengono vivi file già cancellati") }
+                if denied > 0 { why.append("\(denied) cartelle protette che macOS non ha lasciato leggere") }
+                if measuredLabel.contains("Inizio") { why.append("gli altri utenti e le cartelle di sistema (usa «Misura tutto il disco»)") }
+                if why.isEmpty { why.append("metadati del file system e file aperti ma già cancellati") }
+                out.append(DiskSlice(name: "Non misurabile", size: hidden - purge,
+                                     note: why.joined(separator: " · "), kind: .hidden))
             } else if v.roles.contains("System") {
                 out.append(DiskSlice(name: "macOS (\(v.name))", size: v.used, note: "il sistema operativo, sigillato: non si tocca", kind: .system))
             } else if v.roles.contains("VM") {

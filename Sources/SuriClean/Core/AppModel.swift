@@ -37,6 +37,8 @@ final class AppModel: ObservableObject {
     @Published var expandedRepos: Set<UUID> = []
     @Published var diskBreakdown: [DiskSlice] = []
     @Published var diskMapIsFull = false
+    @Published var deniedPaths: [String] = []
+    @Published var snapshotNames: [String] = []
     enum Scope { case me, all }
     @Published var scope: Scope = .all
     @Published var fullScanDone = false
@@ -401,6 +403,7 @@ final class AppModel: ObservableObject {
                 let full = await Task.detached(priority: .userInitiated) { HelperMode.fullScan(rep) }.value
                 if let e = full.error { showToast(e) }
                 if !full.map.isEmpty {
+                    deniedPaths = full.denied
                     setResults(.diskMap, full.map)
                     diskMapIsFull = true
                     refreshBreakdown()
@@ -517,7 +520,8 @@ final class AppModel: ObservableObject {
             busy = nil
             reporter = nil
             switch r {
-            case .success(let list):
+            case .success(let (list, denied)):
+                deniedPaths = denied
                 setResults(.diskMap, list)
                 diskMapIsFull = true
                 refreshBreakdown()
@@ -535,9 +539,50 @@ final class AppModel: ObservableObject {
     func refreshBreakdown() {
         let measured = displayTotal(.diskMap)
         let label = diskMapIsFull ? "Dati misurati (tutti gli utenti)" : "La tua cartella Inizio"
+        let purgeable = DiskInfo.current().purgeable
+        let denied = diskMapIsFull ? deniedPaths.count : 0
+        if !diskMapIsFull { deniedPaths = [] }
         Task {
-            let slices = await Task.detached(priority: .utility) { APFSInfo.breakdown(measured: measured, measuredLabel: label) }.value
+            let snaps = await Task.detached(priority: .utility) { APFSInfo.snapshots() }.value
+            snapshotNames = snaps
+            let slices = await Task.detached(priority: .utility) {
+                APFSInfo.breakdown(measured: measured, measuredLabel: label, purgeable: purgeable, snapshots: snaps, denied: denied)
+            }.value
             diskBreakdown = slices
+        }
+    }
+
+    /// Deletes local APFS snapshots of the data volume with one password (system-update ones are left alone).
+    func deleteSnapshots() {
+        guard busy == nil else { return }
+        let names = snapshotNames.filter { !$0.hasPrefix("com.apple.os.update") }
+        guard !names.isEmpty else { return }
+        busy = BusyState(activity: .sweeping, title: "Via le istantanee, pika-pika! ⏳", progress: nil)
+        Chiptune.shared.mood = .cleaning
+        let before = DiskInfo.current().availableImportant
+        Task {
+            let ok = await Task.detached(priority: .userInitiated) { () -> Bool in
+                func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+                var lines = ["#!/bin/bash", "/usr/bin/tmutil deletelocalsnapshots / >/dev/null 2>&1"]
+                for n in names { lines.append("/usr/sbin/diskutil apfs deleteSnapshot /System/Volumes/Data -name \(q(n)) >/dev/null 2>&1") }
+                let script = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-snap.sh")
+                try? lines.joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)
+                defer { try? FileManager.default.removeItem(at: script) }
+                let r = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"/bin/bash \(script.path)\" with administrator privileges with prompt \"SuriClean vuole eliminare le istantanee locali del disco.\""])
+                return r.status == 0
+            }.value
+            busy = nil
+            try? await Task.sleep(nanoseconds: 2_000_000_000)   // APFS frees space asynchronously
+            refreshDisk()
+            refreshSnapshots()
+            refreshBreakdown()
+            let freed = max(0, disk.availableImportant - before)
+            if ok {
+                celebrate(Celebration(kind: .info, bytes: freed, message: "Istantanee locali eliminate. macOS potrebbe impiegare qualche minuto a restituire tutto lo spazio."))
+            } else {
+                Chiptune.shared.mood = .menu
+                showToast("Non sono riuscita a eliminare le istantanee")
+            }
         }
     }
 

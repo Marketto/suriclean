@@ -306,6 +306,8 @@ struct ItemRow: View {
 
 struct DiskBreakdownCard: View {
     @EnvironmentObject var model: AppModel
+    @State private var confirmSnaps = false
+    @State private var showDenied = false
 
     private func color(_ k: DiskSlice.Kind) -> Color {
         switch k {
@@ -314,6 +316,7 @@ struct DiskBreakdownCard: View {
         case .vm: return Theme.lilac
         case .boot: return Theme.mint
         case .hidden: return Theme.coral
+        case .purgeable: return Theme.peach
         case .other: return Theme.orange
         }
     }
@@ -358,9 +361,11 @@ struct DiskBreakdownCard: View {
                     Button(action: { model.scanFullDisk() }) { Label("Misura tutto il disco", systemImage: "lock.shield.fill") }
                         .buttonStyle(BubblyButtonStyle(color: Theme.orange))
                 }
-                if (model.snapshotCount ?? 0) > 0 {
-                    Button(action: { model.thinSnapshots() }) { Label("Assottiglia \(model.snapshotCount ?? 0) istantanee", systemImage: "clock.arrow.circlepath") }
-                        .buttonStyle(BubblyButtonStyle(color: Theme.sky))
+                if model.snapshotNames.contains(where: { !$0.hasPrefix("com.apple.os.update") }) {
+                    Button(action: { Chiptune.shared.sfx(.pop); confirmSnaps = true }) {
+                        Label("Elimina \(model.snapshotNames.count) istantanee", systemImage: "clock.arrow.circlepath")
+                    }
+                    .buttonStyle(BubblyButtonStyle(color: Theme.sky))
                 }
                 if !model.hasFDA {
                     Button(action: { model.openFDASettings() }) { Label("Accesso completo al disco", systemImage: "lock.open.fill") }
@@ -369,8 +374,39 @@ struct DiskBreakdownCard: View {
                 Spacer()
             }
             .disabled(model.busy != nil)
+            if !model.deniedPaths.isEmpty {
+                Button(action: { withAnimation(.spring(response: 0.3)) { showDenied.toggle() } }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .heavy))
+                            .rotationEffect(.degrees(showDenied ? 90 : 0))
+                        Text("🔒 \(model.deniedPaths.count) cartelle che macOS non ha lasciato leggere")
+                            .font(Theme.font(12, .heavy))
+                    }
+                }
+                .buttonStyle(.plain)
+                if showDenied {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(model.deniedPaths.prefix(15)), id: \.self) { p in
+                            Text(p).font(.system(size: 11, design: .monospaced)).opacity(0.7).lineLimit(1).truncationMode(.middle)
+                        }
+                        if model.deniedPaths.count > 15 {
+                            Text("…e altre \(model.deniedPaths.count - 15)").font(Theme.font(11, .bold)).opacity(0.5)
+                        }
+                        Text("Sono protette dalla privacy di macOS anche per l'amministratore. Se c'è la tua cartella, controlla che SuriClean abbia l'Accesso completo al disco (dopo un aggiornamento macOS a volte lo chiede di nuovo: togli e rimetti la spunta). Quelle degli altri utenti puoi controllarle solo entrando col loro account.")
+                            .font(Theme.font(11, .medium)).opacity(0.6).fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
+                    }
+                    .padding(.leading, 18)
+                }
+            }
         }
         .padding(16)
         .kawaiiCard(color: Theme.lemon)
+        .alert("Eliminare le istantanee locali?", isPresented: $confirmSnaps) {
+            Button("Annulla", role: .cancel) {}
+            Button("Sì, eliminale", role: .destructive) { model.deleteSnapshots() }
+        } message: {
+            Text("Sono copie del disco fatte da Time Machine o da altri programmi di backup: tengono occupato lo spazio dei file che hai già cancellato. I tuoi file attuali non vengono toccati e i backup sul disco esterno restano. Lascio stare quelle degli aggiornamenti di macOS.\n\n" + model.snapshotNames.prefix(6).joined(separator: "\n") + (model.snapshotNames.count > 6 ? "\n…" : ""))
+        }
     }
 }

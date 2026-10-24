@@ -258,18 +258,34 @@ enum Scanners {
     }
 
     /// Whole data volume, every user included. Needs the admin password once (runs `du` as root).
-    static func diskMapFull(_ rep: Reporter) -> Result<[CleanItem], Error> {
+    static func diskMapFull(_ rep: Reporter) -> Result<([CleanItem], [String]), Error> {
         let root = "/System/Volumes/Data"
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-du-\(Int(Date().timeIntervalSince1970)).txt")
-        let cmd = "/usr/bin/du -x -k -d 4 '\(root)' > '\(out.path)' 2>/dev/null; /bin/chmod 644 '\(out.path)'"
+        let err = out.appendingPathExtension("err")
+        let cmd = "/usr/bin/du -x -k -d 4 '\(root)' > '\(out.path)' 2> '\(err.path)'; /bin/chmod 644 '\(out.path)' '\(err.path)'"
         rep.report("Misuro tutto il disco, anche gli altri utenti… (qualche minuto) 🔐", force: true)
         let r = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(cmd)\" with administrator privileges with prompt \"SuriClean vuole misurare tutto il disco, compresi gli altri utenti.\""], mergeStderr: true)
-        defer { try? FileManager.default.removeItem(at: out) }
+        defer { try? FileManager.default.removeItem(at: out); try? FileManager.default.removeItem(at: err) }
         guard let text = try? String(contentsOf: out, encoding: .utf8), !text.isEmpty else {
             let why = r.output.contains("-128") ? "Hai annullato la richiesta della password" : "Non sono riuscita a misurare il disco"
             return .failure(NSError(domain: "SuriClean", code: 2, userInfo: [NSLocalizedDescriptionKey: why]))
         }
-        return .success(parseDu(text))
+        return .success((parseDu(text), parseDuErrors((try? String(contentsOf: err, encoding: .utf8)) ?? "")))
+    }
+
+    /// Folders `du` could not read (macOS privacy protection), as shown paths, most relevant first.
+    static func parseDuErrors(_ text: String) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for line in text.split(separator: "\n") where line.contains("not permitted") || line.contains("Permission denied") {
+            var p = String(line)
+            if p.hasPrefix("du: ") { p = String(p.dropFirst(4)) }
+            if let r = p.range(of: ": ", options: .backwards) { p = String(p[..<r.lowerBound]) }
+            p = p.replacingOccurrences(of: "/System/Volumes/Data", with: "")
+            if p.isEmpty { p = "/" }
+            if seen.insert(p).inserted { out.append(p) }
+        }
+        return out.sorted { $0.split(separator: "/").count < $1.split(separator: "/").count }
     }
 
     /// Turns `du -k -d 4 /System/Volumes/Data` output into disk-map rows.

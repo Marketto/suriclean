@@ -54,6 +54,7 @@ enum HelperMode {
     struct FullResult {
         var map: [CleanItem] = []
         var others: [CleanCategory: [CleanItem]] = [:]
+        var denied: [String] = []
         var error: String?
     }
 
@@ -66,8 +67,9 @@ enum HelperMode {
         defer { try? fm.removeItem(at: work) }
         func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
         let duOut = work.appendingPathComponent("du.txt")
+        let duErr = work.appendingPathComponent("du-err.txt")
         var lines = ["#!/bin/bash",
-                     "/usr/bin/du -x -k -d 4 '/System/Volumes/Data' > \(q(duOut.path)) 2>/dev/null; /bin/chmod 644 \(q(duOut.path))"]
+                     "/usr/bin/du -x -k -d 4 '/System/Volumes/Data' > \(q(duOut.path)) 2> \(q(duErr.path)); /bin/chmod 644 \(q(duOut.path)) \(q(duErr.path))"]
         let homes = otherHomes()
         let exe = Bundle.main.executablePath ?? CommandLine.arguments[0]
         let cats = helperCategories.map { $0.rawValue }.joined(separator: ",")
@@ -90,6 +92,7 @@ enum HelperMode {
         }
         if let text = try? String(contentsOf: duOut, encoding: .utf8), !text.isEmpty {
             r.map = Scanners.parseDu(text)
+            r.denied = Scanners.parseDuErrors((try? String(contentsOf: duErr, encoding: .utf8)) ?? "")
         } else {
             r.error = "Non sono riuscita a misurare il disco"
         }
