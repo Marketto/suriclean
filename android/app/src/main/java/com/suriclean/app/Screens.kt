@@ -489,6 +489,9 @@ private fun Color.compositeOverWhite(): Color = Color(
 
 @Composable
 fun ConfirmDialog(title: String, text: String, ok: String, onDismiss: () -> Unit, onOk: () -> Unit) {
+    // a real window on top of everything: placed inline it ended up below the screen and never showed
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)).clickable(remember { MutableInteractionSource() }, null) { onDismiss() },
         contentAlignment = Alignment.Center) {
         Column(Modifier.padding(24.dp).kawaiiCard(Kawaii.coral, 30.dp).clickable(remember { MutableInteractionSource() }, null) {}.padding(22.dp),
@@ -501,6 +504,7 @@ fun ConfirmDialog(title: String, text: String, ok: String, onDismiss: () -> Unit
                 BubblyButton(ok, Kawaii.coral, onClick = onOk)
             }
         }
+    }
     }
 }
 
