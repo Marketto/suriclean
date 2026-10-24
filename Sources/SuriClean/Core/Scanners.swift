@@ -257,6 +257,48 @@ enum Scanners {
         return out
     }
 
+    /// Whole data volume, every user included. Needs the admin password once (runs `du` as root).
+    static func diskMapFull(_ rep: Reporter) -> Result<[CleanItem], Error> {
+        let root = "/System/Volumes/Data"
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-du-\(Int(Date().timeIntervalSince1970)).txt")
+        let cmd = "/usr/bin/du -x -k -d 4 '\(root)' > '\(out.path)' 2>/dev/null; /bin/chmod 644 '\(out.path)'"
+        rep.report("Misuro tutto il disco, anche gli altri utenti… (qualche minuto) 🔐", force: true)
+        let r = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(cmd)\" with administrator privileges with prompt \"SuriClean vuole misurare tutto il disco, compresi gli altri utenti.\""], mergeStderr: true)
+        defer { try? FileManager.default.removeItem(at: out) }
+        guard let text = try? String(contentsOf: out, encoding: .utf8), !text.isEmpty else {
+            let why = r.output.contains("-128") ? "Hai annullato la richiesta della password" : "Non sono riuscita a misurare il disco"
+            return .failure(NSError(domain: "SuriClean", code: 2, userInfo: [NSLocalizedDescriptionKey: why]))
+        }
+        let base = URL(fileURLWithPath: root).pathComponents.count
+        let me = FS.home.path
+        var items: [CleanItem] = []
+        for line in text.split(separator: "\n") {
+            let parts = line.split(separator: "\t", maxSplits: 1)
+            guard parts.count == 2, let kb = Int64(parts[0]) else { continue }
+            let path = String(parts[1])
+            let url = URL(fileURLWithPath: path)
+            let depth = url.pathComponents.count - base
+            let size = kb * 1024
+            let shown = path == root ? "/" : String(path.dropFirst(root.count))
+            var badges: [String] = []
+            if depth == 2 && shown.hasPrefix("/Users/") {
+                badges.append(("/System/Volumes/Data" + shown) == "/System/Volumes/Data" + me || shown == me ? "🐾 sei tu" : "👤 altro utente")
+            }
+            if shown.hasPrefix("/private/var/vm") { badges.append("🧠 memoria virtuale (macOS)") }
+            if shown.hasPrefix("/Library") || shown.hasPrefix("/private") || shown.hasPrefix("/usr") || shown.hasPrefix("/opt") { badges.append("⚙️ sistema") }
+            if depth == 0 {
+                items.append(CleanItem(url: url, name: "Disco intero (tutti gli utenti)", detail: "/", size: size, date: nil,
+                                       risk: .careful, recommended: false, badges: ["💽 tutto"]))
+                continue
+            }
+            let threshold: Int64 = depth == 1 ? 100 * 1_048_576 : 300 * 1_048_576
+            guard size >= threshold else { continue }
+            items.append(CleanItem(url: url, name: url.lastPathComponent, detail: shown, size: size, date: nil,
+                                   risk: .careful, recommended: false, badges: badges))
+        }
+        return .success(items)
+    }
+
     // MARK: app data
 
     static func appData(_ rep: Reporter) -> [CleanItem] {

@@ -132,6 +132,14 @@ struct CategoryDetailView: View {
                 if model.results[category] != nil {
                     Text("\(count) elementi · \(Fmt.bytes(model.displayTotal(category)))").font(Theme.font(12.5, .bold)).opacity(0.6)
                 }
+                if category == .diskMap {
+                    Button(action: { model.scanFullDisk() }) {
+                        Label("Tutto il disco 🔐", systemImage: "internaldrive.fill")
+                    }
+                    .buttonStyle(BubblyButtonStyle(color: Theme.orange))
+                    .disabled(model.busy != nil)
+                    .help("Misura tutto il disco, compresi gli altri utenti e le cartelle di sistema (chiede la password una volta)")
+                }
                 Button(action: { model.rescan(category) }) {
                     Label("Riscansiona", systemImage: "arrow.clockwise")
                 }

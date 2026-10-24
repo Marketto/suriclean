@@ -461,6 +461,31 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func scanFullDisk() {
+        guard busy == nil else { return }
+        let rep = Reporter()
+        reporter = rep
+        busy = BusyState(activity: .lookout, title: "Misuro tutto il disco, kira-kira! 💽", progress: nil)
+        rep.onUpdate = { [weak self] text, _ in self?.updateBusy { $0.detail = text } }
+        Chiptune.shared.mood = .scanning
+        Task {
+            let r = await Task.detached(priority: .userInitiated) { Scanners.diskMapFull(rep) }.value
+            busy = nil
+            reporter = nil
+            switch r {
+            case .success(let list):
+                setResults(.diskMap, list)
+                Chiptune.shared.mood = .results
+                Chiptune.shared.sfx(.coin)
+                showToast("Ecco tutto il disco, anche gli altri utenti ☆")
+            case .failure(let e):
+                Chiptune.shared.mood = .menu
+                Chiptune.shared.sfx(.error)
+                showToast((e as NSError).localizedDescription)
+            }
+        }
+    }
+
     func thinSnapshots() {
         guard busy == nil else { return }
         busy = BusyState(activity: .sweeping, title: "Dieta per Time Machine! ⏳", progress: nil)

@@ -184,29 +184,37 @@ enum Cleaner {
         let fm = FileManager.default
         var repoLog: [String] = []
         let stamp = ISO8601DateFormatter().string(from: Date())
+        var protected: [CleanItem] = []
+
+        func done(_ item: CleanItem) {
+            for extra in item.extraURLs where fm.fileExists(atPath: extra.path) {
+                try? fm.trashItem(at: extra, resultingItemURL: nil)
+            }
+            o.removed.append(item.id)
+            o.removedURLs.append(item.url)
+            o.bytes += item.size
+            if let c = item.copyText { repoLog.append("# \(item.url.path)  (rimosso \(stamp))\n\(c)") }
+        }
+
         for (i, item) in items.enumerated() {
             if reporter.isCancelled { break }
-            reporter.report(item.name, progress: Double(i) / Double(max(items.count, 1)), force: true)
+            reporter.report(item.name, progress: Double(i) / Double(max(items.count, 1)) * 0.8, force: true)
             if !fm.fileExists(atPath: item.url.path) {
                 o.removed.append(item.id)        // already gone (e.g. inside a repo removed earlier)
                 continue
             }
-            var ok = (try? fm.trashItem(at: item.url, resultingItemURL: nil)) != nil
-            if !ok {
-                // Admin-owned items (App Store apps, pkg installs): let Finder do it, it asks for the password.
-                reporter.report("Il Finder potrebbe chiederti la password per \(item.name)…", force: true)
-                ok = finderTrash(item.url) && !fm.fileExists(atPath: item.url.path)
-            }
-            if ok {
-                for extra in item.extraURLs where fm.fileExists(atPath: extra.path) {
-                    if (try? fm.trashItem(at: extra, resultingItemURL: nil)) == nil { _ = finderTrash(extra) }
-                }
-                o.removed.append(item.id)
-                o.removedURLs.append(item.url)
-                o.bytes += item.size
-                if let c = item.copyText { repoLog.append("# \(item.url.path)  (rimosso \(stamp))\n\(c)") }
+            if (try? fm.trashItem(at: item.url, resultingItemURL: nil)) != nil {
+                done(item)
             } else {
-                o.failed.append(item.name)
+                protected.append(item)           // admin-owned: handled all together below
+            }
+        }
+
+        if !protected.isEmpty && !reporter.isCancelled {
+            reporter.report("Una sola password per \(protected.count) \(protected.count == 1 ? "elemento protetto" : "elementi protetti")… 🔐", progress: 0.85, force: true)
+            adminTrash(protected.map { $0.url })
+            for item in protected {
+                if fm.fileExists(atPath: item.url.path) { o.failed.append(item.name) } else { done(item) }
             }
         }
         FS.appendToRepoLog(repoLog)
@@ -214,30 +222,42 @@ enum Cleaner {
         return o
     }
 
-    /// Moves an item to the Trash through Finder (same as dragging it there, password prompt included).
-    static func finderTrash(_ url: URL) -> Bool {
-        let escaped = url.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let r = Shell.run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"])
-        return r.status == 0
+    /// Moves admin-owned items into the user's Trash with ONE password prompt,
+    /// giving them back to the user so the Trash can be emptied normally.
+    static func adminTrash(_ urls: [URL]) {
+        func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        let trash = FS.trashURL.path
+        let user = NSUserName()
+        let stamp = Int(Date().timeIntervalSince1970)
+        var lines = ["#!/bin/bash", "mkdir -p \(q(trash))"]
+        for (i, u) in urls.enumerated() {
+            let base = u.deletingPathExtension().lastPathComponent
+            let dest = trash + "/" + base + " \(stamp)-\(i)" + (u.pathExtension.isEmpty ? "" : "." + u.pathExtension)
+            lines.append("/usr/sbin/chown -R \(q(user)) \(q(u.path)) 2>/dev/null; /bin/mv \(q(u.path)) \(q(dest))")
+        }
+        let script = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-admin-\(stamp).sh")
+        guard (try? lines.joined(separator: "\n").write(to: script, atomically: true, encoding: .utf8)) != nil else { return }
+        let cmd = "/bin/bash " + q(script.path)
+        let escaped = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        _ = Shell.run("/usr/bin/osascript", ["-e", "do shell script \"\(escaped)\" with administrator privileges with prompt \"SuriClean vuole spostare nel Cestino \(urls.count) elementi protetti.\""])
+        try? FileManager.default.removeItem(at: script)
     }
 
     @discardableResult
     static func emptyTrash() -> Bool {
+        // Same as Finder › Empty Trash: fast and it handles protected items itself.
+        let r = Shell.run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to empty trash"])
         let fm = FileManager.default
+        let left = (try? fm.contentsOfDirectory(atPath: FS.trashURL.path))?.filter { $0 != ".DS_Store" } ?? []
+        if r.status == 0 && left.isEmpty { return true }
+        // Fallback (no permission to talk to Finder): remove what we can ourselves.
         var allOK = true
-        if let kids = try? fm.contentsOfDirectory(at: FS.trashURL, includingPropertiesForKeys: nil, options: []) {
-            for k in kids {
-                if (try? fm.removeItem(at: k)) == nil {
-                    // e.g. Go modules are read-only
-                    _ = Shell.run("/bin/chmod", ["-R", "u+w", k.path])
-                    if (try? fm.removeItem(at: k)) == nil { allOK = false }
-                }
+        for name in left {
+            let k = FS.trashURL.appendingPathComponent(name)
+            if Shell.run("/bin/rm", ["-rf", k.path]).status != 0 || fm.fileExists(atPath: k.path) {
+                _ = Shell.run("/bin/chmod", ["-R", "u+w", k.path])
+                if Shell.run("/bin/rm", ["-rf", k.path]).status != 0 { allOK = false }
             }
-        } else {
-            allOK = false
-        }
-        if !allOK {
-            _ = Shell.run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to empty trash"])
         }
         return allOK
     }

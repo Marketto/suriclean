@@ -12,9 +12,9 @@
       {
         "title": "SuriClean",
         "width": 1180,
-        "height": 780,
+        "height": 720,
         "minWidth": 1000,
-        "minHeight": 660,
+        "minHeight": 600,
         "center": true
       }
     ],
