@@ -75,5 +75,8 @@
  "site.tagline_html": "La suricata kawaii che <mark>scava nel tuo disco</mark> e trova i GB sprecati: cache, duplicati, repo git dimenticati, dati di Claude e Codex… <mark>Tu decidi, lei spazza!</mark> 🧹✨",
  "site.title": "SuriClean · la suricata spazzina ☆",
  "site.version_note": "Versione più recente da GitHub · open source · nessun abbonamento, nessuna pubblicità",
- "site.version_note_v": "Versione {0} · open source · nessun abbonamento, nessuna pubblicità"
+ "site.version_note_v": "Versione {0} · open source · nessun abbonamento, nessuna pubblicità",
+ "site.share": "Condividi",
+ "site.share_text": "SuriClean: la suricata kawaii che libera spazio su Mac, Windows, Ubuntu e Android. Gratis e open source ♡",
+ "site.share_copied": "Link copiato! ♡"
 }

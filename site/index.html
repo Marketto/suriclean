@@ -50,6 +50,8 @@
   .downloads { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
   .dl { --c: var(--pink); display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: #fff; background: var(--c); padding: 14px 22px; border-radius: 22px; font-weight: 900; box-shadow: 0 6px 0 color-mix(in srgb, var(--c) 70%, #000); transition: transform .2s cubic-bezier(.3,1.7,.5,1); position: relative; }
   .dl::after { content: ""; position: absolute; left: 14px; right: 14px; top: 4px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.3); }
+  .share { margin-top: 14px; border: 0; font: inherit; font-weight: 900; font-size: 15px; color: var(--cocoa); background: #fff; padding: 10px 18px; border-radius: 99px; box-shadow: 0 4px 0 rgba(108,178,255,.5); cursor: pointer; transition: transform .2s cubic-bezier(.3,1.7,.5,1); }
+  .share:hover { transform: translateY(-2px) scale(1.06) rotate(1deg); }
   .dl:hover { transform: translateY(-3px) scale(1.05) rotate(-1deg); }
   .dl:active { transform: translateY(4px); box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 70%, #000); }
   .dl .os { font-size: 30px; }
@@ -112,6 +114,7 @@
       <h1>SuriClean<span class="jp">スリクリーン ♡ pika-pika!</span></h1>
       <p class="tagline" data-i18n-html="site.tagline_html"></p>
       <div class="downloads" id="downloads"></div>
+      <button class="share" id="share">🔗 <span data-i18n="site.share"></span></button>
       <div class="tiny" id="version-note"></div>
     </div>
     <div class="suri-stage">
@@ -269,6 +272,22 @@
     else if (Chiptune.muted) { Chiptune.setMuted(false); btn.classList.add("on"); }
     else { Chiptune.setMuted(true); btn.classList.remove("on"); }
     musicLabels();
+  });
+
+  // share: the system share sheet where there is one, otherwise copy the link
+  document.getElementById("share").addEventListener("click", async () => {
+    const data = { title: "SuriClean", text: t("site.share_text"), url: location.origin + location.pathname };
+    try {
+      if (navigator.share) { await navigator.share(data); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(data.url); } catch (e) {
+      const ta = document.createElement("textarea"); ta.value = data.url; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch (e2) {} ta.remove();
+    }
+    const span = document.querySelector("#share span");
+    span.textContent = t("site.share_copied");
+    if (window.Chiptune && Chiptune.running) Chiptune.sfx("coin");
+    setTimeout(() => span.textContent = t("site.share"), 2200);
   });
 
   // language
