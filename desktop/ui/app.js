@@ -20,6 +20,7 @@
     { id: "gitRepos", icon: "🌿", color: C.coral, risk: "review", act: "reading" },
     { id: "duplicates", icon: "👯", color: C.lilac, risk: "review", act: "detective" },
     { id: "bigFiles", icon: "🦖", color: C.pink, risk: "careful", act: "digging" },
+    { id: "squeeze", icon: "🗜️", color: C.lilac, risk: "safe", act: "lookout", squeeze: true },
     { id: "installers", icon: "💿", color: C.sky, risk: "safe", act: "lookout" },
     { id: "oldDownloads", icon: "📥", color: C.mint, risk: "review", act: "lookout" },
   ];
@@ -54,7 +55,12 @@
     tree: localStorage.getItem("suri.tree") === "1", sort: "size", query: "", expanded: new Set(),
     busy: null, trash: 0, muted: localStorage.getItem("suri.muted") === "1",
     freed: Number(localStorage.getItem("suri.freed") || 0), stepBase: 0, steps: 1,
+    sqLevel: store("suri.sqLevel") || "soft", sqTypes: new Set((store("suri.sqTypes") || "pdf,jpg,video").split(",").filter(Boolean)),
+    canVideo: null, press: "",
   };
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
+  }
 
   // ───────── format ─────────
   function bytes(b) {
@@ -66,8 +72,9 @@
   const items = id => S.results[id] || [];
   const total = list => list.reduce((a, b) => a + b.size, 0);
   const displayTotal = id => id === "diskMap" ? Math.max(0, ...items(id).map(i => i.size)) : total(items(id));
-  const foundTotal = () => CATS.filter(c => !c.view).reduce((a, c) => a + total(items(c.id)), 0);
-  const recTotal = () => CATS.filter(c => !c.view).reduce((a, c) => a + total(items(c.id).filter(i => i.recommended)), 0);
+  // "squeeze" lists files to make lighter, not space to free: it stays out of the totals
+  const foundTotal = () => CATS.filter(c => !c.view && !c.squeeze).reduce((a, c) => a + total(items(c.id)), 0);
+  const recTotal = () => CATS.filter(c => !c.view && !c.squeeze).reduce((a, c) => a + total(items(c.id).filter(i => i.recommended)), 0);
   const sfx = k => Chiptune.sfx(k);
 
   function toast(msg) {
@@ -222,6 +229,7 @@
         <div class="card tips"><h3>${esc(t("web.tips.title"))}</h3>
           <div class="tip" style="--c:${C.coral}"><div class="ic">🗑️</div><div class="txt"><b>${esc(trashName)}</b><span>${esc(t("web.tips.trash_note"))}</span></div><div class="val">${bytes(S.trash)}</div>${S.trash ? `<button class="btn" style="--c:${C.coral}" data-act="askEmpty">${esc(t("web.tips.empty"))}</button>` : ""}</div>
           <div class="tip" style="--c:${C.mint}"><div class="ic">🔄</div><div class="txt"><b>${esc(t("web.tips.refresh"))}</b><span>${esc(t("web.tips.refresh_note"))}</span></div><button class="btn" style="--c:${C.mint}" data-act="refresh">${esc(t("web.tips.refresh_btn"))}</button></div>
+          ${items("squeeze").length ? `<div class="tip" style="--c:${C.lilac}"><div class="ic">🗜️</div><div class="txt"><b>${esc(t("web.squeeze.tip", nItems(items("squeeze").length)))}</b><span>${esc(t("web.squeeze.tip_note", bytes(total(items("squeeze")))))}</span></div><button class="btn" style="--c:${C.lilac}" data-open="squeeze">${esc(t("web.squeeze.tip_btn"))}</button></div>` : ""}
           ${S.adminDone ? "" : `<div class="tip" style="--c:${C.orange}"><div class="ic">🔑</div><div class="txt"><b>${esc(t("web.tips.admin"))}</b><span>${esc(t("web.tips.admin_note"))}</span></div><button class="btn" style="--c:${C.orange}" data-act="admin">${esc(t("web.tips.admin_btn"))}</button></div>`}
           ${S.platform === "windows" ? `<div class="tip" style="--c:${C.sky}"><div class="ic">🪟</div><div class="txt"><b>${esc(t("web.tips.cleanmgr"))}</b><span>${esc(t("web.tips.cleanmgr_note"))}</span></div><button class="btn" style="--c:${C.sky}" data-act="cleanmgr">${esc(t("web.tips.open"))}</button></div>` :
           `<div class="tip" style="--c:${C.sky}"><div class="ic">🐧</div><div class="txt"><b>${esc(t("web.tips.pkgs"))}</b><span>${esc(t("web.tips.pkgs_note", "\u0000", "\u0001")).replace("\u0000", "<code>sudo apt autoremove && sudo apt clean</code>").replace("\u0001", "<code>flatpak uninstall --unused</code>")}</span></div></div>`}
@@ -324,8 +332,13 @@
     return `<div class="tree-tools"><button class="btn" style="--c:${C.sky}" data-act="expandAll">${esc(t("web.tree.expand"))}</button><button class="btn" style="--c:${C.lilac}" data-act="collapseAll">${esc(t("web.tree.collapse"))}</button></div>` + rows.join("");
   }
 
+  /** Squeeze zone: only the kinds chosen with the chips (videos only where the webview can encode them). */
+  const sqKind = it => (window.Motore ? Motore.kindOf(it.path) : null);
+  const sqVisible = () => items("squeeze").filter(i => S.sqTypes.has(sqKind(i)) && (sqKind(i) !== "video" || S.canVideo));
+  const catItems = cat => cat.squeeze ? sqVisible() : items(cat.id);
+
   function listHTML(cat) {
-    const l = sorted(items(cat.id));
+    const l = sorted(catItems(cat));
     if (!S.results[cat.id]) return `<div class="empty"><div class="suri-empty" data-suri="${cat.act}"></div><h3>${esc(t("web.list.unknown"))}</h3><button class="btn big" style="--c:${cat.color}" data-act="rescan">${esc(t("web.list.explore"))}</button></div>`;
     if (!l.length) return `<div class="empty"><div class="suri-empty" data-suri="celebrating"></div><h3>${esc(t("web.list.empty"))}</h3></div>`;
     const selectable = !cat.view;
@@ -341,6 +354,13 @@
   }
 
   function footerHTML(cat) {
+    if (cat.squeeze) {
+      const sel = catItems(cat).filter(i => S.sel.has(i.id));
+      return `<div class="footer" style="--c:${cat.color}"><div class="selinfo"><small>${esc(t("web.footer.selected", sel.length))}</small><b>${bytes(total(sel))}</b></div><span class="sp"></span>
+      <button class="btn" style="--c:${C.mint}" data-act="selAll">${esc(t("web.footer.all"))}</button>
+      <button class="btn" style="--c:${C.lilac}" data-act="selNone">${esc(t("web.footer.none"))}</button>
+      <button class="btn big" style="--c:${C.lilac}" data-act="askSqueeze" ${sel.length && !S.busy && window.Motore ? "" : "disabled"}>${esc(t("web.squeeze.go"))}</button></div>`;
+    }
     if (cat.view) return `<div class="footer" style="--c:${cat.color}"><span class="hint">${esc(t("web.footer.map_hint"))}</span><span class="sp"></span><b>${esc(t("web.footer.used", bytes(S.disk.total - S.disk.free)))}</b></div>`;
     const sel = items(cat.id).filter(i => S.sel.has(i.id));
     return `<div class="footer" style="--c:${cat.color}"><div class="selinfo"><small>${esc(t("web.footer.selected", sel.length))}</small><b>${bytes(total(sel))}</b></div><span class="sp"></span>
@@ -362,7 +382,7 @@
         <span class="count" id="count"></span>
         <button class="btn" style="--c:${C.sky}" data-act="rescan" ${S.busy ? "disabled" : ""}>${esc(t("web.detail.rescan"))}</button>
         ${["diskMap", "systemAreas"].includes(cat.id) ? `<button class="btn" style="--c:${C.orange}" data-act="admin" ${S.busy ? "disabled" : ""}>${esc(t("web.detail.admin"))}</button>` : ""}
-      </div></div>
+      </div>${cat.squeeze ? squeezeControls() : ""}</div>
       <div class="list" id="list"></div><div id="footer"></div>`;
     Suri.setActivity($("#suri-head"), cat.act);
     $("#q").addEventListener("input", e => { S.query = e.target.value; renderList(); });
@@ -376,7 +396,7 @@
     list.scrollTop = top;
     list.querySelectorAll("[data-suri]").forEach(el => Suri.setActivity(el, el.dataset.suri));
     $("#footer").innerHTML = footerHTML(cat);
-    $("#count").textContent = S.results[cat.id] ? `${nItems(items(cat.id).length)} · ${bytes(displayTotal(cat.id))}` : "";
+    $("#count").textContent = S.results[cat.id] ? `${nItems(catItems(cat).length)} · ${bytes(cat.squeeze ? total(catItems(cat)) : displayTotal(cat.id))}` : "";
   }
 
   function render() {
@@ -600,6 +620,139 @@
     S.sort = id === "oldDownloads" ? "date" : "size";
     render();
     if (id && !S.results[id] && !S.busy) runScan([id]);
+    if (id === "squeeze" && S.canVideo === null) probeVideo();
+  }
+
+  // ───────── Schiaccia (docs/SCHIACCIA.md) ─────────
+  async function probeVideo() {
+    S.canVideo = false;
+    if (!window.Motore) return;
+    try { S.canVideo = await Motore.canVideo(); } catch (e) { S.canVideo = false; }
+    if (S.view === "squeeze") renderDetail();
+  }
+
+  function squeezeControls() {
+    if (!window.Motore) return `<div class="sq-controls"><span class="hint">${esc(t("web.squeeze.no_engine"))}</span></div>`;
+    const chip = k => {
+      const off = k === "video" && !S.canVideo;
+      return `<button class="chip ${S.sqTypes.has(k) && !off ? "on" : ""} ${off ? "off" : ""}" data-sqtype="${k}" title="${off ? esc(t("web.squeeze.video_off")) : ""}">${esc(t(`web.squeeze.type.${k}`))}</button>`;
+    };
+    const lv = k => `<button class="${S.sqLevel === k ? "on" : ""}" data-sqlevel="${k}">${esc(t(`web.squeeze.level.${k}`))}</button>`;
+    return `<div class="sq-controls">
+      <span class="sq-label">${esc(t("web.squeeze.types"))}</span>${["pdf", "jpg", "video"].map(chip).join("")}
+      <span class="sq-label">${esc(t("web.squeeze.how"))}</span><div class="seg">${Motore.levels.map(lv).join("")}</div>
+      <span class="hint">${esc(t(`web.squeeze.level.${S.sqLevel}_note`))}</span>
+      <span class="sq-credit">${esc(t("web.squeeze.credit", Motore.version))}</span></div>`;
+  }
+
+  const KIND_TAG = { pdf: "PDF", jpg: "JPG", video: "MP4" };
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const baseName = p => p.split(/[\\/]/).pop();
+
+  function sqOverlay() {
+    const ov = document.createElement("div"); ov.className = "ov sq"; ov.id = "sq";
+    ov.innerHTML = `<div class="card panel sq-panel"><h3>${esc(t("web.squeeze.title"))}</h3>
+      <div class="sq-stage" id="sq-stage"><div class="sq-suri" id="sq-suri"></div><div class="sq-file" id="sq-file"></div>
+        <div class="sq-press">${S.press}</div><div class="sq-badge" id="sq-badge"></div></div>
+      <div class="pdetail" id="sq-name"> </div><div class="progress" id="sq-prog"><i></i></div>
+      <div class="hint" id="sq-count"></div><div class="hint" id="sq-saved"></div>
+      <button class="btn" style="--c:${C.lilac}" data-act="sqCancel">${esc(t("web.cancel"))}</button></div>`;
+    $("#overlay").appendChild(ov);
+    Suri.mount($("#sq-suri"), "lookout");
+  }
+
+  function sqUpdate() {
+    const q = S.sq; if (!q || !$("#sq")) return;
+    $("#sq-name").textContent = q.cur ? `${q.cur.name} · ${q.phase === "work" ? t("web.squeeze.working", Math.round(q.pct)) : q.phase === "save" ? t("web.squeeze.saving") : t("web.squeeze.reading")}` : " ";
+    $("#sq-prog").firstElementChild.style.width = `${Math.max(3, ((q.n - 1) + q.pct / 100) / q.N * 100)}%`;
+    $("#sq-count").textContent = t("web.squeeze.count", q.n, q.N);
+    $("#sq-saved").textContent = q.saved ? t("web.squeeze.saved", bytes(q.saved)) : "";
+  }
+
+  /** «Il corriere»: Suri runs the file to the press, which squashes it; the thin file flies off with the saving. */
+  async function sqPhase(name, kind, badge) {
+    const st = $("#sq-stage"); if (!st) return;
+    const sv = $("#sq-suri"), file = $("#sq-file"), b = $("#sq-badge");
+    if (name === "run") {
+      st.className = "sq-stage"; void st.offsetWidth;
+      file.textContent = KIND_TAG[kind] || "PDF"; file.dataset.kind = kind || "pdf"; b.textContent = "";
+      Suri.setActivity(sv, "lookout"); st.classList.add("run"); await wait(850);
+      st.classList.add("work"); Suri.setActivity(sv, "celebrating");
+    } else if (name === "slam") {
+      st.classList.remove("work"); st.classList.add("slam"); sfx("whoosh"); await wait(420);
+      b.textContent = badge; b.className = "sq-badge good"; st.classList.add("fly"); sfx("coin"); await wait(900);
+    } else if (name === "skip") {
+      st.classList.remove("work"); b.textContent = badge; b.className = "sq-badge meh"; st.classList.add("skip"); Suri.setActivity(sv, "sleepy"); await wait(900);
+    }
+  }
+
+  async function squeezeRun(list) {
+    if (S.busy || !list.length || !window.Motore) return;
+    if (!S.press) { try { S.press = await (await fetch("schiaccia/press.svg")).text(); } catch (e) { S.press = ""; } }
+    const ctl = new AbortController();
+    S.busy = { act: "lookout", title: t("web.squeeze.title") };
+    S.sq = { n: 0, N: list.length, saved: 0, done: 0, same: 0, err: 0, errs: [], ctl, cur: null, pct: 0, phase: "read" };
+    Chiptune.setMood("cleaning"); sfx("whoosh"); sqOverlay();
+    const doneIds = new Set();
+    for (const it of list) {
+      if (ctl.signal.aborted) break;
+      const q = S.sq; q.n++; q.cur = it; q.pct = 0; q.phase = "read"; sqUpdate();
+      const kind = Motore.kindOf(it.path);
+      const run = sqPhase("run", kind);
+      try {
+        const bytes = await invoke("read_bytes", { path: it.path });
+        await run;
+        q.phase = "work"; sqUpdate();
+        const res = await Motore.squeeze(new File([bytes], baseName(it.path)), {
+          level: S.sqLevel, signal: ctl.signal, onPct: p => { q.pct = p; sqUpdate(); },
+        });
+        if (res.status === "done") {
+          q.phase = "save"; sqUpdate();
+          const out = new Uint8Array(await res.blob.arrayBuffer());
+          await invoke("save_squeezed", out, { headers: { "x-path": encodeURIComponent(it.path), "x-name": encodeURIComponent(res.name) } });
+          try { await res.release(); } catch (e) { }
+          const gain = Math.max(0, it.size - out.length);
+          q.saved += gain; q.done++; doneIds.add(it.id);
+          await sqPhase("slam", kind, t("web.squeeze.badge", Math.round(gain / it.size * 100)));
+        } else if (res.note === "aborted") {
+          break;
+        } else {
+          (res.status === "same" ? q.same++ : (q.err++, q.errs.push(it.name)));
+          const nk = `web.squeeze.note.${res.note}`, txt = t(nk);
+          await sqPhase("skip", kind, txt === nk ? t("web.squeeze.note.other") : txt);
+        }
+      } catch (e) {
+        await run; q.err++; q.errs.push(it.name);
+        await sqPhase("skip", kind, msg(String(e)).slice(0, 60));
+      }
+    }
+    const q = S.sq;
+    $("#sq")?.remove();
+    S.busy = null; S.sq = null;
+    // the lighter files replaced the originals: drop them from the list, the index is stale
+    S.results.squeeze = (S.results.squeeze || []).filter(i => !doneIds.has(i.id));
+    doneIds.forEach(id => S.sel.delete(id));
+    await invoke("invalidate_index");
+    S.freed += q.saved; store("suri.freed", S.freed);
+    await refreshDisk(); render();
+    sqCelebrate(q, ctl.signal.aborted);
+  }
+
+  function sqCelebrate(q, stopped) {
+    Chiptune.setMood(q.done ? "victory" : "menu");
+    setTimeout(() => Chiptune.getMood() === "victory" && Chiptune.setMood("results"), 3800);
+    const ov = document.createElement("div"); ov.className = "ov celebrate"; ov.id = "cele";
+    const fails = q.errs.length ? ` (${q.errs.slice(0, 3).join(", ")}${q.errs.length > 3 ? "…" : ""})` : "";
+    ov.innerHTML = `<div class="card panel"><div class="suri-ov" id="suri-cele"></div>
+      <h3>${esc(t(q.done ? "web.squeeze.cele_title" : "web.cele.gomen"))}</h3>
+      <b style="font-size:17px">${esc(q.done ? t("web.squeeze.cele_sub", bytes(q.saved)) : t("web.squeeze.cele_none"))}</b>
+      <div class="hint">${esc(t("web.squeeze.cele_detail", q.done, q.same, q.err) + fails)}${stopped ? " · " + esc(t("web.squeeze.note.aborted")) : ""}</div>
+      ${q.done ? `<div class="hint" style="color:#c2453c">${esc(t("web.squeeze.cele_trash"))}</div>` : ""}
+      <div style="display:flex;gap:12px;margin-top:6px">${q.done && S.trash > 0 ? `<button class="btn big" style="--c:${C.coral}" data-act="askEmpty">${esc(t("web.cele.empty_btn"))}</button>` : ""}
+      <button class="btn big" style="--c:${C.mint}" data-act="closeCele">${esc(t("web.cele.thanks"))}</button></div></div>`;
+    $("#overlay").appendChild(ov);
+    if (q.done) confetti(ov);
+    Suri.setActivity($("#suri-cele"), q.done ? "celebrating" : "sleepy");
   }
 
   // ───────── events ─────────
@@ -635,6 +788,16 @@
       n.ids.forEach(id => all ? S.sel.delete(id) : S.sel.add(id));
       sfx(all ? "pop" : "coin"); renderList(); return;
     }
+    const chip = tg.closest("[data-sqtype]");
+    if (chip) {
+      const k = chip.dataset.sqtype;
+      if (k === "video" && !S.canVideo) { toast(t("web.squeeze.video_off")); return; }
+      S.sqTypes.has(k) ? S.sqTypes.delete(k) : S.sqTypes.add(k);
+      store("suri.sqTypes", [...S.sqTypes].join(","));
+      sfx("pop"); renderDetail(); return;
+    }
+    const lvl = tg.closest("[data-sqlevel]");
+    if (lvl) { S.sqLevel = lvl.dataset.sqlevel; store("suri.sqLevel", S.sqLevel); sfx("coin"); renderDetail(); return; }
     const itemEl = tg.closest("[data-item]");
     if (itemEl) { const id = Number(itemEl.dataset.item); S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); sfx("pop"); renderList(); return; }
     const act = tg.closest("[data-act]")?.dataset.act;
@@ -650,15 +813,22 @@
         ]);
         break;
       case "admin": adminScan(); break;
-      case "rescan": if (cat) { if (["buildDeps", "gitRepos", "duplicates", "bigFiles", "installers"].includes(cat.id)) await invoke("invalidate_index"); runScan([cat.id]); } break;
+      case "rescan": if (cat) { if (["buildDeps", "gitRepos", "duplicates", "bigFiles", "installers", "squeeze"].includes(cat.id)) await invoke("invalidate_index"); runScan([cat.id]); } break;
+      case "sqCancel": if (S.sq) { S.sq.ctl.abort(); sfx("error"); $("#sq-name") && ($("#sq-name").textContent = t("web.busy.stopping")); } break;
       case "cancel": if (S.busy) { S.busy.cancelled = true; S.busy.title = t("web.busy.stopping"); showBusy(); invoke("cancel_scan"); sfx("error"); } break;
       case "mute": S.muted = !S.muted; localStorage.setItem("suri.muted", S.muted ? "1" : "0"); Chiptune.setMuted(S.muted); renderSidebar(); break;
       case "refresh": sfx("pop"); await pruneMissing(); await refreshDisk(); render(); break;
       case "askEmpty": sfx("pop"); confirmBox(t("web.empty.ask_title"), t("web.empty.ask_text", bytes(S.trash)), t("web.empty.ask_ok"), emptyTrash); break;
       case "closeCele": sfx("pop"); document.querySelector("#cele")?.remove(); break;
       case "selRec": items(cat.id).forEach(i => i.recommended ? S.sel.add(i.id) : S.sel.delete(i.id)); sfx("coin"); renderList(); break;
-      case "selAll": items(cat.id).forEach(i => S.sel.add(i.id)); sfx("pop"); renderList(); break;
+      case "selAll": catItems(cat).forEach(i => S.sel.add(i.id)); sfx("pop"); renderList(); break;
       case "selNone": items(cat.id).forEach(i => S.sel.delete(i.id)); sfx("pop"); renderList(); break;
+      case "askSqueeze": {
+        const sel = sqVisible().filter(i => S.sel.has(i.id));
+        sfx("pop");
+        confirmBox(t("web.squeeze.ask_title", nItems(sel.length)), t("web.squeeze.ask_text", t(`web.squeeze.level.${S.sqLevel}`)), t("web.squeeze.ask_ok"), () => squeezeRun(sel));
+        break;
+      }
       case "askClean": {
         const sel = items(cat.id).filter(i => S.sel.has(i.id));
         sfx("pop");

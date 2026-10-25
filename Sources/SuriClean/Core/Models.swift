@@ -60,7 +60,7 @@ extension Array where Element == CleanItem {
 
 enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
     case diskMap, caches, logsTemp, systemAreas, aiTools, devCaches, buildDeps, gitRepos, duplicates, appData
-    case bigFiles, installers, oldDownloads, apps, leftovers, appleExtras
+    case bigFiles, squeeze, installers, oldDownloads, apps, leftovers, appleExtras
 
     var id: String { rawValue }
 
@@ -83,6 +83,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .gitRepos: return "arrow.triangle.branch"
         case .duplicates: return "doc.on.doc.fill"
         case .bigFiles: return "externaldrive.fill"
+        case .squeeze: return "arrow.down.right.and.arrow.up.left"
         case .installers: return "opticaldisc"
         case .oldDownloads: return "arrow.down.circle.fill"
         case .apps: return "moon.zzz.fill"
@@ -104,6 +105,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .gitRepos: return Theme.coral
         case .duplicates: return Theme.lilac
         case .bigFiles: return Theme.pink
+        case .squeeze: return Theme.lilac
         case .installers: return Theme.sky
         case .oldDownloads: return Theme.mint
         case .apps: return Theme.lilac
@@ -116,7 +118,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .diskMap, .appData: return .careful
         case .caches, .logsTemp, .devCaches, .buildDeps, .installers: return .safe
-        case .systemAreas: return .review
+        case .systemAreas, .squeeze: return .review
         case .aiTools, .gitRepos, .duplicates, .oldDownloads, .leftovers: return .review
         case .bigFiles, .apps, .appleExtras: return .careful
         }
@@ -132,7 +134,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
         case .buildDeps, .bigFiles: return .digging
         case .gitRepos: return .reading
         case .duplicates: return .detective
-        case .installers, .oldDownloads, .appleExtras: return .lookout
+        case .installers, .oldDownloads, .appleExtras, .squeeze: return .lookout
         case .apps: return .sleepy
         }
     }
@@ -141,7 +143,7 @@ enum CleanCategory: String, CaseIterable, Identifiable, Hashable {
 
     var needsIndex: Bool {
         switch self {
-        case .buildDeps, .gitRepos, .duplicates, .bigFiles, .installers: return true
+        case .buildDeps, .gitRepos, .duplicates, .bigFiles, .installers, .squeeze: return true
         default: return false
         }
     }
@@ -166,7 +168,7 @@ struct BusyState {
 }
 
 struct Celebration: Identifiable {
-    enum Kind { case trashed, emptied, info }
+    enum Kind { case trashed, emptied, info, squeezed }
     let id = UUID()
     var kind: Kind
     var bytes: Int64

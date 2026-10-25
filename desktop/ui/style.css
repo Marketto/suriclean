@@ -161,3 +161,42 @@ h2.zones small { font-size: 13px; opacity: .5; font-weight: 700; margin-left: 8p
 .lang-row { position: relative; display: flex; align-items: center; gap: 4px; padding: 2px 4px; max-width: 120px; white-space: nowrap; overflow: hidden; font-size: 11.5px; font-weight: 800; opacity: .75; cursor: pointer; }
 .lang-row select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .lang-row:hover { opacity: 1; }
+
+/* ───────── Schiaccia: zone controls and «Il corriere» animation (docs/SCHIACCIA.md) ───────── */
+.sq-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.sq-label { font-size: 12px; font-weight: 900; opacity: .7; margin-left: 4px; }
+.chip { border: 2px solid color-mix(in srgb, var(--c) 45%, transparent); background: rgba(255,255,255,.7); color: inherit; font: inherit; font-weight: 800; font-size: 12.5px; padding: 5px 12px; border-radius: 99px; cursor: pointer; transition: transform .15s; }
+.chip:hover { transform: scale(1.06); }
+.chip.on { background: var(--c); border-color: var(--c); color: #fff; }
+.chip.off { opacity: .4; text-decoration: line-through; }
+.sq-credit { font-size: 10.5px; opacity: .45; margin-left: auto; }
+.sq .panel { width: 520px; --c: var(--lilac); }
+.sq-stage { position: relative; height: 240px; width: 100%; border-radius: 22px; background: linear-gradient(#e9fbf4, #fde8f0); overflow: hidden; }
+.sq-press { position: absolute; right: 26px; bottom: 12px; width: 170px; }
+.sq-press svg { width: 100%; height: auto; display: block; overflow: visible; }
+.sq-press .p-sheets, .sq-press .m-glasses, .sq-press .m-fglasses, .sq-press .m-pen, .sq-press .m-camera, .sq-press .m-stamp, .sq-press .m-flash, .sq-press .m-check { display: none; }
+.sq-suri { position: absolute; left: 14px; bottom: 10px; width: 100px; height: 124px; transition: transform .8s cubic-bezier(.5,0,.3,1); }
+.sq-file { position: absolute; left: 78px; bottom: 116px; width: 40px; height: 50px; border-radius: 7px; background: #fff; border: 4px solid #3b2a4a; display: grid; place-items: center;
+  font: 900 11px system-ui, sans-serif; color: #ef5b8b; transform-origin: 50% 100%;
+  transition: left .8s cubic-bezier(.5,0,.3,1), bottom .5s cubic-bezier(.5,0,.3,1), transform .25s, opacity .3s; }
+.sq-file[data-kind="jpg"] { color: #3d9be9; } .sq-file[data-kind="video"] { color: #fff; background: #3b2a4a; }
+.sq-badge { position: absolute; right: 36px; top: 14px; font: 900 18px system-ui, sans-serif; opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s; }
+.sq-badge.good { color: #2fbf86; } .sq-badge.meh { color: #8a7a8f; font-size: 14px; max-width: 70%; text-align: right; }
+/* run: Suri carries the file next to the press */
+.sq-stage.run .sq-suri { transform: translateX(120px); }
+.sq-stage.run .sq-file { left: 198px; }
+/* work: the file waits under the press, which pumps while the engine works */
+.sq-stage.work .sq-suri { transform: translateX(0); }
+.sq-stage.work .sq-file { left: calc(100% - 26px - 85px - 20px); bottom: 34px; animation: sq-wobble .55s ease-in-out infinite; }
+.sq-stage.work .p-head { animation: sq-pump 1.1s ease-in-out infinite; }
+@keyframes sq-pump { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(16px) } }
+@keyframes sq-wobble { 0%, 100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
+/* slam: the head comes down, the file goes flat… */
+.sq-stage.slam .sq-file { left: calc(100% - 26px - 85px - 20px); bottom: 34px; transform: scaleY(.32) scaleX(1.15); }
+.sq-stage.slam .p-head { animation: sq-slam .45s cubic-bezier(.6,0,.4,1) forwards; }
+@keyframes sq-slam { 0% { transform: translateY(0) } 55% { transform: translateY(48px) } 100% { transform: translateY(0) } }
+/* …and flies away with the saving */
+.sq-stage.fly .sq-file { left: 110%; bottom: 190px; transform: scaleY(.32) rotate(30deg); opacity: 0; transition: left .8s ease-in, bottom .8s ease-out, transform .8s, opacity .8s .3s; }
+.sq-stage.fly .sq-badge, .sq-stage.skip .sq-badge { opacity: 1; transform: translateY(0); }
+/* skip: nothing to gain, the file hops back */
+.sq-stage.skip .sq-file { left: 78px; bottom: 116px; }

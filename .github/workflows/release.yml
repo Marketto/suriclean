@@ -114,6 +114,7 @@ jobs:
         shell: bash
         run: |
           cp shared/suri.js shared/chiptune.js shared/i18n.js desktop/ui/
+          rm -rf desktop/ui/schiaccia && cp -R schiaccia desktop/ui/schiaccia
           mkdir -p desktop/ui/i18n && cp i18n/*.json desktop/ui/i18n/
           V="${SURI_VERSION}.0"
           node -e "const f='desktop/src-tauri/tauri.conf.json';const j=require('./'+f);j.version='$V';require('fs').writeFileSync(f,JSON.stringify(j,null,2))"

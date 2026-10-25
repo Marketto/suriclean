@@ -1,0 +1,64 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Schiaccia × SuriClean</title></head>
+<body>
+<!-- Headless page that runs Schiaccia's engine (assets/schiaccia, copied at build time) for SuriClean.
+     Files come in from https://appassets.androidplatform.net/suri-file/<token> (streamed by the app);
+     results go back through window.SuriBridge in base64 chunks. Nothing leaves the phone. -->
+<script src="../schiaccia/config.js"></script>
+<script src="../schiaccia/motore.js"></script>
+<script>
+(function () {
+  "use strict";
+  var B = window.SuriBridge, jobs = {}, CHUNK = 512 * 1024;
+  function b64(u8) {
+    var s = "", step = 0x8000;
+    for (var i = 0; i < u8.length; i += step) s += String.fromCharCode.apply(null, u8.subarray(i, i + step));
+    return btoa(s);
+  }
+  function finish(id, o) { try { B.finish(id, JSON.stringify(o)); } catch (e) {} }
+
+  /* one file: read it from the app, squeeze it with Schiaccia's rules, stream the result back */
+  window.suriSqueeze = async function (id, src, name, type, level) {
+    var ctl = new AbortController(), res = null;
+    jobs[id] = ctl;
+    try {
+      var resp = await fetch(src);
+      if (!resp.ok) throw new Error("read " + resp.status);
+      var file = new File([await resp.blob()], name, { type: type || "", lastModified: Date.now() });
+      var last = -1;
+      res = await Motore.squeeze(file, {
+        level: level, signal: ctl.signal,
+        onPct: function (p) { p = Math.max(0, Math.min(100, Math.round(p))); if (p !== last) { last = p; try { B.progress(id, p); } catch (e) {} } }
+      });
+      file = null;
+      if (res.status === "done" && res.blob) {
+        var size = res.blob.size;
+        for (var o = 0; o < size; o += CHUNK) {
+          if (ctl.signal.aborted) break;
+          var part = new Uint8Array(await res.blob.slice(o, Math.min(size, o + CHUNK)).arrayBuffer());
+          if (!B.chunk(id, b64(part))) { ctl.abort(); break; }
+        }
+      }
+      var aborted = ctl.signal.aborted;
+      finish(id, {
+        status: aborted ? "err" : res.status,
+        note: aborted ? "aborted" : (res.note || ""),
+        name: res.name || name,
+        size: res.blob && !aborted ? res.blob.size : 0
+      });
+    } catch (e) {
+      finish(id, { status: "err", note: ctl.signal.aborted ? "aborted" : "unreadable", name: name, size: 0 });
+    } finally {
+      delete jobs[id];
+      if (res && res.release) try { await res.release(); } catch (e) {}
+    }
+  };
+  window.suriCancel = function (id) { var c = jobs[id]; if (c) c.abort(); };
+
+  /* tell the app the engine is ready and whether this WebView can encode video (WebCodecs) */
+  function ready(v) { try { B.ready(JSON.stringify({ ok: !!window.Motore, canVideo: !!v, version: window.Motore ? Motore.version : "" })); } catch (e) {} }
+  if (!window.Motore) ready(false);
+  else Motore.canVideo().then(ready, function () { ready(false); });
+})();
+</script>
+</body></html>

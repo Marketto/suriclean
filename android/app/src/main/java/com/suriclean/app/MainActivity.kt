@@ -18,12 +18,16 @@ class MainActivity : ComponentActivity() {
         vm.onSystemResult(r.resultCode == RESULT_OK)
     }
 
+    /** Schiaccia's engine (hidden WebView), alive as long as this Activity. */
+    private var engine: SqueezeEngine? = null
+
     private val legacyPerms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refresh() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         L.init(applicationContext)
         enableEdgeToEdge()
+        engine = SqueezeEngine(this).also { vm.engine = it }
         if (Build.VERSION.SDK_INT < 30) {
             legacyPerms.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE))
         }
@@ -50,6 +54,13 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         vm.refresh()
         Chiptune.start()
+    }
+
+    override fun onDestroy() {
+        if (vm.engine === engine) { vm.cancelSqueeze(); vm.engine = null; vm.canVideo = null }
+        engine?.destroy()
+        engine = null
+        super.onDestroy()
     }
 
     override fun onPause() {

@@ -24,6 +24,7 @@ enum class Category(
     CHATS("💬", Kawaii.mint, Risk.REVIEW, Act.SNIFFING),
     DUPLICATES("👯", Kawaii.lilac, Risk.REVIEW, Act.DETECTIVE),
     BIG("🦖", Kawaii.pink, Risk.CAREFUL, Act.DIGGING),
+    SQUEEZE("🗜️", Kawaii.lilac, Risk.REVIEW, Act.LOOKOUT),
     DOWNLOADS("📥", Kawaii.sky, Risk.REVIEW, Act.LOOKOUT),
     APKS("📦", Kawaii.orange, Risk.SAFE, Act.LOOKOUT),
     JUNK("🧹", Kawaii.coral, Risk.SAFE, Act.SWEEPING),
@@ -70,3 +71,15 @@ data class Celebration(val title: String, val subtitle: String, val message: Str
 data class AppUpdate(val version: String, val url: String)
 
 data class Slice(val name: String, val bytes: Long, val color: androidx.compose.ui.graphics.Color, val note: String)
+
+/** «Da schiacciare» in progress: drives the courier animation (Suri brings each file to Schiaccia's press). */
+data class SqueezeRun(
+    val total: Int,
+    val index: Int,
+    val name: String,
+    val kind: String,        // pdf | jpg | video
+    val pct: Int,
+    val saved: Long,
+    val lastSaving: Int?,    // % saved on the last file, for the badge
+    val shot: Int,           // changes with every file, restarts the animation
+)

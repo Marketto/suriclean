@@ -348,6 +348,48 @@ async fn elevated_scan(app: AppHandle, categories: Vec<String>) -> Result<std::c
     .map_err(|e| e.to_string())?
 }
 
+/// Schiaccia (docs/SCHIACCIA.md): the bytes of a file for the engine in the webview, as a raw response.
+#[tauri::command]
+async fn read_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || std::fs::read(&path).map(tauri::ipc::Response::new).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Percent-decoding for the path/name headers (header values must be ASCII).
+fn pct_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).to_string()
+}
+
+/// Schiaccia's result arrives as the raw request body; headers `x-path` (original) and `x-name` (result name).
+/// The lighter file takes the original's place and the original goes to the Trash.
+#[tauri::command]
+async fn save_squeezed(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let header = |k: &str| request.headers().get(k).and_then(|v| v.to_str().ok()).map(pct_decode).unwrap_or_default();
+    let (path, name) = (header("x-path"), header("x-name"));
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else {
+        return Err("expected raw bytes".into());
+    };
+    if path.is_empty() {
+        return Err("missing path".into());
+    }
+    scan::replace_with_squeezed(Path::new(&path), &name, data).map(|p| p.to_string_lossy().to_string())
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if let Some(i) = args.iter().position(|a| a == "--elevated-scan") {
@@ -358,7 +400,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             platform, disk_info, has_git, scan_category, cancel_scan, invalidate_index,
             trash_items, trash_size, empty_trash, existing, reveal, open_folder, open_url,
-            app_version, install_update, install_kind, elevated_scan
+            app_version, install_update, install_kind, elevated_scan, read_bytes, save_squeezed
         ])
         .run(tauri::generate_context!())
         .expect("error while running SuriClean");
