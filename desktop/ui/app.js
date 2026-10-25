@@ -1,7 +1,7 @@
 /* SuriClean desktop UI (Windows / Linux). Talks to the Rust backend through Tauri. */
 (function () {
   const T = window.__TAURI__;
-  const invoke = (cmd, args) => T.core.invoke(cmd, args);
+  const invoke = (cmd, args, opts) => T.core.invoke(cmd, args, opts);
   const $ = sel => document.querySelector(sel);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -722,6 +722,7 @@
           await sqPhase("skip", kind, txt === nk ? t("web.squeeze.note.other") : txt);
         }
       } catch (e) {
+        console.error("squeeze", it.path, e);
         await run; q.err++; q.errs.push(it.name);
         await sqPhase("skip", kind, msg(String(e)).slice(0, 60));
       }

@@ -27,6 +27,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SuriClean"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Schiaccia's engine for «Da schiacciare» (docs/SCHIACCIA.md); scripts/fetch-schiaccia.sh makes ./schiaccia
+if [ ! -f schiaccia/motore.js ] && [ -x scripts/fetch-schiaccia.sh ]; then scripts/fetch-schiaccia.sh || echo "⚠️  Schiaccia non scaricato: «Da schiacciare» farà solo i video"; fi
+[ -f schiaccia/motore.js ] && cp -R schiaccia "$APP/Contents/Resources/schiaccia"
 # translations (i18n/README.md): the JSON files, plus an .lproj per language so macOS
 # shows its own menus and permission texts in the user's language
 mkdir -p "$APP/Contents/Resources/i18n"

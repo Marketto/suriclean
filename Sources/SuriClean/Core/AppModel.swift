@@ -410,7 +410,7 @@ final class AppModel: ObservableObject {
 
     /// Drops items that no longer exist (deleted in Finder, by another app, or by an earlier clean).
     func pruneMissing() {
-        guard busy == nil else { return }
+        guard busy == nil, squeezeRun == nil else { return }
         var gone: [URL] = []
         for key in Array(results.keys) {
             guard let list = results[key] else { continue }

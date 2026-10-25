@@ -13,6 +13,7 @@ struct CategoryDetailView: View {
     @State private var sort: SortMode
     @State private var query = ""
     @State private var confirm = false
+    @State private var confirmSqueeze = false
     @AppStorage("suri.treeView") private var treeView = false
 
     init(category: CleanCategory) {
@@ -21,7 +22,7 @@ struct CategoryDetailView: View {
     }
 
     private var list: [CleanItem] {
-        var l = model.items(category)
+        var l = category == .squeeze ? model.visibleSqueezeItems() : model.items(category)
         if !query.isEmpty {
             l = l.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.detail.localizedCaseInsensitiveContains(query) }
         }
@@ -44,7 +45,7 @@ struct CategoryDetailView: View {
 
     var body: some View {
         let l = list
-        let selected = model.selectedItems(category)
+        let selected = category == .squeeze ? model.visibleSqueezeItems().filter { model.selection.contains($0.id) } : model.selectedItems(category)
         let maxSize = max(l.map { $0.size }.max() ?? 1, 1)
         VStack(spacing: 0) {
             header(count: l.count)
@@ -89,6 +90,12 @@ struct CategoryDetailView: View {
         } message: {
             Text(t("mac.confirm.trash.msg", selected.count, Fmt.bytes(selected.totalSize)))
         }
+        .alert(t("mac.sq.confirm"), isPresented: $confirmSqueeze) {
+            Button(t("mac.common.cancel"), role: .cancel) {}
+            Button(t("mac.sq.confirm.ok")) { model.startSqueeze() }
+        } message: {
+            Text(t("mac.sq.confirm.msg", selected.count, model.squeezeLevel.label))
+        }
     }
 
     private func header(count: Int) -> some View {
@@ -129,8 +136,11 @@ struct CategoryDetailView: View {
                 .padding(.top, 4)
                 MeerkatView(activity: category.activity, size: 96)
             }
+            if category == .squeeze && model.results[category] != nil {
+                SqueezeControls()
+            }
             HStack(spacing: 10) {
-                if model.fullScanDone && category != .diskMap {
+                if model.fullScanDone && category != .diskMap && category != .squeeze {
                     Picker("", selection: $model.scope) {
                         Text(t("mac.scope.me")).tag(AppModel.Scope.me)
                         Text(t("mac.scope.everyone")).tag(AppModel.Scope.all)
@@ -211,11 +221,19 @@ struct CategoryDetailView: View {
             Button(t("mac.sel.rec")) { model.selectRecommended(category) }.buttonStyle(BubblyButtonStyle(color: Theme.mint))
             Button(t("mac.sel.all")) { model.selectAll(category) }.buttonStyle(BubblyButtonStyle(color: Theme.lilac))
             Button(t("mac.sel.none")) { model.selectNone(category) }.buttonStyle(BubblyButtonStyle(color: Theme.lilac))
-            Button(action: { Chiptune.shared.sfx(.pop); confirm = true }) {
-                Label(t("mac.sel.sweep"), systemImage: "trash.fill")
+            if category == .squeeze {
+                Button(action: { Chiptune.shared.sfx(.pop); confirmSqueeze = true }) {
+                    Label(t("mac.sq.go"), systemImage: "arrow.down.right.and.arrow.up.left")
+                }
+                .buttonStyle(BubblyButtonStyle(color: Theme.pink, big: true))
+                .disabled(selected.isEmpty || model.busy != nil || model.squeezeRun != nil)
+            } else {
+                Button(action: { Chiptune.shared.sfx(.pop); confirm = true }) {
+                    Label(t("mac.sel.sweep"), systemImage: "trash.fill")
+                }
+                .buttonStyle(BubblyButtonStyle(color: Theme.coral, big: true))
+                .disabled(selected.isEmpty || model.busy != nil)
             }
-            .buttonStyle(BubblyButtonStyle(color: Theme.coral, big: true))
-            .disabled(selected.isEmpty || model.busy != nil)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 14)
