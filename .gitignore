@@ -11,3 +11,7 @@ android/local.properties
 *.p12
 *.jks
 schiaccia/
+desktop/src-tauri/target/
+desktop/src-tauri/icons/
+desktop/src-tauri/gen/
+.schiaccia-src/

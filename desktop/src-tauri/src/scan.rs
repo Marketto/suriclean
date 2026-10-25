@@ -1037,6 +1037,81 @@ fn big_files(idx: &HomeIndex) -> Vec<Item> {
     }).collect()
 }
 
+/// Files Schiaccia can make lighter (docs/SCHIACCIA.md): PDF and JPG from 1 MB, videos from 20 MB,
+/// only among the user's own files (no hidden folders, app bundles or build output).
+fn squeeze_candidates(idx: &HomeIndex) -> Vec<Item> {
+    let h = home();
+    let skip = ["node_modules", "build", "dist", "target", "Library", "AppData", "vendor", "Pods", "DerivedData"];
+    let mut list: Vec<(&Indexed, &str)> = vec![];
+    for f in &idx.files {
+        let ext = ext_of(&f.path);
+        let (kind, min, max) = match ext.as_str() {
+            "pdf" => ("pdf", MB, u64::MAX),
+            "jpg" | "jpeg" => ("jpg", MB, u64::MAX),
+            // the whole video passes through the webview's memory: keep it reasonable
+            "mp4" | "mov" | "m4v" | "webm" | "mkv" => ("video", 20 * MB, 1500 * MB),
+            _ => continue,
+        };
+        if f.size < min || f.size > max {
+            continue;
+        }
+        let rel = f.path.strip_prefix(&h).unwrap_or(&f.path);
+        let hidden = rel.components().any(|c| {
+            let s = c.as_os_str().to_string_lossy();
+            s.starts_with('.') || s.ends_with(".app") || skip.contains(&s.as_ref())
+        });
+        if hidden {
+            continue;
+        }
+        list.push((f, kind));
+    }
+    list.sort_by(|a, b| b.0.size.cmp(&a.0.size));
+    list.into_iter().take(600).map(|(f, kind)| {
+        let badge = m(&format!("web.rs.squeeze.{}", kind), &[]);
+        new_item(&f.path, file_name(&f.path),
+            m("web.rs.join", &[&f.path.parent().map(pretty).unwrap_or_default(), &rel_time(f.modified)]),
+            f.size, f.modified, "safe", false, vec![badge])
+    }).collect()
+}
+
+/// Puts Schiaccia's lighter version in place of `orig`: the result is written next to it under a
+/// temporary name, the original goes to the system Trash, then the result takes `name`
+/// (which differs only for WebM/MKV → MP4). Returns the final path.
+pub fn replace_with_squeezed(orig: &Path, name: &str, data: &[u8]) -> Result<PathBuf, String> {
+    let dir = orig.parent().ok_or_else(|| m("web.rs.squeeze.no_folder", &[]))?;
+    if name.is_empty() || name.contains('/') || name.contains('\\') || name == "." || name == ".." {
+        return Err(m("web.rs.squeeze.bad_name", &[]));
+    }
+    let meta = fs::metadata(orig).map_err(|e| e.to_string())?;
+    let tmp = dir.join(format!(".{}.suriclean-tmp", name));
+    fs::write(&tmp, data).map_err(|e| e.to_string())?;
+    if let Ok(mt) = meta.modified() {
+        if let Ok(f) = fs::File::options().write(true).open(&tmp) {
+            let _ = f.set_modified(mt);
+        }
+    }
+    let mut dest = dir.join(name);
+    if dest != orig && dest.exists() {
+        // e.g. video.webm → video.mp4 when video.mp4 already exists: never overwrite another file
+        let stem = Path::new(name).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let ext = Path::new(name).extension().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let mut k = 1;
+        while dest.exists() {
+            dest = dir.join(format!("{} ({}).{}", stem, k, ext));
+            k += 1;
+        }
+    }
+    if let Err(e) = trash::delete(orig) {
+        let _ = fs::remove_file(&tmp);
+        return Err(m("web.rs.squeeze.no_trash", &[&e.to_string()]));
+    }
+    if fs::rename(&tmp, &dest).is_err() {
+        fs::copy(&tmp, &dest).map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(&tmp);
+    }
+    Ok(dest)
+}
+
 fn installers(idx: &HomeIndex) -> Vec<Item> {
     let dl = downloads();
     let desk = dirs::desktop_dir().unwrap_or_else(|| home().join("Desktop"));
@@ -1170,7 +1245,7 @@ fn disk_map_at(h: &Path, title: &str, detail: &str, badge: &str, rep: &Reporter)
 // ───────────────────────── dispatch ─────────────────────────
 
 pub fn scan(category: &str, rep: &Reporter) -> Vec<Item> {
-    let needs_index = matches!(category, "buildDeps" | "gitRepos" | "duplicates" | "bigFiles" | "installers");
+    let needs_index = matches!(category, "buildDeps" | "gitRepos" | "duplicates" | "bigFiles" | "installers" | "squeeze");
     let idx = if needs_index {
         match get_index(rep) {
             Some(i) => Some(i),
@@ -1193,6 +1268,7 @@ pub fn scan(category: &str, rep: &Reporter) -> Vec<Item> {
         ("duplicates", Some(i)) => duplicates(&i, rep),
         ("bigFiles", Some(i)) => big_files(&i),
         ("installers", Some(i)) => installers(&i),
+        ("squeeze", Some(i)) => squeeze_candidates(&i),
         _ => vec![],
     }
 }

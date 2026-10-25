@@ -9,6 +9,32 @@ val suriVersion: String = System.getenv("SURI_VERSION") ?: "1.0"
 val suriCode: Int = suriVersion.substringAfter(".").toIntOrNull() ?: 1
 val keystorePath: String? = System.getenv("SURI_KEYSTORE")
 
+/** Copies Schiaccia's engine (the repo's ./schiaccia folder, made by scripts/fetch-schiaccia.sh) into the
+ *  generated assets as assets/schiaccia/, so the headless WebView can load it (docs/SCHIACCIA.md). */
+abstract class CopySchiaccia : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val source: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        val dest = File(out, "schiaccia")
+        dest.mkdirs()
+        val src = source.files.firstOrNull { it.isDirectory }
+        if (src == null) {
+            logger.warn("SuriClean: ../schiaccia is missing; run scripts/fetch-schiaccia.sh (the «Da schiacciare» zone will not work)")
+            return
+        }
+        src.copyRecursively(dest, overwrite = true)
+    }
+}
+
+
 android {
     namespace = "com.suriclean.app"
     compileSdk = 34
@@ -63,6 +89,16 @@ android {
     }
 }
 
+androidComponents {
+    onVariants { variant ->
+        // one task per variant: AGP chooses and wires its output folder
+        val copy = tasks.register<CopySchiaccia>("copy${variant.name.replaceFirstChar { it.uppercase() }}Schiaccia") {
+            source.from(rootProject.file("../schiaccia"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(copy, CopySchiaccia::outputDir)
+    }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
     implementation(composeBom)
@@ -76,4 +112,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
+    implementation("androidx.webkit:webkit:1.11.0")
 }

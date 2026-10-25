@@ -63,6 +63,16 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     private var clearTotal = 0
     var pendingIntent by mutableStateOf<Intent?>(null)
     var breakdown by mutableStateOf<List<Slice>>(emptyList())
+
+    // ───────── Schiaccia (docs/SCHIACCIA.md) ─────────
+    /** Set by MainActivity: Schiaccia's engine in a hidden WebView. */
+    var engine: SqueezeEngine? = null
+    var squeezeLevel by mutableStateOf(prefs.getString("squeezeLevel", "soft") ?: "soft")
+    var squeezeKinds by mutableStateOf(setOf("pdf", "jpg", "video"))
+    /** null until the engine has answered; false when this WebView can't encode video. */
+    var canVideo by mutableStateOf<Boolean?>(null)
+    var squeezeRun by mutableStateOf<SqueezeRun?>(null)
+    private var squeezeJob: kotlinx.coroutines.Job? = null
     /** Set when the «clear all caches» screen is opened, to detect phones that refuse it. */
     var cacheRequestAt = 0L
 
@@ -83,8 +93,10 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun items(c: Category) = results[c] ?: emptyList()
     fun total(l: List<Item>) = l.sumOf { it.size }
     fun displayTotal(c: Category) = if (c.viewOnly) items(c).maxOfOrNull { it.size } ?: 0 else total(items(c))
-    val foundTotal get() = Category.entries.filter { !it.viewOnly }.sumOf { total(items(it)) }
-    val recommendedTotal get() = Category.entries.filter { !it.viewOnly }.sumOf { c -> items(c).filter { it.recommended }.sumOf { it.size } }
+    /** «Da schiacciare» lists files that also count elsewhere and only shrink: it never adds to the totals. */
+    private fun counts(c: Category) = !c.viewOnly && c != Category.SQUEEZE
+    val foundTotal get() = Category.entries.filter { counts(it) }.sumOf { total(items(it)) }
+    val recommendedTotal get() = Category.entries.filter { counts(it) }.sumOf { c -> items(c).filter { it.recommended }.sumOf { it.size } }
 
     fun showToast(s: String) {
         toast = s
@@ -158,7 +170,8 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun selected(c: Category) = items(c).filter { it.id in selection }
 
     private fun setResults(c: Category, list: List<Item>) {
-        selection = selection - items(c).map { it.id }.toSet() + list.filter { it.recommended }.map { it.id }
+        // nothing is preselected for Schiaccia: the user picks what to squeeze
+        selection = selection - items(c).map { it.id }.toSet() + (if (c == Category.SQUEEZE) emptyList() else list.filter { it.recommended }.map { it.id })
         results[c] = list
     }
 
@@ -216,7 +229,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     fun cancelJob() { cancel.set(true); busy = busy?.copy(title = L.t("and.busy.stopping")); Chiptune.sfx(Sfx.ERROR) }
 
-    private fun needsIndex(c: Category) = c in setOf(Category.MAP, Category.DUPLICATES, Category.BIG, Category.APKS, Category.JUNK, Category.SYSTEM)
+    private fun needsIndex(c: Category) = c in setOf(Category.MAP, Category.DUPLICATES, Category.BIG, Category.SQUEEZE, Category.APKS, Category.JUNK, Category.SYSTEM)
 
     fun scan(cats: List<Category>) {
         if (busy != null || cats.isEmpty()) return
@@ -252,6 +265,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                         Category.CHATS -> Scanners.chats(rep)
                         Category.DUPLICATES -> idx?.let { Scanners.duplicates(it, rep) } ?: emptyList()
                         Category.BIG -> idx?.let { Scanners.big(it) } ?: emptyList()
+                        Category.SQUEEZE -> idx?.let { SqueezeKinds.scan(it) } ?: emptyList()
                         Category.DOWNLOADS -> Scanners.downloads(rep)
                         Category.APKS -> idx?.let { Scanners.apks(it) } ?: emptyList()
                         Category.JUNK -> idx?.let { Scanners.junk(it) } ?: emptyList()
@@ -265,7 +279,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                 }
                 if (flag.get()) break
                 setResults(c, list)
-                busy = busy?.copy(found = (busy?.found ?: 0) + list.size, foundBytes = (busy?.foundBytes ?: 0) + if (c.viewOnly) 0 else total(list))
+                busy = busy?.copy(found = (busy?.found ?: 0) + list.size, foundBytes = (busy?.foundBytes ?: 0) + if (counts(c)) total(list) else 0)
                 Chiptune.sfx(Sfx.COIN)
             }
             val cancelled = flag.get()
@@ -315,6 +329,98 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                     L.t("and.cele.trashHint"),
                 offerEmptyTrash = bytes > 0))
         }
+    }
+
+    fun chooseSqueezeLevel(l: String) { squeezeLevel = l; prefs.edit().putString("squeezeLevel", l).apply(); Chiptune.sfx(Sfx.POP) }
+
+    fun toggleSqueezeKind(k: String) {
+        squeezeKinds = if (k in squeezeKinds) squeezeKinds - k else squeezeKinds + k
+        Chiptune.sfx(Sfx.POP)
+    }
+
+    /** Wakes the engine up (when the zone opens) and learns whether videos can be squeezed here. */
+    fun prepareEngine() {
+        if (canVideo != null) return
+        val e = engine ?: return
+        viewModelScope.launch { canVideo = e.canVideo() }
+    }
+
+    /** Items of the zone that the chosen types (and this phone) allow. */
+    fun squeezeVisible(): List<Item> = items(Category.SQUEEZE).filter { val k = SqueezeKinds.of(it.name); k != null && k in squeezeKinds && (k != "video" || canVideo != false) }
+
+    /** Squeezes the selected files one by one; each light copy replaces its original, which goes to Suri's trash. */
+    fun squeeze() {
+        if (busy != null || squeezeRun != null) return
+        val e = engine ?: return
+        val sel = squeezeVisible().filter { it.id in selection }
+        if (sel.isEmpty()) return
+        val level = squeezeLevel
+        squeezeRun = SqueezeRun(total = sel.size, index = 0, name = sel[0].name, kind = SqueezeKinds.of(sel[0].name) ?: "pdf", pct = 0, saved = 0, lastSaving = null, shot = 0)
+        Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
+        squeezeJob = viewModelScope.launch {
+            var saved = 0L
+            var ok = 0
+            val notes = ArrayList<String>()
+            val doneIds = HashSet<Long>()
+            try {
+                for ((i, it) in sel.withIndex()) {
+                    val src = File(it.path)
+                    val kind = SqueezeKinds.of(it.name) ?: continue
+                    squeezeRun = squeezeRun?.copy(index = i, name = it.name, kind = kind, pct = 0, shot = i)
+                    if (!src.exists()) continue
+                    val res = e.squeeze(src, level) { p -> viewModelScope.launch { squeezeRun = squeezeRun?.copy(pct = p) } }
+                    if (res.status == "done" && res.out != null) {
+                        val before = src.length()
+                        val after = res.out.length()
+                        val placed = withContext(Dispatchers.IO) { replaceWithLight(it, src, res.out, res.name) }
+                        if (placed) {
+                            ok++
+                            saved += (before - after).coerceAtLeast(0)
+                            doneIds += it.id
+                            val pct = if (before > 0) ((before - after) * 100 / before).toInt() else 0
+                            squeezeRun = squeezeRun?.copy(saved = saved, lastSaving = pct, pct = 100)
+                            Chiptune.sfx(Sfx.COIN)
+                        } else { res.out.delete(); notes += L.t("and.sq.note.readOnly", it.name) }
+                    } else {
+                        notes += L.t("and.sq.note.${res.note.ifBlank { "unreadable" }}", it.name).let { t -> if (t.startsWith("and.sq.note.")) L.t("and.sq.note.unreadable", it.name) else t }
+                    }
+                }
+            } finally {
+                squeezeRun = null
+                squeezeJob = null
+                results[Category.SQUEEZE] = items(Category.SQUEEZE).filter { it.id !in doneIds }
+                selection = selection - doneIds
+                index = null
+                freed += saved; prefs.edit().putLong("freed", freed).apply()
+                refresh()
+            }
+            celebrate(Celebration(
+                if (ok > 0) L.t("and.sq.cele.title") else L.t("and.cele.gomen"),
+                if (ok > 0) L.tp("and.sq.cele.sub", ok, ok, Fs.bytes(saved)) else L.t("and.sq.cele.none"),
+                if (notes.isNotEmpty()) notes.take(3).joinToString("\n") + (if (notes.size > 3) "\n…" else "") else L.t("and.sq.cele.hint"),
+                offerEmptyTrash = ok > 0))
+        }
+    }
+
+    fun cancelSqueeze() {
+        val j = squeezeJob ?: return
+        j.cancel()
+        Chiptune.sfx(Sfx.ERROR)
+    }
+
+    /** Original → Suri's trash, light copy → the original's place (WebM/MKV become .mp4). */
+    private fun replaceWithLight(item: Item, src: File, light: File, newName: String): Boolean {
+        val (removed, _, _) = Trash.move(ctx, listOf(item), Reporter())
+        if (item.id !in removed) return false
+        var dest = File(src.parentFile, newName)
+        var k = 1
+        while (dest.exists()) { dest = File(src.parentFile, "${File(newName).nameWithoutExtension} ($k).${File(newName).extension}"); k++ }
+        if (!light.renameTo(dest)) {
+            try { light.copyTo(dest, overwrite = false); light.delete() } catch (e: Exception) { return false }
+        }
+        dest.setLastModified(item.date ?: System.currentTimeMillis())
+        android.media.MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath, src.absolutePath), null, null)
+        return true
     }
 
     fun emptyTrash() {

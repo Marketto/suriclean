@@ -115,6 +115,7 @@ enum Scanners {
         case .gitRepos: return gitRepos(index, reporter)
         case .duplicates: return Duplicates.find(index, reporter)
         case .bigFiles: return bigFiles(index, reporter)
+        case .squeeze: return Squeeze.candidates(index, reporter)
         case .installers: return installers(index, reporter)
         case .oldDownloads: return oldDownloads(reporter)
         case .apps: return apps(reporter)

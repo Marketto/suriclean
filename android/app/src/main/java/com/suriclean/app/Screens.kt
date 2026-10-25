@@ -97,6 +97,7 @@ private fun SuriAppContent(vm: AppVM) {
             }
         }
         AnimatedVisibility(vm.busy != null, enter = fadeIn() + scaleIn(initialScale = 0.92f), exit = fadeOut()) { vm.busy?.let { BusyOverlay(vm, it) } }
+        AnimatedVisibility(vm.squeezeRun != null, enter = fadeIn() + scaleIn(initialScale = 0.92f), exit = fadeOut()) { vm.squeezeRun?.let { SqueezeOverlay(vm, it) } }
         AnimatedVisibility(vm.celebration != null, enter = fadeIn() + scaleIn(initialScale = 0.85f), exit = fadeOut()) { vm.celebration?.let { CelebrationOverlay(vm, it) } }
     }
 }
@@ -283,6 +284,9 @@ private fun TipsCard(vm: AppVM, start: (Intent) -> Unit) {
             if (vm.appCache > 0) Fs.bytes(vm.appCache) else "", if (Build.VERSION.SDK_INT >= 25) L.t("and.tips.clean") else null, Kawaii.mint) {
             vm.clearAllCaches()
         }
+        val sq = vm.results[Category.SQUEEZE]
+        if (!sq.isNullOrEmpty()) TipRow("🗜️", L.t("and.sq.tip"), L.tp("and.sq.tipNote", sq.size, sq.size), Fs.bytes(vm.total(sq)),
+            L.t("and.sq.tipOpen"), Kawaii.lilac) { vm.open(Category.SQUEEZE) }
     }
     if (askEmpty) ConfirmDialog(L.t("and.trash.askTitle"), L.t("and.trash.askText", Fs.bytes(vm.trashSize)), L.t("and.trash.askOk"),
         onDismiss = { askEmpty = false }) { askEmpty = false; vm.emptyTrash() }
@@ -373,14 +377,17 @@ private fun Detail(vm: AppVM, c: Category) {
     var query by rememberSaveable(c) { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var confirmSqueeze by remember { mutableStateOf(false) }
     var expanded by remember(c) { mutableStateOf(setOf<String>()) }
-    val all = vm.items(c)
+    // «Da schiacciare» shows only the chosen types (and no videos where the WebView can't encode them)
+    val all = if (c == Category.SQUEEZE) vm.squeezeVisible() else vm.items(c)
+    if (c == Category.SQUEEZE) LaunchedEffect(Unit) { vm.prepareEngine() }
     val list = all.filter { query.isEmpty() || it.name.contains(query, true) || it.detail.contains(query, true) }.let { l ->
         when (sort) { 1 -> l.sortedBy { it.date ?: 0 }; 2 -> l.sortedBy { it.name.lowercase() }; else -> l.sortedByDescending { it.size } }
     }
     val max = (list.maxOfOrNull { it.size } ?: 1).coerceAtLeast(1)
     val treeMode = (tree || c.viewOnly) && c != Category.APPS
-    val sel = vm.selected(c)
+    val sel = if (c == Category.SQUEEZE) all.filter { it.id in vm.selection } else vm.selected(c)
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -396,6 +403,7 @@ private fun Detail(vm: AppVM, c: Category) {
             if (vm.results[c] != null) KText(L.tp("and.detail.count", all.size, all.size, Fs.bytes(vm.displayTotal(c))), 12.sp, color = c.color.darker())
             if (c == Category.MAP && vm.breakdown.isNotEmpty()) BreakdownCard(vm)
             if (c == Category.APPS && !vm.hasUsage) KText(L.t("and.apps.noUsageWarn"), 11.5.sp, color = Kawaii.coral.darker())
+            if (c == Category.SQUEEZE) SqueezeControls(vm)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (!c.viewOnly && c != Category.APPS) SegmentRow(listOf(L.t("and.detail.list") to !tree, L.t("and.detail.tree") to tree), c.color) { tree = it == 1; expanded = emptySet() }
                 SegmentRow(listOf(L.t("and.detail.sortBig") to (sort == 0), L.t("and.detail.sortOld") to (sort == 1), L.t("and.detail.sortName") to (sort == 2)), c.color) { sort = it }
@@ -444,7 +452,9 @@ private fun Detail(vm: AppVM, c: Category) {
                     BubblyButton(L.t("and.detail.clearData"), Kawaii.sky, enabled = sel.isNotEmpty() && vm.busy == null) { confirmClear = true }
                     Spacer(Modifier.width(6.dp))
                 }
-                BubblyButton(if (c == Category.APPS) L.t("and.detail.uninstall") else L.t("and.detail.sweep"), Kawaii.coral, big = c != Category.APPS, enabled = sel.isNotEmpty() && vm.busy == null) { confirm = true }
+                if (c == Category.SQUEEZE)
+                    BubblyButton(L.t("and.sq.go"), Kawaii.lilac, big = true, enabled = sel.isNotEmpty() && vm.busy == null && vm.squeezeRun == null) { confirmSqueeze = true }
+                else BubblyButton(if (c == Category.APPS) L.t("and.detail.uninstall") else L.t("and.detail.sweep"), Kawaii.coral, big = c != Category.APPS, enabled = sel.isNotEmpty() && vm.busy == null) { confirm = true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BubblyButton(L.t("and.detail.selRec"), Kawaii.mint) { vm.selRecommended(c) }
@@ -463,6 +473,9 @@ private fun Detail(vm: AppVM, c: Category) {
                   (if (ShizukuBridge.installed(ctx)) L.t("and.clear.startShizuku") else L.t("and.clear.getShizuku"))),
             L.t("and.clear.askOk"), onDismiss = { confirmClear = false }) { confirmClear = false; vm.clearAppData() }
     }
+    if (confirmSqueeze) ConfirmDialog(L.tp("and.sq.askTitle", sel.size, sel.size),
+        L.t("and.sq.askText", Fs.bytes(vm.total(sel))), L.t("and.sq.askOk"),
+        onDismiss = { confirmSqueeze = false }) { confirmSqueeze = false; vm.squeeze() }
     if (confirm) ConfirmDialog(
         if (c == Category.APPS) L.t("and.uninstall.askTitle", sel.size) else L.t("and.sweep.askTitle"),
         if (c == Category.APPS) L.t("and.uninstall.askText")

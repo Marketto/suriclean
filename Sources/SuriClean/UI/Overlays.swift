@@ -79,12 +79,12 @@ struct CelebrationOverlay: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if c.kind == .trashed && c.bytes > 0 {
+                if (c.kind == .trashed || c.kind == .squeezed) && c.bytes > 0 {
                     Text(t("mac.cele.psst"))
                         .font(Theme.font(12.5, .semibold)).foregroundColor(Theme.coral.darker)
                 }
                 HStack(spacing: 12) {
-                    if c.kind == .trashed && model.trashSize > 0 {
+                    if (c.kind == .trashed || c.kind == .squeezed) && model.trashSize > 0 {
                         Button(action: { model.askEmptyTrash = true }) {
                             Label(t("mac.cele.empty"), systemImage: "trash.fill")
                         }
@@ -106,6 +106,7 @@ struct CelebrationOverlay: View {
         case .trashed: return c.bytes > 0 ? t("mac.cele.yatta") : t("mac.cele.gomen")
         case .emptied: return t("mac.cele.emptied")
         case .info: return t("mac.cele.info")
+        case .squeezed: return c.bytes > 0 ? t("mac.sq.cele.title") : t("mac.cele.gomen")
         }
     }
 
@@ -114,6 +115,7 @@ struct CelebrationOverlay: View {
         case .trashed: return c.bytes > 0 ? t("mac.cele.sent", Fmt.bytes(c.bytes)) : t("mac.cele.nothing")
         case .emptied: return t("mac.cele.recovered", Fmt.bytes(c.bytes))
         case .info: return t("mac.cele.space", Fmt.bytes(c.bytes))
+        case .squeezed: return c.bytes > 0 ? t("mac.sq.cele.saved", Fmt.bytes(c.bytes)) : t("mac.sq.cele.nothing")
         }
     }
 }

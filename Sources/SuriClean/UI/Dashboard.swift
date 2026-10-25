@@ -140,6 +140,11 @@ struct TipsPanel: View {
                    note: t("mac.tips.snaps.note"),
                    value: model.snapshotCount.map { "\($0)" } ?? "…",
                    buttonTitle: (model.snapshotCount ?? 0) > 0 ? t("mac.tips.snaps.btn") : nil) { model.thinSnapshots() }
+            if let sq = model.results[.squeeze], !sq.isEmpty {
+                TipRow(icon: "arrow.down.right.and.arrow.up.left", color: Theme.pink, title: t("mac.tips.squeeze"),
+                       note: t("mac.tips.squeeze.note", sq.count),
+                       value: Fmt.bytes(sq.totalSize), buttonTitle: t("mac.tips.squeeze.btn")) { model.open(.squeeze) }
+            }
             TipRow(icon: "icloud.fill", color: Theme.lilac, title: t("mac.tips.purge"),
                    note: t("mac.tips.purge.note"),
                    value: Fmt.bytes(model.disk.purgeable), buttonTitle: nil) {}

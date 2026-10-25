@@ -90,6 +90,10 @@ struct ContentView: View {
                 LoadingOverlay(state: busy)
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
+            if let r = model.squeezeRun {
+                SqueezeOverlay(run: r)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+            }
             if let c = model.celebration {
                 CelebrationOverlay(c: c)
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))

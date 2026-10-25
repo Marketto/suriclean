@@ -62,6 +62,15 @@ final class AppModel: ObservableObject {
     @Published var gitDetails: [URL: GitDetails] = [:]
     @Published var gitWorking: Set<URL> = []
 
+    // «Da schiacciare» (docs/SCHIACCIA.md)
+    @Published var squeezeRun: SqueezeRunState?
+    @Published var squeezeKinds: Set<SqueezeKind> = Set(SqueezeKind.allCases)
+    @Published var squeezeLevel: SqueezeLevel = SqueezeLevel(rawValue: UserDefaults.standard.string(forKey: "suri.sq.level") ?? "") ?? .soft {
+        didSet { UserDefaults.standard.set(squeezeLevel.rawValue, forKey: "suri.sq.level") }
+    }
+    private let squeezeStop = SqueezeFlag()
+    private var squeezeWeb: SchiacciaWeb?
+
     private var homeIndex: HomeIndex?
     private var reporter: Reporter?
     private var started = false
@@ -328,11 +337,12 @@ final class AppModel: ObservableObject {
         return c == .diskMap ? (l.map { $0.size }.max() ?? 0) : l.totalSize
     }
     func selectedItems(_ c: CleanCategory) -> [CleanItem] { items(c).filter { selection.contains($0.id) } }
+    // the disk map is nested, and files to squeeze only get lighter: neither adds to what can be freed
     var foundTotal: Int64 {
-        results.filter { $0.key != .diskMap }.values.reduce(Int64(0)) { $0 + $1.totalSize }
+        results.filter { $0.key != .diskMap && $0.key != .squeeze }.values.reduce(Int64(0)) { $0 + $1.totalSize }
     }
     var recommendedTotal: Int64 {
-        results.filter { $0.key != .diskMap }.values.reduce(Int64(0)) { acc, list in acc + list.filter { $0.recommended }.totalSize }
+        results.filter { $0.key != .diskMap && $0.key != .squeeze }.values.reduce(Int64(0)) { acc, list in acc + list.filter { $0.recommended }.totalSize }
     }
 
     var greeting: String {
@@ -370,6 +380,11 @@ final class AppModel: ObservableObject {
     }
 
     func selectRecommended(_ c: CleanCategory) {
+        if c == .squeeze {   // nothing is preselected here; «Consigliati» takes every visible file
+            selection.formUnion(visibleSqueezeItems().map { $0.id })
+            Chiptune.shared.sfx(.coin)
+            return
+        }
         let list = items(c)
         selection.subtract(list.map { $0.id })
         selection.formUnion(list.filter { $0.recommended }.map { $0.id })
@@ -395,7 +410,7 @@ final class AppModel: ObservableObject {
 
     /// Drops items that no longer exist (deleted in Finder, by another app, or by an earlier clean).
     func pruneMissing() {
-        guard busy == nil else { return }
+        guard busy == nil, squeezeRun == nil else { return }
         var gone: [URL] = []
         for key in Array(results.keys) {
             guard let list = results[key] else { continue }
@@ -721,13 +736,133 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func celebrate(_ c: Celebration) {
+    func celebrate(_ c: Celebration) {
         celebration = c
         Chiptune.shared.mood = .victory
         Task {
             try? await Task.sleep(nanoseconds: 3_800_000_000)
             if Chiptune.shared.mood == .victory { Chiptune.shared.mood = .results }
         }
+    }
+
+    // MARK: Schiaccia (docs/SCHIACCIA.md)
+
+    /// The files of «Da schiacciare» of the chosen kinds (PDF / photos / videos).
+    func visibleSqueezeItems() -> [CleanItem] {
+        items(.squeeze).filter { SqueezeKind.of($0.url).map { squeezeKinds.contains($0) } ?? false }
+    }
+
+    func toggleSqueezeKind(_ k: SqueezeKind) {
+        if squeezeKinds.contains(k) {
+            guard squeezeKinds.count > 1 else { return }
+            squeezeKinds.remove(k)
+            selection.subtract(items(.squeeze).filter { SqueezeKind.of($0.url) == k }.map { $0.id })
+        } else {
+            squeezeKinds.insert(k)
+        }
+        Chiptune.shared.sfx(.pop)
+    }
+
+    func cancelSqueeze() {
+        squeezeStop.set(true)
+        squeezeRun?.cancelling = true
+        squeezeWeb?.cancel()
+        Chiptune.shared.sfx(.error)
+    }
+
+    /// Squeezes the selected files one after the other: PDF and photos with Schiaccia's engine (hidden web view),
+    /// videos with macOS's encoder. Each light file takes the original's place; the original goes to the Trash.
+    func startSqueeze() {
+        guard busy == nil, squeezeRun == nil else { return }
+        let list = visibleSqueezeItems().filter { selection.contains($0.id) }
+        guard !list.isEmpty else { return }
+        squeezeStop.set(false)
+        squeezeRun = SqueezeRunState(total: list.count)
+        Chiptune.shared.mood = .cleaning
+        Chiptune.shared.sfx(.whoosh)
+        let level = squeezeLevel
+        Task { await runSqueeze(list, level: level) }
+    }
+
+    private func runSqueeze(_ list: [CleanItem], level: SqueezeLevel) async {
+        var web: SchiacciaWeb?
+        var webOK = false
+        if list.contains(where: { SqueezeKind.of($0.url) != .video }) {
+            let w = SchiacciaWeb()
+            squeezeWeb = w
+            web = w
+            webOK = await w.start()
+        }
+        var doneIDs: [UUID] = []
+        var squeezedURLs: [URL] = []
+        var failedNames: [String] = []
+        let stop = squeezeStop
+        for (i, item) in list.enumerated() {
+            if stop.value { break }
+            guard let kind = SqueezeKind.of(item.url), FileManager.default.fileExists(atPath: item.url.path) else { continue }
+            squeezeRun?.index = i
+            squeezeRun?.name = item.name
+            squeezeRun?.kind = kind
+            squeezeRun?.progress = 0
+            let before = SqueezeFiles.size(item.url)
+            var status = "err", note = "", out: URL? = nil, newName: String? = nil
+            if kind == .video {
+                let src = item.url
+                let ticker = SqueezeFlag()
+                let r = await Task.detached(priority: .userInitiated) { () -> NativeVideo.Outcome in
+                    await NativeVideo.squeeze(src, level: level, progress: { p in
+                        if ticker.throttle(p) { Task { @MainActor in self.squeezeRun?.progress = p } }
+                    }, cancelled: { stop.value })
+                }.value
+                status = r.status; note = r.note; out = r.out
+            } else if webOK, let w = web {
+                let r = await w.squeeze(item.url, level: level) { [weak self] p in self?.squeezeRun?.progress = p }
+                status = r.status; note = r.note; out = r.out; newName = r.name
+            } else {
+                note = "noEngine"
+            }
+            if status == "done", let tmp = out {
+                let after = SqueezeFiles.size(tmp)
+                let rename = (newName != nil && newName != item.url.lastPathComponent) ? newName : nil
+                if SqueezeFiles.replace(original: item.url, with: tmp, finalName: rename) != nil {
+                    let saved = max(0, before - after)
+                    squeezeRun?.saved += saved
+                    squeezeRun?.done += 1
+                    squeezeRun?.lastSaving = before > 0 ? Int((Double(saved) / Double(before) * 100).rounded()) : 0
+                    squeezeRun?.tick += 1
+                    doneIDs.append(item.id)
+                    squeezedURLs.append(item.url)
+                    Chiptune.shared.sfx(.coin)
+                } else {
+                    squeezeRun?.failed += 1
+                    failedNames.append(item.name)
+                }
+            } else if status == "same" {
+                squeezeRun?.same += 1
+            } else if note != "aborted" {
+                squeezeRun?.failed += 1
+                failedNames.append(item.name)
+            }
+            squeezeRun?.progress = 1
+        }
+        web?.stop()
+        squeezeWeb = nil
+        let run = squeezeRun ?? SqueezeRunState(total: list.count)
+        squeezeRun = nil
+        results[.squeeze]?.removeAll { doneIDs.contains($0.id) }
+        selection.subtract(doneIDs)
+        homeIndex?.prune(removed: squeezedURLs)
+        totalFreed += run.saved
+        refreshDisk()
+        refreshTrash()
+        var msg = t("mac.sq.summary", run.done, run.same, run.failed)
+        if webOK == false && list.contains(where: { SqueezeKind.of($0.url) != .video }) && Squeeze.bundleDir == nil {
+            msg += "\n" + t("mac.sq.noengine")
+        }
+        if !failedNames.isEmpty {
+            msg += "\n" + t("mac.sq.failed", failedNames.prefix(3).joined(separator: ", ") + (failedNames.count > 3 ? "…" : ""))
+        }
+        celebrate(Celebration(kind: .squeezed, bytes: run.saved, failed: run.failed, message: msg))
     }
 
     func dismissCelebration() {
