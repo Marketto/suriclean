@@ -3,8 +3,6 @@ package com.suriclean.app
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
-import android.media.MediaPlayer
-import android.content.Context
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.exp
@@ -51,37 +49,7 @@ object Chiptune {
 
     private const val SR = 44_100.0
     @Volatile var muted = false
-        set(v) { field = v; updateTrack() }
     @Volatile var intensity = 0.0
-    /** Remix on: the synth only plays sound effects, the music is «Arcade Sparkle» (made with Suno) in a loop. */
-    @Volatile var remix = false
-        set(v) { field = v; updateTrack() }
-    private var appCtx: Context? = null
-    private var player: MediaPlayer? = null
-    @Volatile private var started = false
-
-    fun attach(ctx: Context) { appCtx = ctx.applicationContext }
-
-    @Synchronized
-    private fun updateTrack() {
-        try {
-            if (remix && !muted && started) {
-                if (player == null) {
-                    val ctx = appCtx ?: return
-                    val fd = ctx.assets.openFd("remix.mp3")
-                    player = MediaPlayer().apply {
-                        setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-                        setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
-                        isLooping = true
-                        setVolume(0.55f, 0.55f)
-                        prepare()
-                    }
-                    fd.close()
-                }
-                if (player?.isPlaying == false) player?.start()
-            } else if (player?.isPlaying == true) player?.pause()
-        } catch (e: Exception) { }
-    }
     @Volatile private var pending: Mood? = null
     @Volatile var mood: Mood = Mood.MENU
         private set
@@ -106,8 +74,6 @@ object Chiptune {
     fun sfx(s: Sfx) { sfxReset = true; sfxKind = s }
 
     fun start() {
-        started = true
-        updateTrack()
         if (thread != null) return
         val minBuf = AudioTrack.getMinBufferSize(SR.toInt(), AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val track = AudioTrack.Builder()
@@ -127,7 +93,7 @@ object Chiptune {
         }.apply { isDaemon = true; name = "chiptune"; start() }
     }
 
-    fun stop() { thread?.interrupt(); thread = null; started = false; updateTrack() }
+    fun stop() { thread?.interrupt(); thread = null }
 
     private fun midi(n: Int) = 440.0 * 2.0.pow((n - 69) / 12.0)
 
@@ -154,13 +120,6 @@ object Chiptune {
 
     private fun next(): Double {
         val dt = 1.0 / SR
-        if (remix) {
-            var out = 0.0
-            if (sfxReset) { sfxReset = false; sfxT = 0.0; sfxPhase = 0.0; sfxLp = 0.0 }
-            sfxKind?.let { out += sfxSample(it, dt) }
-            if (muted) return 0.0
-            return out.coerceIn(-1.0, 1.0)
-        }
         val stepLen = SR * 60 / (song.bpm * (1 + intensity * 0.3)) / 4
         if (stepPos >= stepLen) { stepPos = 0.0; advance() }
         stepPos += 1

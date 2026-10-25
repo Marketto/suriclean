@@ -52,7 +52,7 @@
   const S = {
     platform: "linux", disk: { total: 0, free: 0 }, results: {}, sel: new Set(), view: null,
     tree: localStorage.getItem("suri.tree") === "1", sort: "size", query: "", expanded: new Set(),
-    busy: null, trash: 0, muted: localStorage.getItem("suri.muted") === "1", remix: localStorage.getItem("suri.remix") === "1",
+    busy: null, trash: 0, muted: localStorage.getItem("suri.muted") === "1",
     freed: Number(localStorage.getItem("suri.freed") || 0), stepBase: 0, steps: 1,
   };
 
@@ -112,7 +112,6 @@
         <div class="progress" style="width:100%;height:9px;margin:6px 0"><i style="width:${Math.max(4, lv.p * 100)}%"></i></div><div class="s">${lv.next}</div></div>
       ${updatePill()}
       <div class="music-row"><button class="music-toggle" data-act="mute" title="${esc(t(S.muted ? "web.music.paused" : "web.music.on"))}">${S.muted ? "🔇" : "🎵"}</button>
-      <button class="remix-toggle ${S.remix ? "on" : ""}" data-act="remix" title="${esc(t("web.remix.title"))}">${esc(t(S.remix ? "web.remix.on" : "web.remix.off"))}</button>
       <span class="sp"></span>${langPicker()}</div>`;
     Suri.setActivity($("#suri-side"), S.busy ? S.busy.act : "idle");
   }
@@ -605,7 +604,7 @@
 
   // ───────── events ─────────
   document.addEventListener("click", async e => {
-    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(S.muted); Chiptune.setRemix(S.remix); }
+    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(S.muted); }
     const tg = e.target;
     const openEl = tg.closest("[data-open]");
     if (openEl) return open(openEl.dataset.open || null);
@@ -653,9 +652,6 @@
       case "admin": adminScan(); break;
       case "rescan": if (cat) { if (["buildDeps", "gitRepos", "duplicates", "bigFiles", "installers"].includes(cat.id)) await invoke("invalidate_index"); runScan([cat.id]); } break;
       case "cancel": if (S.busy) { S.busy.cancelled = true; S.busy.title = t("web.busy.stopping"); showBusy(); invoke("cancel_scan"); sfx("error"); } break;
-      case "remix": S.remix = !S.remix; localStorage.setItem("suri.remix", S.remix ? "1" : "0"); Chiptune.setRemix(S.remix);
-        if (S.muted) { S.muted = false; localStorage.setItem("suri.muted", "0"); Chiptune.setMuted(false); }
-        toast(t(S.remix ? "web.remix.toast_on" : "web.remix.toast_off")); renderSidebar(); break;
       case "mute": S.muted = !S.muted; localStorage.setItem("suri.muted", S.muted ? "1" : "0"); Chiptune.setMuted(S.muted); renderSidebar(); break;
       case "refresh": sfx("pop"); await pruneMissing(); await refreshDisk(); render(); break;
       case "askEmpty": sfx("pop"); confirmBox(t("web.empty.ask_title"), t("web.empty.ask_text", bytes(S.trash)), t("web.empty.ask_ok"), emptyTrash); break;

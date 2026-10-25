@@ -33,15 +33,6 @@
   let ctx = null, master = null, sfxBus = null, noiseBuf = null, waves = {};
   let mood = "menu", pending = null, step = 0, nextTime = 0, timer = null;
   let intensity = 0, muted = false, volume = 0.5;
-  // Remix: «Arcade Sparkle» (made with Suno) in a loop instead of the procedural songs; effects stay.
-  let remix = false, track = null;
-  function updateTrack() {
-    const want = remix && !muted && !!timer;
-    if (want) {
-      if (!track) { track = new Audio("remix.mp3"); track.loop = true; track.volume = 0.55; }
-      if (track.paused) track.play().catch(() => {});
-    } else if (track && !track.paused) track.pause();
-  }
 
   const midi = n => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -93,7 +84,6 @@
     while (nextTime < ctx.currentTime + 0.12) {
       if (pending) { mood = pending; pending = null; step = 0; }
       const s = SONGS[mood];
-      if (remix) { nextTime += 0.05; continue; }
       const stepDur = 60 / (s.bpm * (1 + intensity * 0.3)) / 4;
       const t = nextTime;
       const ln = s.lead[step % s.lead.length];
@@ -120,22 +110,15 @@
     if (timer) return;
     nextTime = ctx.currentTime + 0.05;
     timer = setInterval(schedule, 25);
-    updateTrack();
   }
 
-  function stop() { if (timer) { clearInterval(timer); timer = null; } updateTrack(); }
-
-  function setRemix(on) {
-    remix = !!on;
-    updateTrack();
-  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
 
   function setMood(m) { if (SONGS[m] && m !== (pending || mood)) pending = m; }
   function getMood() { return pending || mood; }
   function setIntensity(v) { intensity = Math.max(0, Math.min(1, v)); }
   function setMuted(m) {
     muted = m;
-    updateTrack();
     if (master) master.gain.setTargetAtTime(m ? 0 : volume, ctx.currentTime, 0.05);
     if (sfxBus) sfxBus.gain.setTargetAtTime(m ? 0 : 0.8, ctx.currentTime, 0.05);
   }
@@ -167,5 +150,5 @@
     }
   }
 
-  window.Chiptune = { start, stop, setMood, setRemix, get remix() { return remix; }, getMood, setIntensity, setMuted, sfx, get muted() { return muted; }, get running() { return !!timer; } };
+  window.Chiptune = { start, stop, setMood, getMood, setIntensity, setMuted, sfx, get muted() { return muted; }, get running() { return !!timer; } };
 })();

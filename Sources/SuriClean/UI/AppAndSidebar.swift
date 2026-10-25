@@ -26,7 +26,6 @@ struct SuriCleanApp: App {
                 Button(t("mac.menu.home")) { model.open(nil) }.keyboardShortcut("0")
                 Button(t("mac.menu.checkupd")) { Task { await model.checkForUpdates(manual: true) } }
                 Button(model.muted ? t("mac.menu.musicon") : t("mac.menu.musicoff")) { model.muted.toggle() }.keyboardShortcut("m")
-                Button(model.remix ? t("mac.menu.original") : t("mac.menu.remix")) { model.remix.toggle() }.keyboardShortcut("m", modifiers: [.command, .shift])
                 Divider()
                 Button(t("mac.menu.emptytrash")) { model.askEmptyTrash = true }
                 Divider()
@@ -168,15 +167,6 @@ struct Sidebar: View {
                 .buttonStyle(.plain)
                 .opacity(0.7)
                 .help(model.muted ? t("mac.music.paused") : t("mac.music.on"))
-                Button(action: { model.remix.toggle(); if model.muted { model.muted = false }; Chiptune.shared.sfx(.pop) }) {
-                    Text(model.remix ? "🎧 Remix ON" : "🎧 Remix")
-                        .font(Theme.font(11, .heavy))
-                        .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(Capsule().fill(model.remix ? Theme.pink.opacity(0.85) : Color.white.opacity(0.6)))
-                        .foregroundColor(model.remix ? .white : Theme.cocoa)
-                }
-                .buttonStyle(.plain)
-                .help(t("mac.music.remixhelp"))
                 Spacer(minLength: 4)
                 LanguagePicker()
             }

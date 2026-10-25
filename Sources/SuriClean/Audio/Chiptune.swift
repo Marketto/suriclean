@@ -81,8 +81,6 @@ final class SynthState {
     var volume: Double = 0.5
     var sfxKind: Int = 0
     var sfxReset = false
-    /// Remix on: the synth only plays sound effects, the music comes from the Suno track.
-    var remix = false
 
     private var sampleRate: Double = 44_100
     private var song: Song = Songs.menu
@@ -134,13 +132,6 @@ final class SynthState {
 
     func next() -> Float {
         let dt = 1.0 / sampleRate
-        if remix {
-            var out = 0.0
-            if sfxReset { sfxReset = false; sfxT = 0; sfxPhase = 0; sfxLP = 0 }
-            if sfxKind != 0 { out += sfx(dt) }
-            if muted { return 0 }
-            return Float(max(-1, min(1, out)))
-        }
         let bpm = song.bpm * (1 + intensity * 0.3)
         let stepLen = sampleRate * 60 / bpm / 4
         if stepPos >= stepLen { stepPos = 0; advanceStep() }
@@ -268,7 +259,6 @@ final class Chiptune {
         do {
             try engine.start()
             running = true
-            updateTrack()
         } catch {
             NSLog("SuriClean audio: \(error)")
         }
@@ -286,29 +276,7 @@ final class Chiptune {
 
     var muted: Bool {
         get { synth.muted }
-        set { synth.muted = newValue; updateTrack() }
-    }
-
-    /// «Arcade Sparkle» (made with Suno) in a loop instead of the procedural songs.
-    private var player: AVAudioPlayer?
-
-    var remix: Bool {
-        get { synth.remix }
-        set { synth.remix = newValue; updateTrack() }
-    }
-
-    private func updateTrack() {
-        if synth.remix && !synth.muted && running {
-            if player == nil, let url = Bundle.main.url(forResource: "remix", withExtension: "mp3") {
-                player = try? AVAudioPlayer(contentsOf: url)
-                player?.numberOfLoops = -1
-                player?.volume = 0.55
-                player?.prepareToPlay()
-            }
-            if player?.isPlaying == false { player?.play() }
-        } else {
-            player?.pause()
-        }
+        set { synth.muted = newValue }
     }
 
     func sfx(_ e: SFX) {

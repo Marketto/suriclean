@@ -157,9 +157,6 @@ h2.zones small { font-size: 13px; opacity: .5; font-weight: 700; margin-left: 8p
 
 .music-row { display: flex; align-items: center; gap: 6px; }
 .music-row .sp { flex: 1; }
-.remix-toggle { border: 0; font-family: inherit; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.65); color: inherit; cursor: pointer; transition: transform .2s cubic-bezier(.3,1.7,.5,1); }
-.remix-toggle:hover { transform: scale(1.08) rotate(-3deg); }
-.remix-toggle.on { background: #FF80A8; color: #fff; box-shadow: 0 3px 0 rgba(255,128,168,.45); }
 
 .lang-row { position: relative; display: flex; align-items: center; gap: 4px; padding: 2px 4px; max-width: 120px; white-space: nowrap; overflow: hidden; font-size: 11.5px; font-weight: 800; opacity: .75; cursor: pointer; }
 .lang-row select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }

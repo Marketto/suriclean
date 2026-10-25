@@ -61,8 +61,6 @@
 
   .music { position: fixed; right: 18px; bottom: 18px; z-index: 5; border: 0; font-family: inherit; font-weight: 900; font-size: 15px; background: #fff; color: var(--cocoa); padding: 12px 18px; border-radius: 99px; box-shadow: 0 5px 0 rgba(255,128,168,.45); cursor: pointer; display: flex; gap: 8px; align-items: center; transition: transform .2s cubic-bezier(.3,1.7,.5,1); }
   .music:hover { transform: scale(1.07) rotate(-2deg); }
-  .music.remix { right: auto; left: 18px; box-shadow: 0 5px 0 rgba(168,143,250,.45); }
-  .music.remix.on { background: #A88FFA; color: #fff; }
   .music .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
   .music .eq i { width: 4px; background: var(--pink); border-radius: 2px; height: 30%; }
   .music.on .eq i { animation: eq .5s ease-in-out infinite alternate; }
@@ -173,7 +171,6 @@
 </div>
 
 <button class="music" id="music"><span class="eq"><i></i><i></i><i></i></span><span id="music-label"></span></button>
-<button class="music remix" id="remix">🎧 <span id="remix-label"></span></button>
 
 <script src="i18n.js"></script>
 <script src="suri.js"></script>
@@ -204,12 +201,9 @@
   let k = SHOW.length - 1, latest = null, thanks = false;
   const suri = document.getElementById("suri"), speech = document.getElementById("speech");
   const btn = document.getElementById("music"), label = document.getElementById("music-label");
-  const rbtn = document.getElementById("remix");
 
   function musicLabels() {
     label.textContent = t(btn.classList.contains("on") ? "site.music_on" : "site.music_off");
-    document.getElementById("remix-label").textContent = t(rbtn.classList.contains("on") ? "site.remix_on" : "site.remix");
-    rbtn.title = t("site.remix_title");
   }
 
   function render() {
@@ -274,13 +268,6 @@
     if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(false); Chiptune.setMood(SHOW[k][1]); btn.classList.add("on"); }
     else if (Chiptune.muted) { Chiptune.setMuted(false); btn.classList.add("on"); }
     else { Chiptune.setMuted(true); btn.classList.remove("on"); }
-    musicLabels();
-  });
-  rbtn.addEventListener("click", () => {
-    const on = !Chiptune.remix;
-    if (!Chiptune.running) { Chiptune.start(); Chiptune.setMood(SHOW[k][1]); }
-    Chiptune.setRemix(on); Chiptune.setMuted(false);
-    rbtn.classList.toggle("on", on); btn.classList.add("on");
     musicLabels();
   });
 

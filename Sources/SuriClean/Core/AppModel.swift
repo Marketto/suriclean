@@ -30,12 +30,6 @@ final class AppModel: ObservableObject {
         Chiptune.shared.sfx(.pop)
     }
 
-    @Published var remix: Bool = UserDefaults.standard.bool(forKey: "suri.remix") {
-        didSet {
-            UserDefaults.standard.set(remix, forKey: "suri.remix")
-            Chiptune.shared.remix = remix
-        }
-    }
     @Published var muted: Bool = UserDefaults.standard.bool(forKey: "suri.muted") {
         didSet {
             UserDefaults.standard.set(muted, forKey: "suri.muted")
@@ -79,7 +73,6 @@ final class AppModel: ObservableObject {
         started = true
         Chiptune.shared.start()
         Chiptune.shared.muted = muted
-        Chiptune.shared.remix = remix
         Chiptune.shared.mood = .menu
         refreshDisk()
         hasFDA = FS.hasFullDiskAccess()

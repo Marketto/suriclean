@@ -13,8 +13,6 @@ android {
     namespace = "com.suriclean.app"
     compileSdk = 34
 
-    // «Arcade Sparkle» for the remix, shared with the Mac, desktop and web versions
-    sourceSets["main"].assets.srcDir("../../shared/audio")
     // translations shared with the other platforms (one JSON per language)
     sourceSets["main"].assets.srcDir("../../i18n")
     androidResources {

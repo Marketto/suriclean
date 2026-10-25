@@ -27,7 +27,6 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SuriClean"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-[ -f shared/audio/remix.mp3 ] && cp shared/audio/remix.mp3 "$APP/Contents/Resources/remix.mp3"
 # translations (i18n/README.md): the JSON files, plus an .lproj per language so macOS
 # shows its own menus and permission texts in the user's language
 mkdir -p "$APP/Contents/Resources/i18n"

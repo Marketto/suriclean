@@ -47,7 +47,6 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     private val permAsked = mutableSetOf<String>()
     private var permsChecked = false
     var muted by mutableStateOf(prefs.getBoolean("muted", false))
-    var remix by mutableStateOf(prefs.getBoolean("remix", false))
         private set
     var freed by mutableStateOf(prefs.getLong("freed", 0))
         private set
@@ -72,9 +71,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     init {
         L.init(app)
-        Chiptune.attach(app)
         Chiptune.muted = muted
-        Chiptune.remix = remix
         refresh()
         viewModelScope.launch {
             delay(4000)
@@ -130,13 +127,6 @@ class AppVM(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-    }
-
-    fun toggleRemix() {
-        remix = !remix; Chiptune.remix = remix; prefs.edit().putBoolean("remix", remix).apply()
-        if (muted) toggleMute()
-        Chiptune.sfx(Sfx.POP)
-        showToast(if (remix) L.t("and.toast.remixOn") else L.t("and.toast.remixOff"))
     }
 
     fun toggleMute() { muted = !muted; Chiptune.muted = muted; prefs.edit().putBoolean("muted", muted).apply() }
