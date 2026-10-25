@@ -33,3 +33,10 @@ Procedura consigliata: carica `it.json` con Python, traduci a blocchi (es. per p
 `web.`, `site.`), scrivi blocchi parziali e uniscili in `i18n/<codice>.json` (UTF-8, `ensure_ascii=False`,
 indent 1, chiavi ordinate). Poi esegui `python3 i18n/merge.py` e correggi finché la riga della tua lingua
 non riporta più chiavi mancanti o segnaposto sbagliati. Non modificare altri file e non fare commit.
+
+## Aggiornamento: solo le chiavi nuove
+
+Quando in `it.json` compaiono chiavi nuove, si traducono SOLO quelle che mancano in `i18n/<codice>.json`
+(confronta le chiavi; `python3 i18n/merge.py` le elenca), lasciando intatte le traduzioni già presenti.
+Termini di Schiaccia: «Schiaccia» è il nome dell'app (non si traduce); i livelli Carezza / Stretta / Martellata
+vanno resi con parole tenere e buffe equivalenti (carezza leggera, stretta decisa, martellata energica).

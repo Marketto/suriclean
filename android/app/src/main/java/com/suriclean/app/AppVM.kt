@@ -331,7 +331,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setSqueezeLevel(l: String) { squeezeLevel = l; prefs.edit().putString("squeezeLevel", l).apply(); Chiptune.sfx(Sfx.POP) }
+    fun chooseSqueezeLevel(l: String) { squeezeLevel = l; prefs.edit().putString("squeezeLevel", l).apply(); Chiptune.sfx(Sfx.POP) }
 
     fun toggleSqueezeKind(k: String) {
         squeezeKinds = if (k in squeezeKinds) squeezeKinds - k else squeezeKinds + k

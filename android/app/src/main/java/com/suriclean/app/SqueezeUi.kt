@@ -69,7 +69,7 @@ fun SqueezeControls(vm: AppVM) {
         }
         val lv = vm.squeezeLevel
         SegmentRow(listOf(L.t("and.sq.level.soft") to (lv == "soft"), L.t("and.sq.level.mid") to (lv == "mid"), L.t("and.sq.level.hard") to (lv == "hard")),
-            Kawaii.lilac) { vm.setSqueezeLevel(listOf("soft", "mid", "hard")[it]) }
+            Kawaii.lilac) { vm.chooseSqueezeLevel(listOf("soft", "mid", "hard")[it]) }
         KText(L.t("and.sq.level.${lv}Note"), 10.5.sp, bold = false, alpha = 0.6f)
         if (vm.canVideo == false) KText(L.t("and.sq.noVideo"), 10.5.sp, bold = false, color = Kawaii.coral.darker())
     }
