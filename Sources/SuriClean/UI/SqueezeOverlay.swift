@@ -78,7 +78,8 @@ struct PressView: View {
             .frame(width: 36, height: 250)
     }
 
-    @ViewBuilder private var sheet: some View {
+    /// The object under the press (and in Suri's paws): PDF sheet, photo or clapperboard.
+    @ViewBuilder var sheet: some View {
         switch kind {
         case .pdf:
             ZStack {
@@ -149,15 +150,13 @@ struct PressView: View {
     }
 }
 
-/// Little card of the file Suri carries.
+/// The file Suri carries: the same object Schiaccia's press shows for that kind of file.
 private struct FileCard: View {
     let kind: SqueezeKind
     var body: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.white)
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(ink, lineWidth: 3))
-            .overlay(Text(kind.tag).font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundColor(kind == .video ? Theme.sky.darker : (kind == .jpg ? Theme.mint.darker : Theme.coral)))
-            .frame(width: 34, height: 42)
+        PressView(kind: kind, slam: 0, squash: 0).sheet
+            .scaleEffect(0.34)
+            .frame(width: 56, height: 28)
     }
 }
 

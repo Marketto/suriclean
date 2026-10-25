@@ -645,7 +645,13 @@
       <span class="sq-credit">${esc(t("web.squeeze.credit", Motore.version))}</span></div>`;
   }
 
-  const KIND_TAG = { pdf: "PDF", jpg: "JPG", video: "MP4" };
+  /** The object Suri carries: the same one Schiaccia's press shows for this kind (PDF sheet, photo, clapperboard). */
+  function sheetSvg(kind) {
+    const cls = { pdf: "s-pdf", jpg: "s-jpg", video: "s-vid" }[kind] || "s-pdf";
+    const m = (S.press || "").match(new RegExp(`<g class="${cls}">[\\s\\S]*?</g>(?=<g class="s-|</g>)`));
+    const g = m ? m[0] : "";
+    return `<svg viewBox="168 308 176 100" xmlns="http://www.w3.org/2000/svg"><g stroke="#3b2a4a" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">${g}</g></svg>`;
+  }
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const baseName = p => p.split(/[\\/]/).pop();
 
@@ -675,7 +681,7 @@
     const sv = $("#sq-suri"), file = $("#sq-file"), b = $("#sq-badge");
     if (name === "run") {
       st.className = "sq-stage"; void st.offsetWidth;
-      file.textContent = KIND_TAG[kind] || "PDF"; file.dataset.kind = kind || "pdf"; b.textContent = "";
+      file.innerHTML = sheetSvg(kind); file.dataset.kind = kind || "pdf"; b.textContent = "";
       Suri.setActivity(sv, "lookout"); st.classList.add("run"); await wait(850);
       st.classList.add("work"); Suri.setActivity(sv, "celebrating");
     } else if (name === "slam") {

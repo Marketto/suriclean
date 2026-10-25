@@ -138,11 +138,11 @@ private fun CourierStage(run: SqueezeRun) {
         val fy = fyLine - if (t in 0.35f..0.48f) 40f * sin(PI.toFloat() * u) else 0f
         val sy = track(t, 0f to 1f, 0.55f to 1f, 0.62f to 0.35f, 1f to 0.35f)
         val fa = track(t, 0f to 1f, 0.78f to 1f, 0.86f to 0f, 0.99f to 0f, 1f to 1f)
-        Box(Modifier.offset(fx.dp, fy.dp).size(34.dp, 42.dp).alpha(fa)
-            .graphicsLayer { scaleY = sy; transformOrigin = TransformOrigin(0.5f, 1f); rotationZ = if (t > 0.62f) -18f * ((t - 0.62f) / 0.16f).coerceAtMost(1f) else 0f }
-            .background(Color.White, RoundedCornerShape(6.dp)).border(4.dp, Color(0xFF3B2A4A), RoundedCornerShape(6.dp)),
-            contentAlignment = Alignment.Center) {
-            KText(SqueezeKinds.label(run.kind), 9.sp, color = Color(0xFFEF5B8B), maxLines = 1)
+        Canvas(Modifier.offset(fx.dp - 9.dp, fy.dp + 12.dp).size(52.dp, 30.dp).alpha(fa)
+            .graphicsLayer { scaleY = sy; transformOrigin = TransformOrigin(0.5f, 1f); rotationZ = if (t > 0.62f) -18f * ((t - 0.62f) / 0.16f).coerceAtMost(1f) else 0f }) {
+            // same object as under the press, drawn from the press geometry (sheet area x 168…344, y 308…408)
+            val k = size.width / 176f
+            withTransform({ scale(k, k, Offset.Zero); translate(-168f, -308f) }) { drawSheet(run.kind) }
         }
         // the saving of the last file, popping up after the squash
         val ba = track(t, 0f to 0f, 0.62f to 0f, 0.70f to 1f, 0.88f to 1f, 1f to 0f)
@@ -169,28 +169,7 @@ fun DrawScope.drawPress(headDy: Float, kind: String) {
         rr(100f, 150f, 36f, 250f, 18f, Color(0xFFCDB8FF))
         rr(376f, 150f, 36f, 250f, 18f, Color(0xFFCDB8FF))
         // the sheet under the press, as in Schiaccia's PDF / JPG / video modes
-        when (kind) {
-            "jpg" -> {
-                rr(176f, 326f, 160f, 74f, 8f, Color.White)
-                drawRoundRect(Color(0xFF9AD7FF), Offset(190f, 336f), Size(132f, 54f), CornerRadius(3f))
-                drawCircle(Color(0xFFFFD23F), 9f, Offset(300f, 352f))
-                drawPath(Path().apply { moveTo(190f, 390f); relativeLineTo(36f, -30f); relativeLineTo(22f, 18f); relativeLineTo(18f, -14f); relativeLineTo(56f, 26f); close() }, Color(0xFF3DDC97))
-                drawRoundRect(INK, Offset(190f, 336f), Size(132f, 54f), CornerRadius(3f), style = Stroke(5f))
-            }
-            "video" -> {
-                rr(180f, 348f, 152f, 52f, 8f, INK)
-                val clap = Path().apply { moveTo(176f, 330f); relativeLineTo(150f, -14f); relativeLineTo(4f, 22f); relativeLineTo(-150f, 14f); close() }
-                drawPath(clap, Color.White); drawPath(clap, INK, style = line)
-                drawLine(Color.White, Offset(200f, 366f), Offset(290f, 366f), 7f)
-                drawLine(Color.White, Offset(200f, 382f), Offset(256f, 382f), 7f)
-                drawCircle(Color(0xFFFF5A4E), 7f, Offset(312f, 386f))
-            }
-            else -> {
-                rr(176f, 330f, 160f, 70f, 12f, Color.White)
-                drawLine(Color(0xFFF0B6C8), Offset(198f, 353f), Offset(314f, 353f), 7f)
-                drawLine(Color(0xFFF0B6C8), Offset(198f, 375f), Offset(314f, 375f), 7f)
-            }
-        }
+        drawSheet(kind)
         // base
         rr(84f, 392f, 344f, 50f, 25f, Color(0xFFA48CF0))
         // the head, which comes down on the file
@@ -214,5 +193,36 @@ fun DrawScope.drawPress(headDy: Float, kind: String) {
             relativeLineTo(-7f, -17f); relativeLineTo(-17f, -7f); relativeLineTo(17f, -7f); close()
         }
         drawPath(spark, Color(0xFFFFF6A8)); drawPath(spark, INK, style = Stroke(6f, join = StrokeJoin.Round))
+    }
+}
+
+/** The object under the press and in Suri's paws (press SVG units): PDF sheet, photo or clapperboard. */
+fun DrawScope.drawSheet(kind: String) {
+    val line = Stroke(10f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    fun rr(x: Float, y: Float, w: Float, h: Float, r: Float, fill: Color, stroke: Stroke? = line) {
+        drawRoundRect(fill, Offset(x, y), Size(w, h), CornerRadius(r))
+        if (stroke != null) drawRoundRect(INK, Offset(x, y), Size(w, h), CornerRadius(r), style = stroke)
+    }
+    when (kind) {
+        "jpg" -> {
+            rr(176f, 326f, 160f, 74f, 8f, Color.White)
+            drawRoundRect(Color(0xFF9AD7FF), Offset(190f, 336f), Size(132f, 54f), CornerRadius(3f))
+            drawCircle(Color(0xFFFFD23F), 9f, Offset(300f, 352f))
+            drawPath(Path().apply { moveTo(190f, 390f); relativeLineTo(36f, -30f); relativeLineTo(22f, 18f); relativeLineTo(18f, -14f); relativeLineTo(56f, 26f); close() }, Color(0xFF3DDC97))
+            drawRoundRect(INK, Offset(190f, 336f), Size(132f, 54f), CornerRadius(3f), style = Stroke(5f))
+        }
+        "video" -> {
+            rr(180f, 348f, 152f, 52f, 8f, INK)
+            val clap = Path().apply { moveTo(176f, 330f); relativeLineTo(150f, -14f); relativeLineTo(4f, 22f); relativeLineTo(-150f, 14f); close() }
+            drawPath(clap, Color.White); drawPath(clap, INK, style = line)
+            drawLine(Color.White, Offset(200f, 366f), Offset(290f, 366f), 7f)
+            drawLine(Color.White, Offset(200f, 382f), Offset(256f, 382f), 7f)
+            drawCircle(Color(0xFFFF5A4E), 7f, Offset(312f, 386f))
+        }
+        else -> {
+            rr(176f, 330f, 160f, 70f, 12f, Color.White)
+            drawLine(Color(0xFFF0B6C8), Offset(198f, 353f), Offset(314f, 353f), 7f)
+            drawLine(Color(0xFFF0B6C8), Offset(198f, 375f), Offset(314f, 375f), 7f)
+        }
     }
 }

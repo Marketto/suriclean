@@ -200,3 +200,5 @@ h2.zones small { font-size: 13px; opacity: .5; font-weight: 700; margin-left: 8p
 .sq-stage.fly .sq-badge, .sq-stage.skip .sq-badge { opacity: 1; transform: translateY(0); }
 /* skip: nothing to gain, the file hops back */
 .sq-stage.skip .sq-file { left: 78px; bottom: 116px; }
+.sq-file { background: transparent !important; border: 0 !important; width: 58px !important; height: 34px !important; }
+.sq-file svg { width: 100%; height: 100%; display: block; overflow: visible; }
