@@ -44,12 +44,23 @@ enum Squeeze {
         guard let index = index else { return [] }
         var out: [CleanItem] = []
         for f in index.files {
-            guard let k = SqueezeKind.of(f.url), f.size >= k.minSize else { continue }
+            guard let k = SqueezeKind.of(f.url), f.size >= k.minSize, isLocal(f.url) else { continue }
             out.append(CleanItem(url: f.url, name: f.url.lastPathComponent,
                                  detail: t("mac.detail.modified", FS.pretty(f.url.deletingLastPathComponent()), Fmt.relative(f.modified)),
                                  size: f.size, date: f.modified, risk: .review, recommended: false, badges: [k.badge]))
         }
         return out.sorted { $0.size > $1.size }
+    }
+
+    /// iCloud files whose content isn't on this Mac are skipped: reading them would download them.
+    static func isLocal(_ u: URL) -> Bool {
+        #if os(macOS)
+        guard let v = try? u.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]),
+              v.isUbiquitousItem == true else { return true }
+        return v.ubiquitousItemDownloadingStatus == .current
+        #else
+        return true
+        #endif
     }
 
     /// Schiaccia's files inside the app (build.sh copies ./schiaccia, made by scripts/fetch-schiaccia.sh).
