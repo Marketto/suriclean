@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write # scripts/clean-artifacts.sh deletes the previous runs' artifacts
   pages: write
   id-token: write
 
@@ -71,6 +72,11 @@ jobs:
           codesign --verify --deep /tmp/suri/SuriClean.app && echo "✅ signature ok"
           hdiutil detach /tmp/suri
 
+      - name: Delete previous copies of mac
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/clean-artifacts.sh "mac"
       - uses: actions/upload-artifact@v4
         with:
           name: mac
@@ -79,6 +85,7 @@ jobs:
             dist/screenshot-mac.png
             dist/screenshot-mac-*.png
           if-no-files-found: warn
+          retention-days: 7
 
   desktop:
     strategy:
@@ -166,11 +173,17 @@ jobs:
           $bmp.Save("dist/screenshot-windows.png")
           if ($p.HasExited) { Write-Host "❌ exited" } else { Write-Host "✅ running"; Stop-Process -Id $p.Id }
 
+      - name: Delete previous copies of desktop-${{ runner.os }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/clean-artifacts.sh "desktop-${{ runner.os }}"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ runner.os }}
           path: dist/*
           if-no-files-found: warn
+          retention-days: 7
 
   android:
     runs-on: ubuntu-latest
@@ -245,11 +258,17 @@ jobs:
             adb exec-out screencap -p > dist/screenshot-android-3.png
             adb logcat -d -s AndroidRuntime:E | tail -40
 
+      - name: Delete previous copies of android
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/clean-artifacts.sh "android"
       - uses: actions/upload-artifact@v4
         with:
           name: android
           path: dist/*
           if-no-files-found: warn
+          retention-days: 7
 
   release:
     needs: [mac, desktop, android]
@@ -286,14 +305,25 @@ jobs:
           mkdir -p _site/i18n && cp i18n/*.json _site/i18n/
           cp Resources/AppIcon.png _site/icon.png
           if [ -f art/screenshot-mac.png ]; then cp art/screenshot-mac.png _site/screenshot.png; fi
+      - name: Delete previous copies of github-pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/clean-artifacts.sh "github-pages"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      - name: Delete previous copies of screenshots
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/clean-artifacts.sh "screenshots"
       - uses: actions/upload-artifact@v4
         with:
           name: screenshots
           path: art/screenshot-*.png
           if-no-files-found: ignore
+          retention-days: 7
 
   pages:
     needs: release
