@@ -99,6 +99,10 @@ jobs:
       - name: Schiaccia engine (motore.js + press mascot)
         shell: bash
         run: scripts/fetch-schiaccia.sh
+
+      - name: Licenses of the bundled Rust crates
+        shell: bash
+        run: python3 scripts/rust-licenses.py || python scripts/rust-licenses.py
       - name: Version
         shell: bash
         run: echo "SURI_VERSION=1.$((GITHUB_RUN_NUMBER + 10))" >> "$GITHUB_ENV"

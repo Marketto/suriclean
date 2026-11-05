@@ -1,0 +1,104 @@
+[
+ {
+  "name": "Schiaccia (motore di compressione)",
+  "by": "Marco Ricupero",
+  "license": "MIT",
+  "url": "https://github.com/Marketto/pdf-tiny-tools",
+  "platforms": [
+   "mac",
+   "desktop",
+   "android"
+  ],
+  "sameAuthor": true
+ },
+ {
+  "name": "pdf-lib",
+  "by": "Andrew Dillon",
+  "copyright": "Copyright (c) 2019 Andrew Dillon",
+  "license": "MIT",
+  "url": "https://github.com/Hopding/pdf-lib",
+  "platforms": [
+   "mac",
+   "desktop",
+   "android"
+  ]
+ },
+ {
+  "name": "Mediabunny",
+  "by": "Vanilagy",
+  "license": "MPL-2.0",
+  "url": "https://github.com/Vanilagy/mediabunny",
+  "platforms": [
+   "mac",
+   "desktop",
+   "android"
+  ]
+ },
+ {
+  "name": "Tauri",
+  "by": "The Tauri Programme within The Commons Conservancy",
+  "license": "MIT OR Apache-2.0",
+  "url": "https://github.com/tauri-apps/tauri",
+  "platforms": [
+   "desktop"
+  ]
+ },
+ {
+  "name": "Rust crates (serde, walkdir, trash, sha2, dirs, sysinfo, ureq…)",
+  "by": "various authors",
+  "license": "various (see list)",
+  "url": "https://crates.io",
+  "platforms": [
+   "desktop"
+  ],
+  "list": "rust-crates.json"
+ },
+ {
+  "name": "AndroidX / Jetpack Compose",
+  "by": "The Android Open Source Project",
+  "license": "Apache-2.0",
+  "url": "https://developer.android.com/jetpack/androidx",
+  "platforms": [
+   "android"
+  ]
+ },
+ {
+  "name": "Kotlin standard library",
+  "by": "JetBrains s.r.o. and Kotlin Programming Language contributors",
+  "license": "Apache-2.0",
+  "url": "https://github.com/JetBrains/kotlin",
+  "platforms": [
+   "android"
+  ]
+ },
+ {
+  "name": "kotlinx.coroutines",
+  "by": "JetBrains s.r.o. and contributors",
+  "license": "Apache-2.0",
+  "url": "https://github.com/Kotlin/kotlinx.coroutines",
+  "platforms": [
+   "android"
+  ]
+ },
+ {
+  "name": "Shizuku API",
+  "by": "RikkaW",
+  "copyright": "Copyright (c) 2021 RikkaW",
+  "license": "MIT",
+  "url": "https://github.com/RikkaApps/Shizuku-API",
+  "platforms": [
+   "android"
+  ]
+ },
+ {
+  "name": "M PLUS Rounded 1c",
+  "by": "The M+ FONTS Project Authors",
+  "copyright": "Copyright 2021 The M+ FONTS Project Authors",
+  "license": "OFL-1.1",
+  "url": "https://github.com/coz-m/MPLUS_FONTS",
+  "platforms": [
+   "android",
+   "site"
+  ]
+ }
+]
