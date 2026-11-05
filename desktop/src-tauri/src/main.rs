@@ -236,6 +236,37 @@ fn open_url(url: String) {
     }
 }
 
+/// Where the accepted terms/privacy version is kept (source of truth for the consent, legal/README.md).
+fn legal_file() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("SuriClean").join("legal-accepted.txt"))
+}
+
+/// The version of the terms the user accepted ("" if never).
+#[tauri::command]
+fn legal_accepted() -> String {
+    legal_file()
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .and_then(|s| s.lines().next().map(|l| l.trim().to_string()))
+        .unwrap_or_default()
+}
+
+/// Remembers that the user accepted this version of the terms and privacy policy.
+#[tauri::command]
+fn legal_accept(version: String) -> bool {
+    let Some(f) = legal_file() else { return false };
+    if let Some(d) = f.parent() {
+        let _ = std::fs::create_dir_all(d);
+    }
+    let when = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    std::fs::write(f, format!("{}\naccepted-at-unix: {}\n", version.trim(), when)).is_ok()
+}
+
+/// «Esci» in the consent window: the app closes without doing anything.
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 #[tauri::command]
 fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
@@ -400,7 +431,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             platform, disk_info, has_git, scan_category, cancel_scan, invalidate_index,
             trash_items, trash_size, empty_trash, existing, reveal, open_folder, open_url,
-            app_version, install_update, install_kind, elevated_scan, read_bytes, save_squeezed
+            app_version, install_update, install_kind, elevated_scan, read_bytes, save_squeezed,
+            legal_accepted, legal_accept, quit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running SuriClean");

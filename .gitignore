@@ -16,3 +16,4 @@ desktop/src-tauri/icons/
 desktop/src-tauri/gen/
 .schiaccia-src/
 legal/rust-crates.json
+desktop/ui/legal/

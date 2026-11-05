@@ -48,3 +48,55 @@ SuriClean è gratuito, non ha scopo di lucro e il suo codice sorgente è pubblic
 
 Questi termini possono cambiare con le nuove versioni dell'app. Se cambiano in modo rilevante, l'app te li ripropone e potrai continuare a usarla solo accettandoli di nuovo.
 
+---
+
+# SuriClean Terms of Use
+
+_Last updated: 2026-11-04_
+
+## 1. Acceptance
+
+By using SuriClean you accept these Terms of Use and the Privacy Policy. If you do not accept them, do not use the app.
+
+## 2. What the app does
+
+SuriClean identifies files and data that could free up space (caches, logs, temporary files, duplicates, large files, rarely used apps, system areas) and offers to move them to the Trash, delete them, uninstall apps, clear their data or compress files with the Schiaccia engine.
+
+The app's indications (“Safe”, “Review”, “With care”, “Recommended”, the preselections, the space estimates) are automatic assessments: they may be wrong or unsuitable for your case.
+
+## 3. Your responsibilities
+
+You are solely responsible for the files and data you select and for every operation you confirm, in particular:
+- moving files to the Trash, emptying it or permanently deleting files;
+- deleting system files or files of other users, including with the administrator password;
+- uninstalling apps or clearing their data;
+- compressing files by replacing the originals (compression may reduce quality).
+
+Before confirming, check carefully what you have selected and keep up-to-date backups of your important data. Some operations cannot be undone.
+
+## 4. Permissions and system tools
+
+Some features require special permissions (All files access, Usage access, Full Disk Access, administrator password) or external tools such as Shizuku. Granting them is your choice: do so only if you understand what they are for.
+
+## 5. No warranty
+
+SuriClean is free software distributed under the MIT License and is provided “as is”, without warranty of any kind, express or implied, including the warranties of merchantability, fitness for a particular purpose and freedom from errors. There is no guarantee that the app will work without interruption, that it is compatible with your device, or that the results (space freed, quality of compressed files) will be as expected.
+
+## 6. Exclusion of liability and indemnity
+
+To the maximum extent permitted by applicable law, the author of SuriClean and the authors of the included third-party libraries and components are not liable for any damage, direct or indirect, including loss of data, files, time or profits, arising from the use of the app or the inability to use it.
+
+By accepting these terms, you release the author of SuriClean and the authors of the included libraries and components from any liability and waive any claim against them related to the use of the app. Only the rights that the law does not allow to be excluded remain unaffected.
+
+## 7. Third-party software
+
+SuriClean includes components by other authors, each distributed under its own license: the list and the full texts are in the “Licenses” section. Those components are also provided without warranties by their respective authors.
+
+## 8. Free of charge and source code
+
+SuriClean is free of charge, non-profit, and its source code is public on GitHub (github.com/Marketto/suriclean), under the MIT License.
+
+## 9. Changes
+
+These terms may change with new versions of the app. If they change materially, the app will show them to you again and you will be able to continue using it only by accepting them again.
+

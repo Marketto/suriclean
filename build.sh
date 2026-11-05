@@ -30,6 +30,11 @@ cp "$BIN" "$APP/Contents/MacOS/SuriClean"
 # Schiaccia's engine for «Da schiacciare» (docs/SCHIACCIA.md); scripts/fetch-schiaccia.sh makes ./schiaccia
 if [ ! -f schiaccia/motore.js ] && [ -x scripts/fetch-schiaccia.sh ]; then scripts/fetch-schiaccia.sh || echo "⚠️  Schiaccia non scaricato: «Da schiacciare» farà solo i video"; fi
 [ -f schiaccia/motore.js ] && cp -R schiaccia "$APP/Contents/Resources/schiaccia"
+# terms, privacy and third-party licenses (legal/README.md), shown offline in «Note legali»
+mkdir -p "$APP/Contents/Resources/legal/licenses"
+cp legal/VERSION legal/third-party.json "$APP/Contents/Resources/legal/" 2>/dev/null || true
+cp legal/licenses/*.txt "$APP/Contents/Resources/legal/licenses/" 2>/dev/null || true
+cp LICENSE "$APP/Contents/Resources/legal/LICENSE" 2>/dev/null || true
 # translations (i18n/README.md): the JSON files, plus an .lproj per language so macOS
 # shows its own menus and permission texts in the user's language
 mkdir -p "$APP/Contents/Resources/i18n"

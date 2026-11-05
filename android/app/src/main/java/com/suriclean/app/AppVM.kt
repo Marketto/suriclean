@@ -55,6 +55,26 @@ class AppVM(app: Application) : AndroidViewModel(app) {
         private set
     val version: String = try { app.packageManager.getPackageInfo(app.packageName, 0).versionName ?: "0" } catch (e: Exception) { "0" }
 
+    // ───────── legal (legal/README.md): terms + privacy accepted once, again when legal/VERSION changes ─────────
+    /** Date of the documents in force, from assets/legal/VERSION. */
+    val legalVersion: String = try { app.assets.open("legal/VERSION").bufferedReader().use { it.readText().trim() } } catch (e: Exception) { "" }
+    /** The version accepted earlier, or "" if never. */
+    private val legalAcceptedBefore: String = prefs.getString("legalAccepted", "") ?: ""
+    /** The consent dialog must be shown: nothing works until it is accepted. */
+    var needsLegal by mutableStateOf(legalAcceptedBefore != legalVersion)
+        private set
+    /** Accepted an older version: the dialog says the documents changed. */
+    val legalUpdated: Boolean get() = legalAcceptedBefore.isNotEmpty() && legalAcceptedBefore != legalVersion
+    /** «Note legali» full-screen viewer. */
+    var showLegal by mutableStateOf(false)
+
+    fun acceptLegal() {
+        prefs.edit().putString("legalAccepted", legalVersion).putLong("legalAcceptedAt", System.currentTimeMillis()).apply()
+        needsLegal = false
+        Chiptune.sfx(Sfx.COIN)
+        refresh()   // now the permission dialog may appear
+    }
+
     /** Package names waiting for the system uninstall dialog. */
     val uninstallQueue = ArrayDeque<String>()
     /** Apps whose settings page we still have to open for «Cancella dati» (no Shizuku). */
@@ -112,7 +132,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             ShizukuBridge.installed(ctx) -> 1
             else -> 0
         }
-        if (!permsChecked) {
+        if (!permsChecked && !needsLegal) {
             permsChecked = true
             if ((!hasFiles || !hasUsage) && prefs.getString("permsSnoozed", "") != version) askPerms = true
         }
@@ -183,6 +203,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     }
 
     fun scanAll() {
+        if (needsLegal) return
         if (!hasFiles || !hasUsage) { permTourScan = true; askPerms = true; return }
         scan(Category.entries.toList())
     }
@@ -232,7 +253,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     private fun needsIndex(c: Category) = c in setOf(Category.MAP, Category.DUPLICATES, Category.BIG, Category.SQUEEZE, Category.APKS, Category.JUNK, Category.SYSTEM)
 
     fun scan(cats: List<Category>) {
-        if (busy != null || cats.isEmpty()) return
+        if (needsLegal || busy != null || cats.isEmpty()) return
         if (!hasFiles && cats.any { it != Category.APPS }) { showToast(L.t("and.toast.needFiles")); return }
         cancel = AtomicBoolean(false)
         val flag = cancel
@@ -293,6 +314,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     // ───────── cleaning ─────────
     fun clean(c: Category) {
+        if (needsLegal) return
         if (busy != null) return
         var sel = selected(c)
         if (c == Category.APPS) { uninstall(sel); return }
@@ -350,6 +372,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     /** Squeezes the selected files one by one; each light copy replaces its original, which goes to Suri's trash. */
     fun squeeze() {
+        if (needsLegal) return
         if (busy != null || squeezeRun != null) return
         val e = engine ?: return
         val sel = squeezeVisible().filter { it.id in selection }
@@ -452,6 +475,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
     fun hideShizuku() { shizukuHidden = true; prefs.edit().putBoolean("shizukuHidden", true).apply() }
 
     fun clearAllCaches() {
+        if (needsLegal) return
         if (ShizukuBridge.ready()) {
             if (busy != null) return
             busy = Busy(Act.SWEEPING, L.t("and.busy.cachesAll"), progress = null)
@@ -511,6 +535,7 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     /** Wipes the data of the selected apps: in one go with Shizuku, otherwise app page after app page. */
     fun clearAppData() {
+        if (needsLegal) return
         if (busy != null) return
         val apps = selected(Category.APPS).filter { it.packageName != null }
         if (apps.isEmpty()) return

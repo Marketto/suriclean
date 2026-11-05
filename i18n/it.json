@@ -1020,7 +1020,7 @@
  "site.music_off": "♪ Accendi la musica",
  "site.music_on": "♪ Pikopiko ON",
  "site.ribbon_html": "☆ NUOVO <b>新発売</b> Gratis per Mac · Windows · Ubuntu · Android ☆",
- "site.safe1_html": "Tutto finisce nel <b>Cestino</b>: puoi sempre ripensarci.",
+ "site.safe1_html": "Quasi tutto finisce nel <b>Cestino</b>; quando un'operazione non si può annullare, Suri te lo dice prima.",
  "site.safe2_html": "Chiede sempre <b>conferma</b> prima di spostare qualcosa.",
  "site.safe3_html": "I repo git vengono toccati solo se sono <b>al sicuro sul remote</b>; il comando per riclonarli viene salvato.",
  "site.safe4_html": "Rami e stash eliminati: commit annotato e <b>copia .patch</b> salvata.",
