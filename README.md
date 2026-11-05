@@ -97,3 +97,11 @@ Durante le scansioni Suri fa cose diverse:
 - annusa le briciole;
 - spazza con la scopa;
 - festeggia con il cappellino da festa.
+
+## Licenza e note legali
+
+SuriClean è software libero con licenza **MIT** (vedi [`LICENSE`](LICENSE)), fornito «così com'è», senza garanzie.
+Al primo avvio ogni app chiede di accettare i [Termini d'uso](TERMS.md) e l'[Informativa privacy](PRIVACY.md);
+le licenze dei componenti inclusi sono in [`THIRD-PARTY.md`](THIRD-PARTY.md) e, con i testi completi, nella voce
+«Note legali» dentro ogni app e sul sito. I testi stanno in `i18n/` (chiavi `legal.*`, in tutte le lingue):
+vedi [`legal/README.md`](legal/README.md).
