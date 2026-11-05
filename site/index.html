@@ -9,9 +9,10 @@
 <meta property="og:description" content="Cache, duplicati, repo git dimenticati, dati di Claude e Codex… Suri li trova, tu decidi. Gratis per Mac, Windows e Ubuntu.">
 <meta property="og:image" content="icon.png">
 <link rel="icon" href="icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap" rel="stylesheet">
 <style>
+  /* the font is served by this site itself: no third-party requests (see the privacy policy) */
+  @font-face { font-family: "M PLUS Rounded 1c"; src: url("fonts/mplus_rounded_medium.ttf") format("truetype"); font-weight: 400 600; font-display: swap; }
+  @font-face { font-family: "M PLUS Rounded 1c"; src: url("fonts/mplus_rounded_extrabold.ttf") format("truetype"); font-weight: 700 900; font-display: swap; }
   :root { --cream:#FFF7E8; --peach:#FFCCAD; --pink:#FF80A8; --hot:#FF5A82; --coral:#FF786E; --orange:#FFA85C; --lemon:#FFD14D; --mint:#61D6AD; --sky:#6CB2FF; --lilac:#A88FFA; --cocoa:#54382B; }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -62,6 +63,23 @@
   .tiny { font-size: 13px; font-weight: 700; opacity: .65; margin-top: 12px; }
 
   .music { position: fixed; right: 18px; bottom: 18px; z-index: 5; border: 0; font-family: inherit; font-weight: 900; font-size: 15px; background: #fff; color: var(--cocoa); padding: 12px 18px; border-radius: 99px; box-shadow: 0 5px 0 rgba(255,128,168,.45); cursor: pointer; display: flex; gap: 8px; align-items: center; transition: transform .2s cubic-bezier(.3,1.7,.5,1); }
+  .legal-links a { font-size: 13px; }
+  .legal-ov { position: fixed; inset: 0; z-index: 20; background: rgba(84,56,43,.35); display: grid; place-items: center; padding: 16px; }
+  .legal-ov[hidden] { display: none; }
+  .legal-card { background: #FFF9F0; width: min(760px, 100%); max-height: min(86vh, 900px); border-radius: 26px; box-shadow: 0 8px 0 rgba(255,128,168,.4); display: flex; flex-direction: column; overflow: hidden; }
+  .legal-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 6px; }
+  .legal-top h2 { margin: 0; font-size: 22px; }
+  .legal-x { border: 0; background: #fff; border-radius: 99px; width: 36px; height: 36px; font: inherit; font-weight: 900; cursor: pointer; color: var(--cocoa); }
+  .legal-tabs { display: flex; gap: 8px; padding: 6px 20px 10px; flex-wrap: wrap; }
+  .legal-tabs button { border: 0; font: inherit; font-weight: 800; font-size: 14px; padding: 8px 14px; border-radius: 99px; background: #fff; color: var(--cocoa); cursor: pointer; }
+  .legal-tabs button.on { background: var(--pink); color: #fff; }
+  .legal-body { overflow-y: auto; padding: 4px 22px 22px; font-size: 14.5px; line-height: 1.55; }
+  .legal-body h3 { font-size: 16px; margin: 18px 0 6px; }
+  .legal-body .upd { opacity: .6; font-size: 13px; }
+  .legal-body ul { margin: 4px 0 8px; padding-inline-start: 22px; }
+  .legal-body .lic { background: #fff; border-radius: 16px; padding: 10px 14px; margin: 8px 0; }
+  .legal-body .lic small { opacity: .7; }
+  .legal-body details pre { white-space: pre-wrap; font-size: 12px; background: #fdf3ea; padding: 10px; border-radius: 10px; max-height: 320px; overflow: auto; direction: ltr; text-align: left; }
   .music:hover { transform: scale(1.07) rotate(-2deg); }
   .music .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 16px; }
   .music .eq i { width: 4px; background: var(--pink); border-radius: 2px; height: 30%; }
@@ -169,8 +187,23 @@
   <footer>
     <span data-i18n="site.footer_made"></span> · <a href="https://github.com/Marketto/suriclean" data-i18n="site.footer_code"></a> ·
     <a href="https://github.com/Marketto/suriclean/releases" data-i18n="site.footer_releases"></a><br>
+    <span class="legal-links"><a href="#terms" data-legal="terms" data-i18n="legal.link.terms"></a> ·
+    <a href="#privacy" data-legal="privacy" data-i18n="legal.link.privacy"></a> ·
+    <a href="#licenses" data-legal="licenses" data-i18n="legal.link.licenses"></a></span><br>
     <span style="font-size:13px" data-i18n="site.footer_first_open"></span>
   </footer>
+</div>
+
+<div class="legal-ov" id="legal" hidden>
+  <div class="legal-card" role="dialog" aria-modal="true" aria-labelledby="legal-h">
+    <div class="legal-top"><h2 id="legal-h" data-i18n="legal.link.title"></h2><button class="legal-x" id="legal-close">✕</button></div>
+    <div class="legal-tabs">
+      <button data-tab="terms" data-i18n="legal.link.terms"></button>
+      <button data-tab="privacy" data-i18n="legal.link.privacy"></button>
+      <button data-tab="licenses" data-i18n="legal.link.licenses"></button>
+    </div>
+    <div class="legal-body" id="legal-body"></div>
+  </div>
 </div>
 
 <button class="music" id="music"><span class="eq"><i></i><i></i><i></i></span><span id="music-label"></span></button>
@@ -210,6 +243,8 @@
   }
 
   function render() {
+    const lc = document.getElementById("legal-close"); if (lc) lc.title = t("legal.close");
+    if (typeof legalEl !== "undefined" && legalEl && !legalEl.hidden) renderLegal();
     document.title = t("site.title");
     const md = document.querySelector('meta[name="description"]'); if (md) md.content = t("site.meta_desc");
     document.querySelectorAll("[data-i18n]").forEach(el => el.textContent = t(el.dataset.i18n));
@@ -289,6 +324,61 @@
     if (window.Chiptune && Chiptune.running) Chiptune.sfx("coin");
     setTimeout(() => span.textContent = t("site.share"), 2200);
   });
+
+  // legal notes: terms, privacy, licenses (same texts as the apps, legal.* keys)
+  const LIC_FILES = { "MIT": ["MIT"], "Apache-2.0": ["Apache-2.0"], "MPL-2.0": ["MPL-2.0"], "OFL-1.1": ["OFL-1.1"], "MIT OR Apache-2.0": ["MIT", "Apache-2.0"] };
+  let legalTab = "terms", legalVersion = "", thirdParty = null, ownLicense = "";
+  const legalEl = document.getElementById("legal"), legalBody = document.getElementById("legal-body");
+  function paras(text) {
+    return text.split(/\n\s*\n/).map(block => {
+      const lines = block.split("\n");
+      if (lines.some(l => l.startsWith("• "))) {
+        const head = lines.filter(l => !l.startsWith("• ")).map(esc).join("<br>");
+        return (head ? `<p>${head}</p>` : "") + `<ul>${lines.filter(l => l.startsWith("• ")).map(l => `<li>${esc(l.slice(2))}</li>`).join("")}</ul>`;
+      }
+      return `<p>${lines.map(esc).join("<br>")}</p>`;
+    }).join("");
+  }
+  async function loadLegal() {
+    if (thirdParty) return;
+    try { legalVersion = (await (await fetch("legal/VERSION")).text()).trim(); } catch (e) {}
+    try { thirdParty = await (await fetch("legal/third-party.json")).json(); } catch (e) { thirdParty = []; }
+    try { ownLicense = await (await fetch("legal/LICENSE")).text(); } catch (e) {}
+  }
+  async function licText(id) { try { return await (await fetch(`legal/licenses/${id}.txt`)).text(); } catch (e) { return ""; } }
+  function renderLegal() {
+    legalEl.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === legalTab));
+    if (legalTab === "licenses") {
+      const items = (thirdParty || []).map((e, i) => {
+        const by = e.sameAuthor ? t("legal.lic.same_author") : t("legal.lic.by", e.by);
+        const files = LIC_FILES[e.license] || [];
+        return `<div class="lic" data-i="${i}"><b>${esc(e.name)}</b> · ${esc(e.license)}<br><small>${esc(by)}${e.copyright ? " · " + esc(e.copyright) : ""} · <a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(t("legal.lic.source"))}</a></small>
+          ${files.map(f => `<details data-lic="${f}"><summary>${esc(t("legal.lic.text"))} · ${f}</summary><pre></pre></details>`).join("")}</div>`;
+      }).join("");
+      legalBody.innerHTML = `<p>${esc(t("legal.lic.intro"))}</p>
+        <div class="lic"><b>${esc(t("legal.lic.app"))}</b><details open><summary>${esc(t("legal.lic.text"))} · MIT</summary><pre>${esc(ownLicense)}</pre></details></div>${items}`;
+      legalBody.querySelectorAll("details[data-lic]").forEach(d => d.addEventListener("toggle", async () => {
+        const pre = d.querySelector("pre"); if (!d.open || pre.textContent) return;
+        const e = (thirdParty || [])[+d.closest(".lic").dataset.i] || {};
+        pre.textContent = (await licText(d.dataset.lic)).replace("Copyright (c) <year> <copyright holders>", e.copyright || `Copyright (c) ${e.by || ""}`);
+      }));
+      return;
+    }
+    let html = `<h2 style="font-size:19px;margin:6px 0 2px">${esc(t(`legal.${legalTab}.title`))}</h2><div class="upd">${esc(t("legal.updated", legalVersion))}</div>`;
+    for (let i = 1; t(`legal.${legalTab}.s${i}.title`) !== `legal.${legalTab}.s${i}.title`; i++)
+      html += `<h3>${esc(t(`legal.${legalTab}.s${i}.title`))}</h3>${paras(t(`legal.${legalTab}.s${i}.body`))}`;
+    legalBody.innerHTML = html;
+  }
+  async function openLegal(tab) {
+    legalTab = tab || "terms"; await loadLegal(); legalEl.hidden = false; renderLegal(); legalBody.scrollTop = 0;
+    if (window.Chiptune && Chiptune.running) Chiptune.sfx("pop");
+  }
+  document.querySelectorAll("[data-legal]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); openLegal(a.dataset.legal); }));
+  legalEl.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", () => { legalTab = b.dataset.tab; renderLegal(); legalBody.scrollTop = 0; }));
+  document.getElementById("legal-close").addEventListener("click", () => { legalEl.hidden = true; });
+  legalEl.addEventListener("click", e => { if (e.target === legalEl) legalEl.hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") legalEl.hidden = true; });
+  if (["#terms", "#privacy", "#licenses"].includes(location.hash)) openLegal(location.hash.slice(1));
 
   // language
   document.getElementById("lang-select").addEventListener("change", async e => {

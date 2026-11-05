@@ -40,3 +40,16 @@ Quando in `it.json` compaiono chiavi nuove, si traducono SOLO quelle che mancano
 (confronta le chiavi; `python3 i18n/merge.py` le elenca), lasciando intatte le traduzioni già presenti.
 Termini di Schiaccia: «Schiaccia» è il nome dell'app (non si traduce); i livelli Carezza / Stretta / Martellata
 vanno resi con parole tenere e buffe equivalenti (carezza leggera, stretta decisa, martellata energica).
+
+## Testi legali (`legal.*`)
+
+Termini d'uso, informativa privacy e consenso: qui la precisione vince sul tono kawaii.
+- Rendi esattamente lo stesso significato giuridico: non aggiungere, togliere o attenuare obblighi, garanzie,
+  esclusioni di responsabilità o manleve. Usa il lessico giuridico standard della lingua (come nelle licenze e nelle
+  informative ufficiali), con frasi chiare e il «tu» informale già usato nell'app.
+- «così com'è» («as is»): traduci «così com'è» e lascia «as is» in inglese tra parentesi.
+- Lascia invariati: Marco Ricupero, SuriClean, Suri, Schiaccia, Shizuku, GitHub, GitHub Pages, MIT, URL e indirizzi
+  (github.com/…, api.github.com), i nomi dei permessi già tradotti altrove nel file (riusa gli stessi termini).
+- «Garante per la protezione dei dati personali»: è l'autorità italiana; lascia il nome italiano e, se serve,
+  spiega tra parentesi che è l'autorità italiana; non sostituirlo con l'autorità del tuo paese.
+- Mantieni i paragrafi (righe vuote, `\n\n`) e gli elenchi (righe che iniziano con «• ») nella stessa posizione.

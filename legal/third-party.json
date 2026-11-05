@@ -9,7 +9,8 @@
    "desktop",
    "android"
   ],
-  "sameAuthor": true
+  "sameAuthor": true,
+  "copyright": "Copyright (c) 2026 Marco Ricupero"
  },
  {
   "name": "pdf-lib",
