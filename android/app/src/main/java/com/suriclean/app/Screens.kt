@@ -100,6 +100,9 @@ private fun SuriAppContent(vm: AppVM) {
         AnimatedVisibility(vm.squeezeRun != null, enter = fadeIn() + scaleIn(initialScale = 0.92f), exit = fadeOut()) { vm.squeezeRun?.let { SqueezeOverlay(vm, it) } }
         AnimatedVisibility(vm.celebration != null, enter = fadeIn() + scaleIn(initialScale = 0.85f), exit = fadeOut()) { vm.celebration?.let { CelebrationOverlay(vm, it) } }
     }
+    // legal/README.md: accepted once (and again when the documents change) before anything else
+    if (vm.needsLegal) LegalConsentDialog(vm)
+    if (vm.showLegal) LegalViewer(vm.legalVersion) { vm.showLegal = false }
 }
 
 @Composable
@@ -176,7 +179,7 @@ private fun Home(vm: AppVM) {
         }
         if (!vm.hasFiles || !vm.hasUsage) PermissionsCard(vm)
         if (vm.shizuku < 3 && !vm.shizukuHidden) ShizukuCard(vm)
-        if (vm.askPerms) ConfirmDialog(L.t("and.perm.dlgTitle"),
+        if (vm.askPerms && !vm.needsLegal) ConfirmDialog(L.t("and.perm.dlgTitle"),
             (if (!vm.hasFiles) L.t("and.perm.dlgFiles") + "\n" else "") +
             (if (!vm.hasUsage) L.t("and.perm.dlgUsage") + "\n" else "") +
             L.t("and.perm.dlgText"),
@@ -200,6 +203,8 @@ private fun Home(vm: AppVM) {
             Spacer(Modifier.weight(1f))
             KText(if (vm.autoUpdate) L.t("and.home.autoOn") else L.t("and.home.autoOff"), 11.sp, alpha = 0.6f, modifier = Modifier.clickable { vm.setAuto(!vm.autoUpdate) }.padding(6.dp))
         }
+        KText("⚖️ " + L.t("legal.link.title") + " · " + L.t("legal.link.privacy") + " · " + L.t("legal.link.licenses"), 11.sp, alpha = 0.55f,
+            modifier = Modifier.clickable { vm.showLegal = true; Chiptune.sfx(Sfx.POP) }.padding(vertical = 4.dp))
         Spacer(Modifier.height(30.dp))
     }
 }

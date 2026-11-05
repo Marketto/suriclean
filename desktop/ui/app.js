@@ -119,7 +119,8 @@
         <div class="progress" style="width:100%;height:9px;margin:6px 0"><i style="width:${Math.max(4, lv.p * 100)}%"></i></div><div class="s">${lv.next}</div></div>
       ${updatePill()}
       <div class="music-row"><button class="music-toggle" data-act="mute" title="${esc(t(S.muted ? "web.music.paused" : "web.music.on"))}">${S.muted ? "🔇" : "🎵"}</button>
-      <span class="sp"></span>${langPicker()}</div>`;
+      <span class="sp"></span>${langPicker()}</div>
+      <button class="legal-link" data-act="legal">⚖️ ${esc(t("legal.link.title"))}</button>`;
     Suri.setActivity($("#suri-side"), S.busy ? S.busy.act : "idle");
   }
 
@@ -764,6 +765,9 @@
 
   // ───────── events ─────────
   document.addEventListener("click", async e => {
+    // nothing works until the terms of use and the privacy policy are accepted (legal/README.md)
+    if (window.Legal && !Legal.accepted) return;
+    if (e.target.closest(".legal-ov")) return;
     if (!Chiptune.running) { Chiptune.start(); Chiptune.setMuted(S.muted); }
     const tg = e.target;
     const openEl = tg.closest("[data-open]");
@@ -823,6 +827,7 @@
       case "rescan": if (cat) { if (["buildDeps", "gitRepos", "duplicates", "bigFiles", "installers", "squeeze"].includes(cat.id)) await invoke("invalidate_index"); runScan([cat.id]); } break;
       case "sqCancel": if (S.sq) { S.sq.ctl.abort(); sfx("error"); $("#sq-name") && ($("#sq-name").textContent = t("web.busy.stopping")); } break;
       case "cancel": if (S.busy) { S.busy.cancelled = true; S.busy.title = t("web.busy.stopping"); showBusy(); invoke("cancel_scan"); sfx("error"); } break;
+      case "legal": sfx("pop"); Legal.open("terms"); break;
       case "mute": S.muted = !S.muted; localStorage.setItem("suri.muted", S.muted ? "1" : "0"); Chiptune.setMuted(S.muted); renderSidebar(); break;
       case "refresh": sfx("pop"); await pruneMissing(); await refreshDisk(); render(); break;
       case "askEmpty": sfx("pop"); confirmBox(t("web.empty.ask_title"), t("web.empty.ask_text", bytes(S.trash)), t("web.empty.ask_ok"), emptyTrash); break;
@@ -879,6 +884,7 @@
       if (p != null) S.busy.progress = S.steps > 1 ? (S.busy.step + Math.min(1, Math.max(0, p))) / S.steps : p;
       showBusy();
     });
+    await Legal.ensure();
     setTimeout(() => toast(t("web.music.tap")), 1200);
     setTimeout(() => checkUpdate(false), 4000);
     setInterval(() => checkUpdate(false), 6 * 3600 * 1000);

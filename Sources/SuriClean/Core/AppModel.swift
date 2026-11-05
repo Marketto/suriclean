@@ -11,6 +11,10 @@ final class AppModel: ObservableObject {
     @Published var selectedCategory: CleanCategory?
     @Published var hasFDA = true
     @Published var showFDAGuide = false
+    /// Terms of use and privacy notice not accepted yet (or changed since): everything waits (legal/README.md).
+    @Published var needsConsent = !Legal.isAccepted
+    @Published var showLegal = false
+    @Published var legalTab: LegalTab = .terms
     @Published var passwordPrompt: PasswordPrompt?
     private var passwordWaiter: CheckedContinuation<Bool, Never>?
     private var fullScanAfterFDA = false
@@ -85,13 +89,7 @@ final class AppModel: ObservableObject {
         Chiptune.shared.mood = .menu
         refreshDisk()
         hasFDA = FS.hasFullDiskAccess()
-        if !hasFDA && UserDefaults.standard.string(forKey: "fdaSnoozedVersion") != Updater.currentVersion {
-            showFDAGuide = true
-        }
-        if UserDefaults.standard.bool(forKey: "fullScanAfterRelaunch") {
-            UserDefaults.standard.set(false, forKey: "fullScanAfterRelaunch")
-            if hasFDA { askScanScope = true }
-        }
+        if !needsConsent { askPermissionsAtLaunch() }
         refreshTrash()
         refreshSnapshots()
         Task {
@@ -428,7 +426,33 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func scanAll() { askScanScope = true; Chiptune.shared.sfx(.pop) }
+    // MARK: terms of use and privacy (legal/README.md)
+
+    func acceptLegal() {
+        Legal.accept()
+        needsConsent = false
+        Chiptune.shared.sfx(.coin)
+        askPermissionsAtLaunch()
+    }
+
+    func openLegal(_ tab: LegalTab) {
+        legalTab = tab
+        showLegal = true
+        Chiptune.shared.sfx(.pop)
+    }
+
+    /// What start() used to ask right away: only once the terms are accepted.
+    private func askPermissionsAtLaunch() {
+        if !hasFDA && UserDefaults.standard.string(forKey: "fdaSnoozedVersion") != Updater.currentVersion {
+            showFDAGuide = true
+        }
+        if UserDefaults.standard.bool(forKey: "fullScanAfterRelaunch") {
+            UserDefaults.standard.set(false, forKey: "fullScanAfterRelaunch")
+            if hasFDA { askScanScope = true }
+        }
+    }
+
+    func scanAll() { guard !needsConsent else { return }; askScanScope = true; Chiptune.shared.sfx(.pop) }
 
     /// full = also the whole disk and every other user's folder (one admin password).
     func scanAll(full: Bool, askedFDA: Bool = false) {
@@ -470,6 +494,7 @@ final class AppModel: ObservableObject {
     }
 
     private func runScan(_ cats: [CleanCategory], thenFull: Bool = false) {
+        guard !needsConsent else { return }
         guard busy == nil, !cats.isEmpty else { return }
         let rep = Reporter()
         reporter = rep
@@ -549,6 +574,7 @@ final class AppModel: ObservableObject {
     // MARK: cleaning
 
     func clean(_ c: CleanCategory) {
+        guard !needsConsent else { return }
         guard busy == nil else { return }
         var items = selectedItems(c)
         if c == .duplicates {
@@ -631,6 +657,7 @@ final class AppModel: ObservableObject {
     }
 
     func scanFullDisk(askedFDA: Bool = false) {
+        guard !needsConsent else { return }
         guard busy == nil else { return }
         if !askedFDA && !FS.hasFullDiskAccess() {
             fullDiskAfterFDA = true
@@ -773,7 +800,7 @@ final class AppModel: ObservableObject {
     /// Squeezes the selected files one after the other: PDF and photos with Schiaccia's engine (hidden web view),
     /// videos with macOS's encoder. Each light file takes the original's place; the original goes to the Trash.
     func startSqueeze() {
-        guard busy == nil, squeezeRun == nil else { return }
+        guard !needsConsent, busy == nil, squeezeRun == nil else { return }
         let list = visibleSqueezeItems().filter { selection.contains($0.id) }
         guard !list.isEmpty else { return }
         squeezeStop.set(false)

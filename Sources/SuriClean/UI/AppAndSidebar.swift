@@ -102,6 +102,10 @@ struct ContentView: View {
                 PasswordOverlay(prompt: p)
                     .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
+            if model.needsConsent {
+                ConsentOverlay()
+                    .transition(.opacity)
+            }
         }
         .foregroundColor(Theme.cocoa)
         .animation(.spring(response: 0.45, dampingFraction: 0.82), value: model.selectedCategory)
@@ -175,11 +179,18 @@ struct Sidebar: View {
                 LanguagePicker()
             }
             .padding(.horizontal, 8)
+            Button(action: { model.openLegal(.terms) }) {
+                Text(t("legal.link.title")).font(Theme.font(10.5, .bold)).underline()
+            }
+            .buttonStyle(.plain)
+            .opacity(0.55)
+            .padding(.horizontal, 8)
             .padding(.bottom, 10)
         }
         .padding(.horizontal, 12)
         .frame(width: 252)
         .background(Color.white.opacity(0.5))
+        .sheet(isPresented: $model.showLegal) { LegalSheet().environmentObject(model) }
     }
 }
 

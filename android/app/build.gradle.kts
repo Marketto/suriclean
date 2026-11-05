@@ -34,6 +34,35 @@ abstract class CopySchiaccia : DefaultTask() {
     }
 }
 
+/** Copies the legal documents (repo's legal/VERSION, third-party.json, licenses/ and LICENSE) into the
+ *  generated assets as assets/legal/, for the consent dialog and «Note legali» (legal/README.md). */
+abstract class CopyLegal : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val source: ConfigurableFileCollection
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val license: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile
+        out.deleteRecursively()
+        val dest = File(out, "legal")
+        dest.mkdirs()
+        val src = source.files.firstOrNull { it.isDirectory }
+        if (src != null) {
+            File(src, "VERSION").takeIf { it.isFile }?.copyTo(File(dest, "VERSION"), overwrite = true)
+            File(src, "third-party.json").takeIf { it.isFile }?.copyTo(File(dest, "third-party.json"), overwrite = true)
+            File(src, "licenses").takeIf { it.isDirectory }?.copyRecursively(File(dest, "licenses"), overwrite = true)
+        } else logger.warn("SuriClean: ../legal is missing")
+        license.files.firstOrNull { it.isFile }?.copyTo(File(dest, "LICENSE"), overwrite = true)
+    }
+}
 
 android {
     namespace = "com.suriclean.app"
@@ -96,6 +125,11 @@ androidComponents {
             source.from(rootProject.file("../schiaccia"))
         }
         variant.sources.assets?.addGeneratedSourceDirectory(copy, CopySchiaccia::outputDir)
+        val legal = tasks.register<CopyLegal>("copy${variant.name.replaceFirstChar { it.uppercase() }}Legal") {
+            source.from(rootProject.file("../legal"))
+            license.from(rootProject.file("../LICENSE"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(legal, CopyLegal::outputDir)
     }
 }
 
