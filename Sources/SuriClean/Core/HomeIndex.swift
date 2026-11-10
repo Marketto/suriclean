@@ -79,64 +79,98 @@ final class HomeIndex {
         }
     }
 
-    static func build(reporter: Reporter) -> HomeIndex {
-        let idx = HomeIndex()
-        let fm = FileManager.default
-        let home = FS.home
-        var skip = Set(skipTop.map { home.appendingPathComponent($0).path })
-        skip.insert(home.appendingPathComponent("go/pkg").path)
-        let downloads = home.appendingPathComponent("Downloads").path
-        let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey,
-                                      .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .contentModificationDateKey]
-        let keySet = Set(keys)
-        guard let en = fm.enumerator(at: home, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true }) else {
-            return idx
+    static let depNames: Set<Substring> = [
+        "node_modules", ".venv", "venv", "env", ".env", "target", ".build", "Pods", ".gradle", "build", ".next",
+        ".nuxt", ".output", ".dart_tool", "vendor", ".turbo", ".parcel-cache", ".angular", "DerivedData"
+    ]
+
+    /// Notes a folder met during the walk; true when its content is not for the index
+    /// (handled by a dedicated scanner, a repo, an app or package, a dependency folder).
+    private func note(dir path: String, name: Substring, home: String, skip: Set<String>, downloads: String) -> Bool {
+        if skip.contains(path) { return true }
+        let parent = String(path[..<(path.lastIndex(of: "/") ?? path.endIndex)])
+        if name == ".git" {
+            if parent != home { repos.append(URL(fileURLWithPath: parent, isDirectory: true)) }   // never the home itself (dotfiles repos)
+            return true
         }
-        while let obj = en.nextObject() {
-            guard let url = obj as? URL else { continue }
+        if let dot = name.lastIndex(of: "."), dot != name.startIndex {
+            let ext = name[name.index(after: dot)...].lowercased()
+            if ext == "app" {
+                if parent == downloads { downloadApps.append(URL(fileURLWithPath: path, isDirectory: true)) }
+                return true
+            }
+            if HomeIndex.packageExts.contains(ext) {
+                packages.append(URL(fileURLWithPath: path, isDirectory: true))
+                return true
+            }
+        }
+        guard HomeIndex.depNames.contains(name) else { return false }
+        // dependency folders inside hidden tool dirs (~/.volta, ~/.npm-global, editor
+        // extensions…) are installed tools, not project deps
+        let rel = path.dropFirst(home.count + 1)
+        let insideHidden = rel.split(separator: "/").dropLast().contains { $0.hasPrefix(".") }
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        if !insideHidden, let kind = HomeIndex.depKind(url) {
+            deps.append((url, kind))
+            return true
+        }
+        return false
+    }
+
+    struct Walk {
+        var index: HomeIndex
+        /// Size of every folder 1…4 levels below the home (only when measuring).
+        var sizes: [String: Int64] = [:]
+        var total: Int64 = 0
+    }
+
+    static func build(reporter: Reporter) -> HomeIndex { walk(reporter: reporter, measure: false).index }
+
+    /// One single walk of the home folder (FastWalk). With `measure` nothing is skipped and every
+    /// folder is measured too, so the disk map and the index cost one walk instead of two.
+    static func walk(reporter: Reporter, measure: Bool, mapDepth: Int = 4) -> Walk {
+        let idx = HomeIndex()
+        let home = FS.home.standardizedFileURL.path
+        var skip = Set(skipTop.map { home + "/" + $0 })
+        skip.insert(home + "/go/pkg")
+        let downloads = home + "/Downloads"
+        var w = Walk(index: idx)
+        var hidden: String?          // folder being measured whose content the index leaves out
+        var hiddenSlash = ""
+        var stack: [(path: String, acc: Int64)] = []
+        FastWalk.walk(home) { e in
             idx.scannedCount += 1
-            if idx.scannedCount % 400 == 0 {
-                if reporter.isCancelled { break }
-                reporter.report(t("mac.busy.sniffed", idx.scannedCount, FS.pretty(url)))
+            if idx.scannedCount % 1000 == 0 {
+                if reporter.isCancelled { return .stop }
+                reporter.report(t(measure ? "mac.busy.measured" : "mac.busy.sniffed", idx.scannedCount, FS.pretty(URL(fileURLWithPath: e.path))))
             }
-            guard let v = try? url.resourceValues(forKeys: keySet) else { continue }
-            if v.isSymbolicLink == true { continue }
-            if v.isDirectory == true {
-                if skip.contains(url.path) { en.skipDescendants(); continue }
-                let name = url.lastPathComponent
-                let ext = url.pathExtension.lowercased()
-                if name == ".git" {
-                    let repo = url.deletingLastPathComponent()
-                    // never offer the home folder itself (dotfiles repos)
-                    if repo.standardizedFileURL.path != home.standardizedFileURL.path { idx.repos.append(repo) }
-                    en.skipDescendants(); continue
+            if let h = hidden, e.path != h && !e.path.hasPrefix(hiddenSlash) { hidden = nil }
+            switch e.kind {
+            case .dir:
+                if measure { stack.append((e.path, 0)) }
+                if hidden == nil && e.level > 0 && idx.note(dir: e.path, name: e.name, home: home, skip: skip, downloads: downloads) {
+                    if !measure { return .skip }
+                    hidden = e.path
+                    hiddenSlash = e.path + "/"
                 }
-                if ext == "app" {
-                    if url.deletingLastPathComponent().path == downloads { idx.downloadApps.append(url) }
-                    en.skipDescendants(); continue
+            case .dirEnd:
+                if measure, let top = stack.last, top.path == e.path {
+                    stack.removeLast()
+                    if e.level >= 1 && e.level <= mapDepth { w.sizes[e.path] = top.acc }
+                    if stack.isEmpty { w.total = top.acc } else { stack[stack.count - 1].acc += top.acc }
                 }
-                if packageExts.contains(ext) {
-                    idx.packages.append(url)
-                    en.skipDescendants(); continue
+            case .file:
+                if measure, !stack.isEmpty { stack[stack.count - 1].acc += e.size }
+                if hidden == nil && e.size >= 1_048_576 {
+                    idx.files.append(IndexedFile(url: URL(fileURLWithPath: e.path), size: e.size,
+                                                 modified: Date(timeIntervalSince1970: e.modified)))
                 }
-                // dependency folders inside hidden tool dirs (~/.volta, ~/.npm-global, editor
-                // extensions…) are installed tools, not project deps
-                let rel = url.path.dropFirst(home.path.count + 1)
-                let insideHidden = rel.split(separator: "/").dropLast().contains { $0.hasPrefix(".") }
-                if !insideHidden, let kind = depKind(url) {
-                    idx.deps.append((url, kind))
-                    en.skipDescendants(); continue
-                }
-                continue
+            case .other:
+                break
             }
-            if v.isRegularFile == true {
-                let size = Int64(v.totalFileAllocatedSize ?? v.fileAllocatedSize ?? 0)
-                if size >= 1_048_576 {
-                    idx.files.append(IndexedFile(url: url, size: size, modified: v.contentModificationDate))
-                }
-            }
+            return .go
         }
         reporter.report(t("mac.busy.explored", idx.scannedCount), force: true)
-        return idx
+        return w
     }
 }

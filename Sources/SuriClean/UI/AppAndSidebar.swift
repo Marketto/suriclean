@@ -123,6 +123,8 @@ struct ContentView: View {
             Text(t("mac.scope.msg"))
         }
         .sheet(isPresented: $model.showFDAGuide) { FDAGuide().environmentObject(model) }
+        .sheet(isPresented: $model.showQuickClean) { QuickCleanSheet().environmentObject(model) }
+        .sheet(isPresented: $model.showGrowth) { GrowthSheet().environmentObject(model) }
         .alert(t("mac.trash.ask"), isPresented: $model.askEmptyTrash) {
             Button(t("mac.common.cancel"), role: .cancel) {}
             Button(t("mac.trash.forever"), role: .destructive) { model.emptyTrash() }

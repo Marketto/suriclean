@@ -148,26 +148,13 @@ enum FS {
 
     private static let sizeKeys: Set<URLResourceKey> = [.isRegularFileKey, .isDirectoryKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
 
-    /// Real space on disk (allocated size), recursing into folders and packages.
+    /// Real space on disk (allocated size), recursing into folders and packages (FastWalk, BSD fts).
     static func allocatedSize(_ url: URL, reporter: Reporter? = nil) -> Int64 {
         guard let v = try? url.resourceValues(forKeys: sizeKeys) else { return 0 }
         if v.isDirectory != true {
             return Int64(v.totalFileAllocatedSize ?? v.fileAllocatedSize ?? 0)
         }
-        guard let en = fm.enumerator(at: url, includingPropertiesForKeys: Array(sizeKeys), options: [], errorHandler: { _, _ in true }) else { return 0 }
-        var total: Int64 = 0
-        var n = 0
-        while let obj = en.nextObject() {
-            guard let f = obj as? URL else { continue }
-            n += 1
-            if n % 500 == 0 {
-                if reporter?.isCancelled == true { break }
-                reporter?.report(pretty(f))
-            }
-            guard let fv = try? f.resourceValues(forKeys: sizeKeys), fv.isRegularFile == true else { continue }
-            total += Int64(fv.totalFileAllocatedSize ?? fv.fileAllocatedSize ?? 0)
-        }
-        return total
+        return FastWalk.size(url.path, reporter: reporter)
     }
 
     /// Reading TCC.db is only possible with Full Disk Access.
