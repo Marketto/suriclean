@@ -46,6 +46,12 @@ struct DashboardView: View {
                                 .foregroundColor(Theme.mint.darker)
                             Text(t("mac.dash.safe")).font(Theme.font(11.5, .semibold)).opacity(0.6)
                         }
+                        Button(action: { model.openQuickClean() }) {
+                            Label(t("mac.quick.btn"), systemImage: "trash.fill")
+                        }
+                        .buttonStyle(BubblyButtonStyle(color: Theme.mint, big: true))
+                        .disabled(model.busy != nil)
+                        .help(t("mac.quick.help"))
                     }
                 }
             }
@@ -145,13 +151,21 @@ struct TipsPanel: View {
                        note: t("mac.tips.squeeze.note", sq.count),
                        value: Fmt.bytes(sq.totalSize), buttonTitle: t("mac.tips.squeeze.btn")) { model.open(.squeeze) }
             }
+            TipRow(icon: "chart.line.uptrend.xyaxis", color: Theme.coral, title: t("mac.tips.grow"),
+                   note: model.growth.map { t("mac.tips.grow.note", Fmt.relative($0.since)) } ?? t("mac.tips.grow.first"),
+                   value: model.growth.map { ($0.usedDelta >= 0 ? "+" : "−") + Fmt.bytes(abs($0.usedDelta)) } ?? "",
+                   buttonTitle: model.growth != nil ? t("mac.tips.grow.btn") : nil) { model.showGrowth = true }
+            if model.swapSize >= 512 * 1_048_576 {
+                TipRow(icon: "memorychip", color: Theme.orange, title: t("mac.tips.swap"),
+                       note: t("mac.tips.swap.note"), value: Fmt.bytes(model.swapSize), buttonTitle: nil) {}
+            }
             TipRow(icon: "icloud.fill", color: Theme.lilac, title: t("mac.tips.purge"),
                    note: t("mac.tips.purge.note"),
                    value: Fmt.bytes(model.disk.purgeable), buttonTitle: nil) {}
             TipRow(icon: "arrow.clockwise", color: Theme.mint, title: t("mac.tips.refresh"),
                    note: t("mac.tips.refresh.note"),
                    value: "", buttonTitle: t("mac.tips.refresh.btn")) {
-                model.refreshDisk(); model.refreshTrash(); model.refreshSnapshots()
+                model.refreshDisk(); model.refreshTrash(); model.refreshSnapshots(); model.refreshSwap()
             }
         }
         .padding(18)

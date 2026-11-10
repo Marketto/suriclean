@@ -12,7 +12,8 @@ struct Target {
 
 enum Targets {
     static func electron(_ app: String, _ label: String) -> [Target] {
-        ["Cache", "CachedData", "Code Cache", "GPUCache", "CachedExtensionVSIXs", "DawnCache", "DawnGraphiteCache", "logs", "Crashpad/completed"]
+        ["Cache", "CachedData", "Code Cache", "GPUCache", "CachedExtensionVSIXs", "CachedProfilesData", "DawnCache", "DawnGraphiteCache",
+         "Service Worker/CacheStorage", "Service Worker/ScriptCache", "logs", "Crashpad/completed"]
             .map { Target(path: "Library/Application Support/\(app)/\($0)", name: "\(label) · \($0)") }
     }
 
@@ -45,7 +46,7 @@ enum Targets {
         Target(path: ".cache/torch", name: "PyTorch · \(t("mac.tg.cache_modelli"))", risk: .review, recommended: false)
     ]
         return base + electron("Claude", "Claude Desktop") + electron("Cursor", "Cursor")
-            + electron("Code", "VS Code") + electron("Windsurf", "Windsurf")
+            + electron("Code", "VS Code") + electron("Code - Insiders", "VS Code Insiders") + electron("Windsurf", "Windsurf")
     }
 
     static var dev: [Target] { [
@@ -109,7 +110,7 @@ enum Scanners {
         case .caches: return caches(reporter)
         case .logsTemp: return logsTemp(reporter)
         case .systemAreas: return SystemAreas.scan(reporter)
-        case .aiTools: return fixed(Targets.ai, reporter)
+        case .aiTools: return fixed(Targets.ai, reporter) + Editors.scan(reporter)
         case .devCaches: return fixed(Targets.dev, reporter) + homebrewOld(reporter)
         case .buildDeps: return buildDeps(index, reporter)
         case .gitRepos: return gitRepos(index, reporter)
@@ -198,49 +199,34 @@ enum Scanners {
 
     // MARK: disk map
 
+    /// The index built by the last home disk map (same walk), picked up by AppModel.
+    static var walkedIndex: HomeIndex?
+
     /// Every folder >= 300 MB down to 4 levels below Home, plus Applications. View-only.
+    /// The same walk builds the home index and feeds «Cosa cresce» (Growth).
     static func diskMap(_ rep: Reporter) -> [CleanItem] {
-        let fm = FileManager.default
         let home = FS.home
-        let homeDepth = home.pathComponents.count
-        var sizes: [String: Int64] = [:]
-        var total: Int64 = 0
-        let keys: [URLResourceKey] = [.isRegularFileKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
-        let keySet = Set(keys)
-        var n = 0
-        if let en = fm.enumerator(at: home, includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true }) {
-            while let obj = en.nextObject() {
-                guard let url = obj as? URL else { continue }
-                n += 1
-                if n % 500 == 0 {
-                    if rep.isCancelled { return [] }
-                    rep.report(t("mac.busy.measured", n, FS.pretty(url)))
-                }
-                guard let v = try? url.resourceValues(forKeys: keySet), v.isRegularFile == true else { continue }
-                let sz = Int64(v.totalFileAllocatedSize ?? v.fileAllocatedSize ?? 0)
-                if sz == 0 { continue }
-                total += sz
-                let comps = url.pathComponents
-                var path = home.path
-                let maxDepth = min(comps.count - 1, homeDepth + 4)
-                if homeDepth < maxDepth {
-                    for i in homeDepth..<maxDepth {
-                        path += "/" + comps[i]
-                        sizes[path, default: 0] += sz
-                    }
-                }
-            }
-        }
+        let homeDepth = home.standardizedFileURL.pathComponents.count
+        let w = HomeIndex.walk(reporter: rep, measure: true)
+        if rep.isCancelled { return [] }
+        walkedIndex = w.index
+        let total = w.total
+        let sizes = w.sizes
+        let growth = FS.isHelper ? nil : Growth.compare(sizes: sizes, home: total)
         var out: [CleanItem] = []
         out.append(CleanItem(url: home, name: t("mac.item.home"), detail: "~", size: total, date: nil,
                              risk: .careful, recommended: false, badges: [t("mac.badge.burrow")]))
         for (path, size) in sizes {
-            let depth = URL(fileURLWithPath: path).pathComponents.count - homeDepth
-            let threshold: Int64 = depth == 1 ? 50 * 1_048_576 : 300 * 1_048_576
-            guard size >= threshold else { continue }
             let url = URL(fileURLWithPath: path)
+            let depth = url.pathComponents.count - homeDepth
+            let threshold: Int64 = depth == 1 ? 50 * 1_048_576 : 300 * 1_048_576
+            let grew = growth?.grew[path] ?? 0
+            guard size >= threshold || grew >= Growth.minShown else { continue }
+            var badges: [String] = []
+            if grew >= Growth.minShown, let since = growth?.since { badges.append(t("mac.badge.grew", Fmt.bytes(grew), Fmt.relative(since))) }
+            if let b = hiddenBadge(path) { badges.append(b) }
             out.append(CleanItem(url: url, name: url.lastPathComponent, detail: FS.pretty(url), size: size, date: nil,
-                                 risk: .careful, recommended: false))
+                                 risk: .careful, recommended: false, badges: badges))
         }
         rep.report(t("mac.busy.measureapps"), progress: 0.95, force: true)
         let apps = URL(fileURLWithPath: "/Applications")
@@ -256,7 +242,25 @@ enum Scanners {
         }
         out.append(CleanItem(url: apps, name: t("mac.item.applications"), detail: "/Applications", size: appsTotal, date: nil, risk: .careful, recommended: false, badges: [t("mac.badge.apps")]))
         out += appItems
+        if !FS.isHelper && !rep.isCancelled { Growth.save(sizes: sizes, home: total, apps: appsTotal, used: DiskInfo.current().used) }
         return out
+    }
+
+    /// Who fills a well-known folder of the home (shown as a badge in the disk map).
+    static let knownOwners: [(String, String)] = [
+        ("Library/Application Support/Code", "🧩 VS Code"), (".vscode", "🧩 VS Code"),
+        ("Library/Application Support/Cursor", "🧩 Cursor"), (".cursor", "🧩 Cursor"),
+        (".claude", "✳️ Claude Code"), (".local/share/claude", "✳️ Claude Code"), ("Library/Caches/claude-cli-nodejs", "✳️ Claude Code"),
+        ("Library/Application Support/Claude", "✳️ Claude"), (".npm", "📦 npm"), ("Library/Caches/Homebrew", "🍺 Homebrew"),
+        ("Library/Containers/com.docker.docker", "🐳 Docker"), ("Library/Developer", "🔨 Xcode"),
+        ("Library/Mobile Documents", "☁️ iCloud Drive"), ("Library/Application Support/MobileSync", "📱 iPhone/iPad")
+    ]
+
+    static func hiddenBadge(_ path: String) -> String? {
+        let home = FS.home.standardizedFileURL.path + "/"
+        guard path.hasPrefix(home) else { return nil }
+        let rel = String(path.dropFirst(home.count))
+        return knownOwners.first { rel == $0.0 || rel.hasPrefix($0.0 + "/") }?.1
     }
 
     /// Whole data volume, every user included. Needs the admin password once (runs `du` as root).
@@ -309,6 +313,11 @@ enum Scanners {
                 badges.append(("/System/Volumes/Data" + shown) == "/System/Volumes/Data" + me || shown == me ? t("mac.badge.you") : t("mac.badge.otheruser"))
             }
             if shown.hasPrefix("/private/var/vm") { badges.append(t("mac.badge.vm")) }
+            if shown.hasPrefix("/.Spotlight-V100") { badges.append(t("mac.badge.spotlight")) }
+            if shown.hasPrefix("/private/var/db/diagnostics") || shown.hasPrefix("/private/var/db/uuidtext") { badges.append(t("mac.badge.syslogs")) }
+            if shown.hasPrefix("/private/var/folders") { badges.append(t("mac.badge.varfolders")) }
+            if shown.hasPrefix("/.DocumentRevisions-V100") { badges.append(t("mac.badge.versions")) }
+            if shown.hasPrefix("/Users/"), let b = hiddenBadge(FS.home.deletingLastPathComponent().path + "/" + shown.dropFirst("/Users/".count)) { badges.append(b) }
             if shown.hasPrefix("/Library") || shown.hasPrefix("/private") || shown.hasPrefix("/usr") || shown.hasPrefix("/opt") { badges.append(t("mac.badge.system")) }
             if depth == 0 {
                 items.append(CleanItem(url: url, name: t("mac.item.wholedisk"), detail: "/", size: size, date: nil,
@@ -427,6 +436,7 @@ enum Scanners {
                              risk: .safe, recommended: true, rep: rep) { out.append(it) }
         if let it = makeItem(FS.library.appendingPathComponent("Application Support/CrashReporter"), name: t("mac.item.crashreports"),
                              risk: .safe, recommended: true, rep: rep) { out.append(it) }
+        if !FS.isHelper { out += hiddenSystemCaches(rep) }
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
         for k in (FS.isHelper ? [] : FS.children(tmp)) {
             if rep.isCancelled { return out }
@@ -434,6 +444,39 @@ enum Scanners {
             guard FS.daysSince(d) >= 3 else { continue }
             if let it = makeItem(k, name: t("mac.item.temp", k.lastPathComponent), detail: t("mac.detail.temp", Fmt.relative(d)),
                                  risk: .safe, recommended: true, rep: rep, minSize: 256 * 1024) {
+                out.append(it)
+            }
+        }
+        return out
+    }
+
+    /// macOS keeps a second, hidden cache folder per user (/private/var/folders/…/C, next to the
+    /// temporary one), filled by system services and command-line tools; plus what is left in
+    /// /private/tmp. Rebuilt when needed; recommended only when untouched for a month (3 days for /tmp).
+    static func hiddenSystemCaches(_ rep: Reporter) -> [CleanItem] {
+        var out: [CleanItem] = []
+        let me = NSNumber(value: getuid())
+        func mine(_ u: URL) -> Bool {
+            ((try? FileManager.default.attributesOfItem(atPath: u.path))?[.ownerAccountID] as? NSNumber) == me
+        }
+        let cacheDir = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL.deletingLastPathComponent().appendingPathComponent("C")
+        rep.report(FS.pretty(cacheDir), force: true)
+        for k in FS.children(cacheDir) where mine(k) {
+            if rep.isCancelled { return out }
+            let d = FS.newestModDate(k)
+            let old = FS.daysSince(d) >= 30
+            if let it = makeItem(k, name: t("mac.item.hiddencache", FS.friendlyName(k.lastPathComponent)),
+                                 detail: t("mac.detail.lastmod", k.path, Fmt.relative(d)), risk: .review, recommended: old,
+                                 rep: rep, minSize: 10 * 1_048_576, badges: [t("mac.badge.rebuilt")], date: d) {
+                out.append(it)
+            }
+        }
+        for k in FS.children(URL(fileURLWithPath: "/private/tmp")) where mine(k) && !k.lastPathComponent.hasPrefix("com.apple.") && !k.lastPathComponent.hasPrefix(".") {
+            if rep.isCancelled { return out }
+            let d = FS.newestModDate(k)
+            guard FS.daysSince(d) >= 3 else { continue }
+            if let it = makeItem(k, name: t("mac.item.temp", k.lastPathComponent), detail: t("mac.detail.temp", Fmt.relative(d)),
+                                 risk: .safe, recommended: true, rep: rep, minSize: 1_048_576, badges: [t("mac.badge.temp")], date: d) {
                 out.append(it)
             }
         }

@@ -67,6 +67,12 @@ final class AppModel: ObservableObject {
     @Published var gitWorking: Set<URL> = []
 
     // «Da schiacciare» (docs/SCHIACCIA.md)
+    @Published var growth: Growth.Report? = Growth.report()
+    @Published var showGrowth = false
+    @Published var showQuickClean = false
+    /// Items ticked in the quick-clean window (everything recommended, until the user unticks).
+    @Published var quickPick: Set<UUID> = []
+    @Published var swapSize: Int64 = 0
     @Published var squeezeRun: SqueezeRunState?
     @Published var squeezeKinds: Set<SqueezeKind> = Set(SqueezeKind.allCases)
     @Published var squeezeLevel: SqueezeLevel = SqueezeLevel(rawValue: UserDefaults.standard.string(forKey: "suri.sq.level") ?? "") ?? .soft {
@@ -92,6 +98,7 @@ final class AppModel: ObservableObject {
         if !needsConsent { askPermissionsAtLaunch() }
         refreshTrash()
         refreshSnapshots()
+        refreshSwap()
         Task {
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             while true {
@@ -219,6 +226,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Swap files and the sleep image in /private/var/vm: macOS frees them at restart.
+    func refreshSwap() {
+        Task {
+            let s = await Task.detached(priority: .utility) { FS.allocatedSize(URL(fileURLWithPath: "/private/var/vm")) }.value
+            self.swapSize = s
+        }
+    }
+
     func refreshSnapshots() {
         Task {
             let n = await Task.detached(priority: .utility) { () -> Int in
@@ -340,7 +355,7 @@ final class AppModel: ObservableObject {
         results.filter { $0.key != .diskMap && $0.key != .squeeze }.values.reduce(Int64(0)) { $0 + $1.totalSize }
     }
     var recommendedTotal: Int64 {
-        results.filter { $0.key != .diskMap && $0.key != .squeeze }.values.reduce(Int64(0)) { acc, list in acc + list.filter { $0.recommended }.totalSize }
+        quickGroups.reduce(Int64(0)) { $0 + $1.items.totalSize }
     }
 
     var greeting: String {
@@ -534,7 +549,12 @@ final class AppModel: ObservableObject {
                 let found = await Task.detached(priority: .userInitiated) { Scanners.scan(cat, index: index, reporter: rep) }.value
                 if rep.isCancelled { break }
                 setResults(cat, found)
-                if cat == .diskMap { diskMapIsFull = false; refreshBreakdown() }
+                if cat == .diskMap {
+                    diskMapIsFull = false
+                    refreshBreakdown()
+                    if let idx = Scanners.walkedIndex { homeIndex = idx; Scanners.walkedIndex = nil }   // same walk, no second pass
+                    growth = Growth.report()
+                }
                 let bytes = found.totalSize
                 updateBusy { $0.foundCount += found.count; $0.foundBytes += bytes }
                 Chiptune.shared.sfx(.coin)
@@ -577,24 +597,80 @@ final class AppModel: ObservableObject {
         guard !needsConsent else { return }
         guard busy == nil else { return }
         var items = selectedItems(c)
-        if c == .duplicates {
-            // Always keep at least one copy per group, and only if that copy still exists.
-            let groups = Dictionary(grouping: self.items(c), by: { $0.group ?? -1 })
-            var safe: [CleanItem] = []
-            for (_, g) in groups {
-                let keepers = g.filter { !selection.contains($0.id) && FileManager.default.fileExists(atPath: $0.url.path) }
-                if keepers.isEmpty {
-                    // whole group selected: spare the 💎 one (or the first)
-                    let spare = g.first(where: { !$0.recommended }) ?? g[0]
-                    guard FileManager.default.fileExists(atPath: spare.url.path) else { continue }
-                    safe += g.filter { selection.contains($0.id) && $0.id != spare.id }
-                } else {
-                    safe += g.filter { selection.contains($0.id) }
-                }
+        if c == .duplicates { items = keepOneCopy(items) }
+        performTrash(items)
+    }
+
+    /// Duplicates: always keeps at least one copy per group, and only if that copy still exists.
+    func keepOneCopy(_ chosen: [CleanItem]) -> [CleanItem] {
+        let ids = Set(chosen.map { $0.id })
+        let groups = Dictionary(grouping: self.items(.duplicates), by: { $0.group ?? -1 })
+        var safe: [CleanItem] = []
+        for (_, g) in groups {
+            let keepers = g.filter { !ids.contains($0.id) && FileManager.default.fileExists(atPath: $0.url.path) }
+            if keepers.isEmpty {
+                // whole group chosen: spare the 💎 one (or the first)
+                let spare = g.first(where: { !$0.recommended }) ?? g[0]
+                guard FileManager.default.fileExists(atPath: spare.url.path) else { continue }
+                safe += g.filter { ids.contains($0.id) && $0.id != spare.id }
+            } else {
+                safe += g.filter { ids.contains($0.id) }
             }
-            if safe.count < items.count { showToast(t("mac.toast.keptdup")) }
-            items = safe
         }
+        if safe.count < chosen.count { showToast(t("mac.toast.keptdup")) }
+        return safe
+    }
+
+    // MARK: quick clean («liberabili senza pensieri»)
+
+    /// The recommended items of every zone (not the map, not Schiaccia), biggest first.
+    struct QuickGroup: Identifiable {
+        let category: CleanCategory
+        let items: [CleanItem]
+        var id: CleanCategory { category }
+    }
+
+    var quickGroups: [QuickGroup] {
+        CleanCategory.allCases.compactMap { c in
+            guard c != .diskMap && c != .squeeze else { return nil }
+            let l = items(c).filter { $0.recommended }.sorted { $0.size > $1.size }
+            return l.isEmpty ? nil : QuickGroup(category: c, items: l)
+        }
+    }
+
+    var quickPickedSize: Int64 {
+        quickGroups.flatMap { $0.items }.filter { quickPick.contains($0.id) }.totalSize
+    }
+
+    func openQuickClean() {
+        guard !needsConsent, busy == nil else { return }
+        pruneMissing()
+        quickPick = Set(quickGroups.flatMap { $0.items.map { $0.id } })
+        showQuickClean = true
+        Chiptune.shared.sfx(.pop)
+    }
+
+    func toggleQuick(_ ids: [UUID], on: Bool) {
+        if on { quickPick.formUnion(ids) } else { quickPick.subtract(ids) }
+        Chiptune.shared.sfx(on ? .coin : .pop)
+    }
+
+    func runQuickClean(emptyTrashAfter: Bool) {
+        var chosen: [CleanItem] = []
+        for g in quickGroups {
+            let picked = g.items.filter { quickPick.contains($0.id) }
+            chosen += g.category == .duplicates ? keepOneCopy(picked) : picked
+        }
+        showQuickClean = false
+        // an item inside another chosen folder goes with it
+        let dirs = chosen.map { $0.url.path + "/" }
+        chosen = chosen.filter { it in !dirs.contains { it.url.path.hasPrefix($0) } }
+        performTrash(chosen, emptyTrashAfter: emptyTrashAfter)
+    }
+
+    /// Moves the items to the Trash (one password for the protected ones), then celebrates.
+    func performTrash(_ items: [CleanItem], emptyTrashAfter: Bool = false) {
+        guard !needsConsent, busy == nil else { return }
         guard !items.isEmpty else { return }
         let toTrash = items
         let rep = Reporter()
@@ -620,12 +696,18 @@ final class AppModel: ObservableObject {
             }
             selection.subtract(removed)
             homeIndex?.prune(removed: o.removedURLs)
+            var emptied = false
+            if emptyTrashAfter && !o.removed.isEmpty {
+                updateBusy { $0.title = t("mac.busy.emptytrash"); $0.progress = nil }
+                _ = await Task.detached(priority: .userInitiated) { Cleaner.emptyTrash() }.value
+                emptied = true
+            }
             busy = nil
             reporter = nil
             totalFreed += o.bytes
             refreshDisk()
             refreshTrash()
-            var msg = ""
+            var msg = emptied ? t("mac.quick.emptied") : ""
             if !o.failed.isEmpty {
                 msg = t("mac.clean.failed", o.failed.count, o.failed.prefix(3).joined(separator: ", ") + (o.failed.count > 3 ? "…" : ""))
             }
