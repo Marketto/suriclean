@@ -494,6 +494,40 @@ class AppVM(app: Application) : AndroidViewModel(app) {
             }
             return
         }
+        // No Shizuku: ask Android for all the space it could free. To make room it deletes the
+        // cached files of every app (StorageManager.allocateBytes, public API, no permission).
+        if (busy != null) return
+        busy = Busy(Act.SWEEPING, L.t("and.busy.cachesAll"), progress = null)
+        Chiptune.setMood(Mood.CLEANING); Chiptune.sfx(Sfx.WHOOSH)
+        viewModelScope.launch {
+            val before = Fs.storage().second
+            withContext(Dispatchers.IO) { trimCachesByAllocation() }
+            delay(800)
+            val gained = (Fs.storage().second - before).coerceAtLeast(0)
+            busy = null
+            refresh()
+            when {
+                gained >= 1_048_576 -> {
+                    freed += gained; prefs.edit().putLong("freed", freed).apply()
+                    celebrate(Celebration(L.t("and.cele.cachesCleared"), L.t("and.cele.cachesFreed", Fs.bytes(gained))))
+                }
+                appCache >= 50L * 1_048_576 -> openClearCacheScreen()   // this phone refused: the system screen is left
+                else -> showToast(L.t("and.toast.cacheAlready"))
+            }
+            if (results[Category.APPS] != null) rescan(Category.APPS)
+        }
+    }
+
+    /** Asks for every allocatable byte: Android clears other apps' caches to grant it. */
+    private fun trimCachesByAllocation(): Boolean = try {
+        val sm = ctx.getSystemService(android.os.storage.StorageManager::class.java)
+        val uuid = sm.getUuidForPath(ctx.filesDir)
+        val n = sm.getAllocatableBytes(uuid)
+        if (n > 0) sm.allocateBytes(uuid, n)
+        true
+    } catch (e: Exception) { false }
+
+    private fun openClearCacheScreen() {
         if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
             showToast(L.t("and.toast.cacheNeedFiles")); return
         }
