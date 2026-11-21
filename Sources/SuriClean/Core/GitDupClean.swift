@@ -40,6 +40,24 @@ enum GitInspector {
         ".DS_Store", ".turbo", ".parcel-cache", ".angular", ".cache", "coverage", ".idea", ".vscode", "vendor", ".swiftpm"
     ]
 
+    /// A remote somewhere else (not a folder on this disk), so the repo can be cloned again.
+    static func isNetwork(_ r: String) -> Bool { (r.contains("://") && !r.hasPrefix("file:")) || r.contains("@") }
+
+    /// The url of `origin`, read from .git/config as plain text (no git run).
+    static func originFromConfig(_ repo: URL) -> String? {
+        guard let text = try? String(contentsOf: repo.appendingPathComponent(".git/config"), encoding: .utf8) else { return nil }
+        var inOrigin = false
+        for raw in text.split(separator: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { inOrigin = line.replacingOccurrences(of: " ", with: "") == "[remote\"origin\"]"; continue }
+            if inOrigin, line.hasPrefix("url"), let eq = line.firstIndex(of: "=") {
+                let v = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+                return v.isEmpty ? nil : v
+            }
+        }
+        return nil
+    }
+
     static func inspect(_ repo: URL) -> RepoInfo {
         var dates: [Date] = []
         // As administrator, on another user's repo, git must not run at all: the repo's own config
@@ -48,7 +66,7 @@ enum GitInspector {
             for f in ["index", "FETCH_HEAD", "HEAD", "ORIG_HEAD"] {
                 if let d = FS.modDate(repo.appendingPathComponent(".git/\(f)")) { dates.append(d) }
             }
-            return RepoInfo(lastActivity: dates.max(), remote: nil, dirty: true, unpushed: 0, stashed: false)
+            return RepoInfo(lastActivity: dates.max(), remote: originFromConfig(repo).filter(isNetwork).map(sanitize), dirty: true, unpushed: 0, stashed: false)
         }
         func g(_ args: [String]) -> ShellResult {
             Shell.run("/usr/bin/git", ["-C", repo.path, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"] + args,
@@ -87,7 +105,7 @@ enum GitInspector {
         if up.status != 0 { unpushed = last.status == 0 ? 1 : 0 }   // unknown = unsafe (empty repos have no log)
         else { unpushed = up.output.isEmpty ? 0 : up.output.split(separator: "\n").count }
         let stash = g(["stash", "list"])
-        let networkRemote = remote.map { r in (r.contains("://") && !r.hasPrefix("file:")) || r.contains("@") } ?? false
+        let networkRemote = remote.map(isNetwork) ?? false
         return RepoInfo(lastActivity: dates.max(), remote: networkRemote ? remote.map(sanitize) : nil, dirty: dirty,
                         unpushed: unpushed, stashed: !stash.output.isEmpty)
     }

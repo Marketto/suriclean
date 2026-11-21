@@ -145,7 +145,8 @@ async fn trash_items(app: AppHandle, mut items: Vec<TrashReq>, repo_header: Opti
     let rep = reporter(&app);
     // administrator steps only as the scan issued them
     let mut refused: Vec<String> = vec![];
-    if let Ok(m) = issued().lock() {
+    {
+        let m = issued().lock().unwrap_or_else(|e| e.into_inner());
         items.retain_mut(|it| match m.get(&it.id) {
             Some(i) if i.path == it.path => {
                 it.admin = i.admin;
@@ -195,10 +196,9 @@ async fn trash_items(app: AppHandle, mut items: Vec<TrashReq>, repo_header: Opti
         }
         if !admin.is_empty() && !rep.cancelled() {
             rep.report_force(&scan::m("web.rs.p.one_password", &[&admin.len().to_string()]), Some(0.85));
-            let work = match scan::private_dir() {
-                Ok(d) => d,
-                Err(e) => { out.failed.push(e); return out; }
-            };
+            match scan::private_dir() {
+                Err(e) => out.failed.push(e),
+                Ok(work) => {
             let done = work.join("done.txt");
             let dq = scan::shell_quote(&done.to_string_lossy());
             let mut lines: Vec<String> = vec![];
@@ -229,6 +229,8 @@ async fn trash_items(app: AppHandle, mut items: Vec<TrashReq>, repo_header: Opti
                 Err(e) => out.failed.push(e),
             }
             let _ = std::fs::remove_dir_all(&work);
+                }
+            }
         }
         if !log.is_empty() {
             out.repo_log = scan::append_repo_log(&log, repo_header.as_deref());
@@ -320,7 +322,8 @@ fn app_version(app: AppHandle) -> String {
 /// Linux .deb: saves the package in Downloads and opens it with the software installer.
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String, kind: String) -> Result<String, String> {
-    if !(url.starts_with("https://github.com/") || url.starts_with("https://objects.githubusercontent.com/")) {
+    // only SuriClean's own release files (GitHub then redirects to its download server)
+    if !url.to_ascii_lowercase().starts_with("https://github.com/marketto/suriclean/releases/download/") || url.contains("..") {
         return Err(scan::m("web.rs.err.bad_url", &[]));
     }
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<(PathBuf, bool), String> {
@@ -401,6 +404,12 @@ async fn elevated_scan(app: AppHandle, categories: Vec<String>) -> Result<std::c
         let out = work.join("scan.json");
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let q = |s: &str| scan::shell_quote(s);
+        // only the zones the elevated scan knows: nothing from the page reaches the root command line
+        const KNOWN: [&str; 2] = ["diskMapFull", "systemAreas"];
+        if categories.is_empty() || categories.iter().any(|c| !KNOWN.contains(&c.as_str())) {
+            let _ = std::fs::remove_dir_all(&work);
+            return Err(scan::m("web.rs.err.admin_failed", &[]));
+        }
         let cats = categories.join(",");
         let line = match std::env::var("APPIMAGE") {
             Ok(img) if !cfg!(windows) => format!("env APPIMAGE_EXTRACT_AND_RUN=1 {} --elevated-scan {} {}", q(&img), cats, q(&out.to_string_lossy())),

@@ -57,7 +57,7 @@ struct QuickCleanSheet: View {
                     Button(t("mac.common.cancel")) { model.showQuickClean = false }
                         .buttonStyle(BubblyButtonStyle(color: Theme.lilac))
                     Spacer()
-                    Text(Fmt.bytes(picked.totalSize)).font(Theme.font(20, .heavy)).foregroundColor(Theme.mint.darker)
+                    Text(Fmt.bytes(model.quickSize(picked))).font(Theme.font(20, .heavy)).foregroundColor(Theme.mint.darker)
                     Button(action: { model.runQuickClean(emptyTrashAfter: emptyAfter) }) {
                         Label(t("mac.quick.go"), systemImage: "sparkles")
                     }
@@ -90,7 +90,7 @@ struct QuickCleanSheet: View {
                     Text(t("mac.quick.count", n, ids.count)).font(Theme.font(11, .semibold)).opacity(0.55)
                 }
                 Spacer()
-                Text(Fmt.bytes(items.filter { model.quickPick.contains($0.id) }.totalSize)).font(Theme.font(14, .heavy))
+                Text(Fmt.bytes(model.quickSize(items.filter { model.quickPick.contains($0.id) }))).font(Theme.font(14, .heavy))
                 Button(action: {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         if expanded { open.remove(c) } else { open.insert(c) }

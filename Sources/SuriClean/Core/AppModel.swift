@@ -355,7 +355,7 @@ final class AppModel: ObservableObject {
         results.filter { $0.key != .diskMap && $0.key != .squeeze }.values.reduce(Int64(0)) { $0 + $1.totalSize }
     }
     var recommendedTotal: Int64 {
-        quickGroups.reduce(Int64(0)) { $0 + $1.items.totalSize }
+        quickSize(quickGroups.flatMap { $0.items })
     }
 
     var greeting: String {
@@ -638,8 +638,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var quickPickedSize: Int64 {
-        quickGroups.flatMap { $0.items }.filter { quickPick.contains($0.id) }.totalSize
+    /// What the ticked items really free: nested items and the same path in two zones count once.
+    func quickSize(_ picked: [CleanItem]) -> Int64 {
+        var seen = Set<String>()
+        return withoutNested(picked).filter { seen.insert($0.url.standardizedFileURL.path).inserted }.totalSize
     }
 
     func openQuickClean() {
@@ -662,7 +664,35 @@ final class AppModel: ObservableObject {
             chosen += g.category == .duplicates ? keepOneCopy(picked) : picked
         }
         showQuickClean = false
-        performTrash(withoutNested(chosen), emptyTrashAfter: emptyTrashAfter)
+        performTrash(withoutNested(sparingCopies(chosen)), emptyTrashAfter: emptyTrashAfter)
+    }
+
+    /// A duplicate group must keep one copy even when its copies are reached through other zones
+    /// (an old installer, a folder): if every copy would go, the preferred one and whatever contains it stay.
+    func sparingCopies(_ chosen: [CleanItem]) -> [CleanItem] {
+        var out = chosen
+        func covered(_ u: URL, by list: [CleanItem]) -> Bool {
+            let set = Set(list.map { $0.url.standardizedFileURL.path })
+            var p = u.standardizedFileURL.path
+            while p.count > 1 {
+                if set.contains(p) { return true }
+                p = (p as NSString).deletingLastPathComponent
+            }
+            return false
+        }
+        let groups = Dictionary(grouping: items(.duplicates), by: { $0.group ?? -1 })
+        for (_, g) in groups {
+            let there = g.filter { FileManager.default.fileExists(atPath: $0.url.path) }
+            guard !there.isEmpty, there.allSatisfy({ covered($0.url, by: out) }) else { continue }
+            let spare = there.first(where: { !$0.recommended }) ?? there[0]
+            let keep = spare.url.standardizedFileURL.path
+            out.removeAll { it in
+                let p = it.url.standardizedFileURL.path
+                return p == keep || keep.hasPrefix(p + "/")
+            }
+        }
+        if out.count < chosen.count { showToast(t("mac.toast.keptdup")) }
+        return out
     }
 
     /// An item inside another chosen folder goes with it: counted once.
@@ -719,7 +749,7 @@ final class AppModel: ObservableObject {
             refreshTrash()
             var msg = emptied ? t("mac.quick.emptied") : ""
             if !o.failed.isEmpty {
-                msg = t("mac.clean.failed", o.failed.count, o.failed.prefix(3).joined(separator: ", ") + (o.failed.count > 3 ? "…" : ""))
+                msg += (msg.isEmpty ? "" : "\n") + t("mac.clean.failed", o.failed.count, o.failed.prefix(3).joined(separator: ", ") + (o.failed.count > 3 ? "…" : ""))
             }
             if toTrash.contains(where: { $0.copyText != nil }) && o.bytes > 0 {
                 msg += (msg.isEmpty ? "" : "\n") + t("mac.clean.repolog")

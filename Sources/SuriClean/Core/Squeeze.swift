@@ -197,7 +197,7 @@ enum SqueezeFiles {
         let attrs = try? fm.attributesOfItem(atPath: original.path)
         var dest = finalName.map { original.deletingLastPathComponent().appendingPathComponent($0) } ?? original
         // another file already has the new name: never touch it, add « (n)» as desktop and Android do
-        if dest != original {
+        if dest.path.lowercased() != original.path.lowercased() {   // APFS ignores case: foto.JPG → foto.jpg is the same file
             let base = dest.deletingPathExtension().lastPathComponent, ext = dest.pathExtension, dir = dest.deletingLastPathComponent()
             var k = 1
             while fm.fileExists(atPath: dest.path) {
