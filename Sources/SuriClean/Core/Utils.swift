@@ -148,6 +148,19 @@ enum FS {
 
     private static let sizeKeys: Set<URLResourceKey> = [.isRegularFileKey, .isDirectoryKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
 
+    /// Temporary entries a running program may still be using although their date is old:
+    /// sockets (tmux, ssh-agent, X11…), folders holding sockets, sessions of system services.
+    static func inUseTemp(_ u: URL) -> Bool {
+        let n = u.lastPathComponent
+        for p in ["tmux-", "ssh-", ".X", ".ICE", "com.apple.", "systemd-private-", "launchd"] where n.hasPrefix(p) { return true }
+        func sock(_ path: String) -> Bool {
+            var st = stat()
+            return lstat(path, &st) == 0 && (st.st_mode & 0o170000) == 0o140000   // S_IFSOCK
+        }
+        if sock(u.path) { return true }
+        return children(u).prefix(500).contains { sock($0.path) }
+    }
+
     /// Real space on disk (allocated size), recursing into folders and packages (FastWalk, BSD fts).
     static func allocatedSize(_ url: URL, reporter: Reporter? = nil) -> Int64 {
         guard let v = try? url.resourceValues(forKeys: sizeKeys) else { return 0 }

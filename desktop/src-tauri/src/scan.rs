@@ -531,6 +531,24 @@ fn caches(rep: &Reporter) -> Vec<Item> {
     out
 }
 
+/// Temporary entries a running program may still use although their date is old: sockets
+/// (tmux, ssh-agent, X11…), folders holding sockets, private folders of running services.
+fn in_use_temp(p: &Path) -> bool {
+    let n = file_name(p);
+    if ["tmux-", "ssh-", ".X", ".ICE", "systemd-private-", "snap-private-tmp", "pulse-", "dbus-"].iter().any(|x| n.starts_with(x)) {
+        return true;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        let sock = |q: &Path| fs::symlink_metadata(q).map(|m| m.file_type().is_socket()).unwrap_or(false);
+        if sock(p) || children(p).iter().take(500).any(|c| sock(c)) {
+            return true;
+        }
+    }
+    false
+}
+
 fn logs_temp(rep: &Reporter) -> Vec<Item> {
     let mut out = vec![];
     let mut temps = vec![std::env::temp_dir()];
@@ -554,6 +572,9 @@ fn logs_temp(rep: &Reporter) -> Vec<Item> {
                     Ok(m) if m.uid() == my_uid => {}
                     _ => continue,
                 }
+            }
+            if in_use_temp(&k) {
+                continue;
             }
             let d = newest(&k, &[]);
             if days_since(d) < 3 {
@@ -886,12 +907,14 @@ fn git_repos(idx: &HomeIndex, rep: &Reporter) -> Vec<Item> {
     out
 }
 
-pub fn append_repo_log(lines: &[String]) -> Option<String> {
+/// `header`: the translated `mac.repolog.header` sent by the page (Italian if missing).
+pub fn append_repo_log(lines: &[String], header: Option<&str>) -> Option<String> {
     let docs = dirs::document_dir().unwrap_or_else(home);
     let path = docs.join("SuriClean - repo rimossi.txt");
     let mut text = String::new();
     if !path.exists() {
-        text.push_str("# Repo spostati nel Cestino da SuriClean.\n# Per riaverli basta lanciare il comando git clone sotto ciascuno.\n\n");
+        text.push_str(header.unwrap_or("# Repo spostati nel Cestino da SuriClean.\n# Per riaverli basta lanciare il comando git clone sotto ciascuno."));
+        text.push_str("\n\n");
     }
     text.push_str(&lines.join("\n\n"));
     text.push_str("\n\n");
@@ -1550,6 +1573,7 @@ fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
     rep.report_force(&m("web.rs.sys.p_tmp_backups", &[]), Some(0.8));
     for k in children(Path::new("/var/tmp")) {
         if rep.cancelled() { return; }
+        if in_use_temp(&k) { continue; }
         let d = newest(&k, &[]);
         if days_since(d) < 3 { continue; }
         if let Some(it) = sys_item(&k, &m("web.rs.sys.var_tmp", &[&file_name(&k)]), &m("web.rs.sys.var_tmp_detail", &[&rel_time(d)]), "safe", true, rep, 256 * 1024, &[m("web.rs.sys.badge_temp", &[]).as_str()]) {
@@ -1566,11 +1590,25 @@ fn system_linux(rep: &Reporter, out: &mut Vec<Item>) {
     }
 }
 
-/// Runs the given shell lines as administrator with ONE prompt (UAC on Windows, pkexec on Linux).
-pub fn run_elevated(lines: &[String]) -> Result<(), String> {
-    let dir = std::env::temp_dir().join(format!("suriclean-admin-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+/// A new folder only this user can open, for the files exchanged with the administrator step
+/// (script, results). Random name, created atomically: it fails if something is already there.
+pub fn private_dir() -> Result<PathBuf, String> {
+    let base = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_dir()).unwrap_or_else(std::env::temp_dir);
+    let nanos = SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let dir = base.join(format!("suriclean-{}-{:x}-{}", std::process::id(), nanos, fresh_id()));
+    let mut b = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        b.mode(0o700);
+    }
+    b.create(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Runs the given shell lines as administrator with ONE prompt (UAC on Windows, pkexec on Linux),
+/// from a script written in `dir` (made by `private_dir`).
+pub fn run_elevated(dir: &Path, lines: &[String]) -> Result<(), String> {
     let res = if cfg!(windows) {
         let script = dir.join("suri.cmd");
         let body = format!("@echo off\r\nchcp 65001 >nul\r\n{}\r\n", lines.join("\r\n"));
@@ -1582,11 +1620,6 @@ pub fn run_elevated(lines: &[String]) -> Result<(), String> {
     } else {
         let script = dir.join("suri.sh");
         fs::write(&script, format!("#!/bin/sh\n{}\nexit 0\n", lines.join("\n"))).map_err(|e| e.to_string())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&dir, fs::Permissions::from_mode(0o700));
-        }
         match Command::new("pkexec").arg("/bin/sh").arg(&script).status() {
             Ok(st) if st.code() == Some(126) || st.code() == Some(127) => Err(m("web.rs.err.pw_cancelled", &[])),
             Ok(_) => Ok(()),
@@ -1599,7 +1632,8 @@ pub fn run_elevated(lines: &[String]) -> Result<(), String> {
 /// Quoted for the shell the elevated script runs in.
 pub fn shell_quote(p: &str) -> String {
     if cfg!(windows) {
-        format!("\"{}\"", p.replace('"', ""))
+        // in a .cmd file %VAR% is expanded even inside quotes: %% is a literal %
+        format!("\"{}\"", p.replace('"', "").replace('%', "%%"))
     } else {
         format!("'{}'", p.replace('\'', "'\\''"))
     }

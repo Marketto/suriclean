@@ -41,12 +41,20 @@ enum GitInspector {
     ]
 
     static func inspect(_ repo: URL) -> RepoInfo {
+        var dates: [Date] = []
+        // As administrator, on another user's repo, git must not run at all: the repo's own config
+        // (core.fsmonitor, filters…) could make root run that user's commands. Unknown = not safe.
+        if FS.isHelper {
+            for f in ["index", "FETCH_HEAD", "HEAD", "ORIG_HEAD"] {
+                if let d = FS.modDate(repo.appendingPathComponent(".git/\(f)")) { dates.append(d) }
+            }
+            return RepoInfo(lastActivity: dates.max(), remote: nil, dirty: true, unpushed: 0, stashed: false)
+        }
         func g(_ args: [String]) -> ShellResult {
-            Shell.run("/usr/bin/git", ["-C", repo.path] + args,
+            Shell.run("/usr/bin/git", ["-C", repo.path, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"] + args,
                       env: ["GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C",
                             "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"])
         }
-        var dates: [Date] = []
         let last = g(["log", "-1", "--format=%ct"])
         if last.status == 0, let ts = Double(last.output) { dates.append(Date(timeIntervalSince1970: ts)) }
         for f in ["index", "FETCH_HEAD", "HEAD", "ORIG_HEAD"] {
@@ -193,7 +201,10 @@ enum Cleaner {
             }
             o.removed.append(item.id)
             o.removedURLs.append(item.url)
-            o.bytes += item.size
+            // count only what really moved
+            let left = item.extraURLs.filter { fm.fileExists(atPath: $0.path) }
+            o.bytes += max(0, item.size - left.reduce(Int64(0)) { $0 + FS.allocatedSize($1) })
+            if !left.isEmpty { o.failed.append(item.name) }
             if let c = item.copyText { repoLog.append(t("mac.repolog.entry", item.url.path, stamp) + "\n\(c)") }
         }
 

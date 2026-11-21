@@ -1,6 +1,6 @@
 # 🐾 SuriClean
 
-La suricata spazzina per il tuo Mac. App nativa SwiftUI per macOS 12 Monterey (l'ultima versione disponibile sul MacBook Air 2015).
+La suricata spazzina per Mac, Windows, Ubuntu e Android. Su Mac è un'app nativa SwiftUI che funziona da macOS 12 Monterey (l'ultima versione disponibile sul MacBook Air 2015).
 
 ## Download
 
@@ -11,6 +11,7 @@ La suricata spazzina per il tuo Mac. App nativa SwiftUI per macOS 12 Monterey (l
 | macOS 12+ (Intel e Apple Silicon) | `SuriClean.dmg` |
 | Windows 10/11 | `SuriClean-Windows-Setup.exe` |
 | Ubuntu 22.04+ | `SuriClean-Linux.deb` oppure `SuriClean-Linux.AppImage` |
+| Android 8+ | `SuriClean-Android.apk` |
 
 L'app controlla da sola se è uscita una versione nuova e si aggiorna (si può spegnere con l'interruttore «auto» nella barra laterale).
 
@@ -71,7 +72,8 @@ Nella tana trovi anche:
 
 ## Sicurezza
 
-- Suri non cancella mai niente direttamente: sposta tutto nel **Cestino**, quindi puoi ripensarci. Lo spazio torna libero davvero solo quando svuoti il Cestino.
+- Suri sposta nel **Cestino** quasi tutto, quindi puoi ripensarci. Lo spazio torna libero davvero solo quando svuoti il Cestino (la pulizia senza pensieri del Mac può svuotarlo subito, se spunti la casella).
+- Eccezioni, sempre dichiarate prima nell'app: le aree di sistema di Windows e Ubuntu (si cancellano per sempre dopo la password di amministratore), le cache delle app su Android (le svuota il sistema) e, con Shizuku, le cartelle in `Android/data`.
 - Per ogni repo git rimosso, il comando `git clone` per riaverlo viene salvato in `~/Documenti/SuriClean - repo rimossi.txt`. Puoi anche copiarlo dal pulsante 📋.
 - Le cache si ricreano da sole, ma è meglio chiudere le app prima di pulirle.
 - Le app installate dall'App Store o di proprietà dell'amministratore potrebbero rifiutarsi di essere spostate. In quel caso trascinale nel Cestino dal Finder.

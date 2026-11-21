@@ -70,7 +70,7 @@ enum HelperMode {
         let duOut = work.appendingPathComponent("du.txt")
         let duErr = work.appendingPathComponent("du-err.txt")
         var lines = ["#!/bin/bash",
-                     "/usr/bin/du -x -k -d 4 '/System/Volumes/Data' > \(q(duOut.path)) 2> \(q(duErr.path)); /bin/chmod 644 \(q(duOut.path)) \(q(duErr.path))"]
+                     Scanners.duCommand(out: duOut, err: duErr)]
         let homes = otherHomes()
         let exe = Bundle.main.executablePath ?? CommandLine.arguments[0]
         let cats = helperCategories.map { $0.rawValue }.joined(separator: ",")

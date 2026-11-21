@@ -195,7 +195,16 @@ enum SqueezeFiles {
     static func replace(original: URL, with temp: URL, finalName: String? = nil) -> URL? {
         let fm = FileManager.default
         let attrs = try? fm.attributesOfItem(atPath: original.path)
-        let dest = finalName.map { original.deletingLastPathComponent().appendingPathComponent($0) } ?? original
+        var dest = finalName.map { original.deletingLastPathComponent().appendingPathComponent($0) } ?? original
+        // another file already has the new name: never touch it, add « (n)» as desktop and Android do
+        if dest != original {
+            let base = dest.deletingPathExtension().lastPathComponent, ext = dest.pathExtension, dir = dest.deletingLastPathComponent()
+            var k = 1
+            while fm.fileExists(atPath: dest.path) {
+                dest = dir.appendingPathComponent(ext.isEmpty ? "\(base) (\(k))" : "\(base) (\(k)).\(ext)")
+                k += 1
+            }
+        }
         var trashed: NSURL?
         do {
             try fm.trashItem(at: original, resultingItemURL: &trashed)
@@ -204,7 +213,6 @@ enum SqueezeFiles {
             return nil
         }
         do {
-            if dest != original && fm.fileExists(atPath: dest.path) { try fm.trashItem(at: dest, resultingItemURL: nil) }
             try fm.moveItem(at: temp, to: dest)
         } catch {
             // put the original back where it was

@@ -433,13 +433,21 @@ class AppVM(app: Application) : AndroidViewModel(app) {
 
     /** Original → Suri's trash, light copy → the original's place (WebM/MKV become .mp4). */
     private fun replaceWithLight(item: Item, src: File, light: File, newName: String): Boolean {
+        // where Trash.move will put the original (same naming), to bring it back if anything fails
+        var trashed = File(Trash.dir, src.name)
+        var t = 1
+        while (trashed.exists()) { trashed = File(Trash.dir, "${src.nameWithoutExtension} ($t)${if (src.extension.isNotEmpty()) "." + src.extension else ""}"); t++ }
         val (removed, _, _) = Trash.move(ctx, listOf(item), Reporter())
         if (item.id !in removed) return false
         var dest = File(src.parentFile, newName)
         var k = 1
         while (dest.exists()) { dest = File(src.parentFile, "${File(newName).nameWithoutExtension} ($k).${File(newName).extension}"); k++ }
         if (!light.renameTo(dest)) {
-            try { light.copyTo(dest, overwrite = false); light.delete() } catch (e: Exception) { return false }
+            try { light.copyTo(dest, overwrite = false); light.delete() } catch (e: Exception) {
+                dest.delete()
+                if (trashed.exists() && !src.exists()) trashed.renameTo(src)   // the original goes back in its place
+                return false
+            }
         }
         dest.setLastModified(item.date ?: System.currentTimeMillis())
         android.media.MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath, src.absolutePath), null, null)

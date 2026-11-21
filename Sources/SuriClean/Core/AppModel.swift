@@ -595,10 +595,10 @@ final class AppModel: ObservableObject {
 
     func clean(_ c: CleanCategory) {
         guard !needsConsent else { return }
-        guard busy == nil else { return }
+        guard busy == nil, c != .diskMap else { return }   // the map is view-only (it holds the home itself)
         var items = selectedItems(c)
         if c == .duplicates { items = keepOneCopy(items) }
-        performTrash(items)
+        performTrash(withoutNested(items))
     }
 
     /// Duplicates: always keeps at least one copy per group, and only if that copy still exists.
@@ -662,10 +662,20 @@ final class AppModel: ObservableObject {
             chosen += g.category == .duplicates ? keepOneCopy(picked) : picked
         }
         showQuickClean = false
-        // an item inside another chosen folder goes with it
-        let dirs = chosen.map { $0.url.path + "/" }
-        chosen = chosen.filter { it in !dirs.contains { it.url.path.hasPrefix($0) } }
-        performTrash(chosen, emptyTrashAfter: emptyTrashAfter)
+        performTrash(withoutNested(chosen), emptyTrashAfter: emptyTrashAfter)
+    }
+
+    /// An item inside another chosen folder goes with it: counted once.
+    func withoutNested(_ items: [CleanItem]) -> [CleanItem] {
+        let dirs = Set(items.map { $0.url.standardizedFileURL.path })
+        return items.filter { it in
+            var p = it.url.standardizedFileURL.deletingLastPathComponent().path
+            while p.count > 1 {
+                if dirs.contains(p) { return false }
+                p = (p as NSString).deletingLastPathComponent
+            }
+            return true
+        }
     }
 
     /// Moves the items to the Trash (one password for the protected ones), then celebrates.

@@ -559,12 +559,20 @@
     let sel = items(catId).filter(i => S.sel.has(i.id));
     if (catId === "duplicates") {
       const groups = {};
-      items(catId).forEach(i => (groups[i.group] ||= []).push(i));
+      const all = items(catId);
+      all.forEach(i => (groups[i.group] ||= []).push(i));
+      // a copy counts as kept only if it is still there (as on Mac and Android)
+      let there = all.map(() => true);
+      try { there = await invoke("existing", { paths: all.map(i => i.path) }); } catch (e) { console.error(e); }
+      const exists = new Map(all.map((i, k) => [i.id, there[k]]));
       const safe = [];
       Object.values(groups).forEach(g => {
-        const kept = g.filter(i => !S.sel.has(i.id));
+        const kept = g.filter(i => !S.sel.has(i.id) && exists.get(i.id));
         if (kept.length) safe.push(...g.filter(i => S.sel.has(i.id)));
-        else { const spare = g.find(i => !i.recommended) || g[0]; safe.push(...g.filter(i => S.sel.has(i.id) && i.id !== spare.id)); }
+        else {
+          const spare = g.find(i => !i.recommended && exists.get(i.id)) || g.find(i => exists.get(i.id));
+          if (spare) safe.push(...g.filter(i => S.sel.has(i.id) && i.id !== spare.id));
+        }
       });
       if (safe.length < sel.length) toast(t("web.clean.kept_one"));
       sel = safe;
@@ -575,7 +583,7 @@
     Chiptune.setMood("cleaning"); sfx("whoosh"); showBusy();
     let out;
     try {
-      out = await invoke("trash_items", { items: sel.map(i => ({ id: i.id, path: i.path, name: i.name, size: i.size, extra: i.extra, copyText: i.copyText, admin: i.admin, cmd: i.cmd })) });
+      out = await invoke("trash_items", { items: sel.map(i => ({ id: i.id, path: i.path, name: i.name, size: i.size, extra: i.extra, copyText: i.copyText, admin: i.admin, cmd: i.cmd })), repoHeader: t("mac.repolog.header") });
     } catch (e) { out = { removed: [], bytes: 0, failed: [msg(String(e))] }; }
     out.failed = (out.failed || []).map(msg);
     const removed = new Set(out.removed);
