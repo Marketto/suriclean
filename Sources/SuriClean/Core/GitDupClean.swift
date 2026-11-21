@@ -66,7 +66,7 @@ enum GitInspector {
             for f in ["index", "FETCH_HEAD", "HEAD", "ORIG_HEAD"] {
                 if let d = FS.modDate(repo.appendingPathComponent(".git/\(f)")) { dates.append(d) }
             }
-            return RepoInfo(lastActivity: dates.max(), remote: originFromConfig(repo).filter(isNetwork).map(sanitize), dirty: true, unpushed: 0, stashed: false)
+            return RepoInfo(lastActivity: dates.max(), remote: originFromConfig(repo).flatMap { isNetwork($0) ? sanitize($0) : nil }, dirty: true, unpushed: 0, stashed: false)
         }
         func g(_ args: [String]) -> ShellResult {
             Shell.run("/usr/bin/git", ["-C", repo.path, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"] + args,
