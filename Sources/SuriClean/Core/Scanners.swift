@@ -661,7 +661,8 @@ enum Scanners {
             let bundle = Bundle(url: app)
             let id = bundle?.bundleIdentifier ?? ""
             let isInstaller = id.hasPrefix("com.apple.InstallAssistant") || app.lastPathComponent.hasPrefix("Install macOS") || app.lastPathComponent.hasPrefix("Installa macOS")
-            if (id.hasPrefix("com.apple.") && !isInstaller) || id == FS.ownBundleID { continue }
+            // macOS installers live in one zone only: «Aree di sistema», to review, not ticked
+            if id.hasPrefix("com.apple.") || isInstaller || id == FS.ownBundleID { continue }
             let name = app.deletingPathExtension().lastPathComponent
             let last = FS.lastUsedDate(app)
             let size = FS.allocatedSize(app, reporter: rep)
@@ -676,11 +677,6 @@ enum Scanners {
             if extraSize > 0 { badges.append(t("mac.badge.extradata", Fmt.bytes(extraSize))) }
             let version = (bundle?.infoDictionary?["CFBundleShortVersionString"] as? String).map { " · v\($0)" } ?? ""
             let detail = (last.map { t("mac.detail.lastused", Fmt.relative($0)) } ?? t("mac.detail.nouse")) + version
-            if isInstaller {
-                out.append(CleanItem(url: app, name: name, detail: t("mac.detail.macosinstaller"), size: size, date: last,
-                                     risk: .safe, recommended: true, badges: [t("mac.badge.macosinstaller")]))
-                continue
-            }
             out.append(CleanItem(url: app, name: name, detail: detail, size: size + extraSize, date: last,
                                  risk: .careful, recommended: false, badges: badges, extraURLs: extras))
         }

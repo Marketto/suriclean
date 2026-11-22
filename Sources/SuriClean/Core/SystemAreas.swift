@@ -110,7 +110,8 @@ enum SystemAreas {
                          min: 1_048_576, badges: [t("mac.badge.leftover")], rep) { out.append(it) }
         for k in FS.children(URL(fileURLWithPath: "/Applications")) {
             let n = k.lastPathComponent
-            guard n.hasSuffix(".app"), n.hasPrefix("Install macOS") || n.hasPrefix("Install OS X") || n.hasPrefix("Installa macOS") else { continue }
+            let assistant = Bundle(url: k)?.bundleIdentifier?.hasPrefix("com.apple.InstallAssistant") ?? false
+            guard n.hasSuffix(".app"), assistant || n.hasPrefix("Install macOS") || n.hasPrefix("Install OS X") || n.hasPrefix("Installa macOS") else { continue }
             if let it = item(k, t("mac.sys.installer", k.deletingPathExtension().lastPathComponent),
                              t("mac.sys.installer.detail"),
                              risk: .review, rec: false, min: 1_048_576, badges: [t("mac.badge.redl")], rep) { out.append(it) }
