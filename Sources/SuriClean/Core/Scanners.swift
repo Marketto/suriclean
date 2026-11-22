@@ -20,9 +20,9 @@ enum Targets {
     static var ai: [Target] {
         let base: [Target] = [
         Target(path: ".claude/projects", name: "Claude Code · \(t("mac.tg.sessioni"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
-        Target(path: ".claude/file-history", name: "Claude Code · \(t("mac.tg.storico_file_modificati"))"),
-        Target(path: ".claude/shell-snapshots", name: "Claude Code · \(t("mac.tg.snapshot_della_shell"))"),
-        Target(path: ".claude/todos", name: "Claude Code · \(t("mac.tg.liste_todo_vecchie"))"),
+        Target(path: ".claude/file-history", name: "Claude Code · \(t("mac.tg.storico_file_modificati"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".claude/shell-snapshots", name: "Claude Code · \(t("mac.tg.snapshot_della_shell"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".claude/todos", name: "Claude Code · \(t("mac.tg.liste_todo_vecchie"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
         Target(path: ".claude/debug", name: "Claude Code · \(t("mac.tg.log_di_debug"))"),
         Target(path: ".claude/statsig", name: "Claude Code · \(t("mac.tg.cache_telemetria"))"),
         Target(path: ".claude/paste-cache", name: "Claude Code · \(t("mac.tg.cache_incolla"))"),
@@ -389,7 +389,10 @@ enum Scanners {
             if rep.isCancelled { return out }
             if cacheSkip.contains(k.lastPathComponent) { continue }
             rep.report(FS.pretty(k), progress: Double(i) / Double(max(kids.count, 1)) * 0.6)
-            if let it = makeItem(k, name: FS.friendlyName(k.lastPathComponent), risk: .safe, recommended: true, rep: rep, minSize: 1_048_576) {
+            // Apple's own caches: rebuilt too, but left to you (same rule as /Library/Caches)
+            let apple = k.lastPathComponent.hasPrefix("com.apple.")
+            if let it = makeItem(k, name: FS.friendlyName(k.lastPathComponent), risk: apple ? .review : .safe, recommended: !apple,
+                                 rep: rep, minSize: 1_048_576, badges: apple ? [t("mac.badge.applecache")] : []) {
                 out.append(it)
             }
         }

@@ -387,7 +387,7 @@
  "legal.privacy.s4.title": "4. 網際網路連線",
  "legal.privacy.s5.body": "這些權限僅供本 App 的功能使用，並在裝置上使用：\n• 檔案存取權與完整磁碟取用權限：用來測量及清理資料夾；\n• 使用狀況存取權（Android）：用來得知 App 佔用多少空間以及你何時使用過它們；\n• 管理者密碼（Mac）：僅在記憶體中保留約 15 分鐘，用於需要管理者權限的操作，絕不會被儲存或傳送；\n• 安裝 App（Android）：用來安裝你選擇的更新。",
  "legal.privacy.s5.title": "5. 權限",
- "legal.privacy.s6.body": "本 App 只會在裝置上儲存你的偏好設定（語言、音樂、選擇）、累計釋放的空間、你對這些文件的同意紀錄，以及在 Android 上，在你清空 Suri 的垃圾桶之前其中的檔案。解除安裝本 App 即會刪除這些資料。",
+ "legal.privacy.s6.body": "本 App 只會在裝置上儲存以下內容：你的偏好設定（語言、音樂、選擇）、累計釋放的空間和你對這些文件的同意紀錄；在 Mac 上，用於「什麼在變大」的檔案夾測量資料（路徑和大小，儲存在檔案 Application Support/SuriClean/growth.json 中）；在電腦上，當你將 git 儲存庫移到垃圾桶時，「文件」檔案夾中的檔案「SuriClean - repo rimossi.txt」，其中包含重新複製這些儲存庫的指令；在 Android 上，在你清空 Suri 的垃圾桶之前其中的檔案。這些資料絕不會離開裝置。解除安裝本 App 即會刪除偏好設定；growth.json 和「文件」中的該檔案，你可以隨時自行刪除。",
  "legal.privacy.s6.title": "6. 儲存在裝置上的資料",
  "legal.privacy.s7.body": "SuriClean 的下載頁面由 GitHub Pages 託管：GitHub 可能會依其自身的隱私權政策記錄造訪的技術資料。本網站不使用 Cookie、統計工具，也不使用第三方字型與服務。",
  "legal.privacy.s7.title": "7. 網站",

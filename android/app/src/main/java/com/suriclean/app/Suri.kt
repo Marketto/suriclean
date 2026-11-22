@@ -94,7 +94,13 @@ private val WOOD = Color(0xFF9E6B42)
 @Composable
 fun Suri(act: Act, height: Dp = 180.dp, modifier: Modifier = Modifier) {
     var t by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
+    // «Rimuovi animazioni» of Android (animator scale 0): Suri stays still
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val still = remember {
+        android.provider.Settings.Global.getFloat(ctx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    LaunchedEffect(still) {
+        if (still) return@LaunchedEffect
         val start = System.nanoTime()
         while (true) withFrameNanos { t = ((it - start) / 1e9).toFloat() }
     }

@@ -92,6 +92,8 @@ La musica chiptune è sintetizzata in tempo reale (onde quadre, triangolo e rumo
 
 Puoi silenziare la musica con ⌘M. ⌘R scansiona tutto.
 
+Se nel sistema è attivo «Riduci movimento» (Mac, Windows, Ubuntu) o «Rimuovi animazioni» (Android), Suri e lo sfondo restano fermi. Il pulsante **Condividi** in fondo alla barra laterale (in basso nella tana su Android) manda il link al sito.
+
 Durante le scansioni Suri fa cose diverse:
 - scava con la paletta;
 - indaga con lente e cappello;

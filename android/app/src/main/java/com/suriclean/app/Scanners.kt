@@ -337,7 +337,10 @@ object SystemAreas {
 
         rep.report(L.t("and.rep.oemLogs"), 0.6f, force = true)
         for (name in listOf("MIUI/debug_log", "log", "logs", "Log", "bugreports", "mtklog", "debuglogger", "Android/log", "tombstones", "Huawei/log")) {
-            add(Scanners.item(File(root, name), L.t("and.sys.log", name), Fs.pretty(File(root, name)), Risk.SAFE, true, listOf(L.t("and.badge.log")), rep = rep, minSize = 64 * 1024))
+            // generic names (log, logs, Log) may be the user's or another app's folders: to review, not ticked
+            val generic = name == "log" || name == "logs" || name == "Log"
+            add(Scanners.item(File(root, name), L.t("and.sys.log", name), Fs.pretty(File(root, name)),
+                if (generic) Risk.REVIEW else Risk.SAFE, !generic, listOf(L.t("and.badge.log")), rep = rep, minSize = 64 * 1024))
         }
 
         rep.report(L.t("and.rep.appBackups"), 0.75f, force = true)

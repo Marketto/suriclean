@@ -163,13 +163,15 @@ private struct FileCard: View {
 /// Animation A «Il corriere»: Suri runs with the file, throws it under Schiaccia's press, the head slams,
 /// the flattened file flies off with the real saving of the last file.
 struct CourierStage: View {
+    /// «Riduci movimento» of the system: one still frame instead of the animation.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let run: SqueezeRunState
     private let width: CGFloat = 460
     private let height: CGFloat = 230
     private let cycle = 3.0
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { tl in
             let p = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
             let suriX = kf(p, [(0, 0), (0.1, 0), (0.35, 110), (0.55, 110), (0.8, 0), (1, 0)])
             let fx = kf(p, [(0, 108), (0.1, 108), (0.35, 218), (0.48, 352), (0.62, 352), (0.78, 438), (1, 438)])

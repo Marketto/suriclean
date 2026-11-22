@@ -256,10 +256,12 @@ struct CountingBytes: AnimatableModifier {
 }
 
 struct StripedProgress: View {
+    /// «Riduci movimento» of the system: one still frame instead of the animation.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let progress: Double?
     var color: Color = Theme.pink
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let w = Double(size.width), h = Double(size.height)
@@ -293,9 +295,11 @@ struct StripedProgress: View {
 
 /// Pastel gradient with slow floating bubbles and stars.
 struct KawaiiBackground: View {
+    /// «Riduci movimento» of the system: one still frame instead of the animation.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let colors = [Theme.pink, Theme.sky, Theme.lemon, Theme.lilac, Theme.mint]
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: reduceMotion)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
                 let w = Double(size.width), h = Double(size.height)
@@ -322,10 +326,12 @@ struct KawaiiBackground: View {
 }
 
 struct ConfettiView: View {
+    /// «Riduci movimento» of the system: one still frame instead of the animation.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start = Date()
     private let colors = [Theme.pink, Theme.lemon, Theme.sky, Theme.mint, Theme.lilac, Theme.coral]
     var body: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(minimumInterval: nil, paused: reduceMotion)) { tl in
             let t = tl.date.timeIntervalSince(start)
             Canvas { ctx, size in
                 let w = Double(size.width), h = Double(size.height)

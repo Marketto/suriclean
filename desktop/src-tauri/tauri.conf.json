@@ -19,12 +19,31 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "media-src": "'self' blob:",
+        "worker-src": "'self' blob:",
+        "connect-src": "'self' ipc: http://ipc.localhost https://api.github.com",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
+    "targets": [
+      "nsis",
+      "deb",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,12 +58,17 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Italian", "English"]
+        "languages": [
+          "Italian",
+          "English"
+        ]
       }
     },
     "linux": {
       "deb": {
-        "depends": ["git"]
+        "depends": [
+          "git"
+        ]
       }
     }
   }
