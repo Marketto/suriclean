@@ -120,7 +120,8 @@
       ${updatePill()}
       <div class="music-row"><button class="music-toggle" data-act="mute" title="${esc(t(S.muted ? "web.music.paused" : "web.music.on"))}">${S.muted ? "🔇" : "🎵"}</button>
       <span class="sp"></span>${langPicker()}</div>
-      <button class="legal-link" data-act="legal">⚖️ ${esc(t("legal.link.title"))}</button>`;
+      <div class="music-row"><button class="legal-link" data-act="legal">⚖️ ${esc(t("legal.link.title"))}</button><span class="sp"></span>
+      <button class="legal-link" data-act="share" title="${esc(t("site.share_text"))}">📤 ${esc(t("site.share"))}</button></div>`;
     Suri.setActivity($("#suri-side"), S.busy ? S.busy.act : "idle");
   }
 
@@ -400,10 +401,25 @@
     $("#count").textContent = S.results[cat.id] ? `${nItems(catItems(cat).length)} · ${bytes(cat.squeeze ? total(catItems(cat)) : displayTotal(cat.id))}` : "";
   }
 
+  /** «Condividi»: the system share sheet where the webview has one, otherwise the link is copied. */
+  async function share() {
+    const url = "https://marketto.github.io/suriclean/";
+    try {
+      if (navigator.share) { await navigator.share({ title: "SuriClean", text: t("site.share_text"), url }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(url); toast(t("site.share_copied")); }
+    catch (e) { toast(url); }
+  }
+
   function render() {
     renderSidebar();
     if (S.view) renderDetail(); else renderDashboard();
   }
+
+  /** Buttons that show only an emoji: their tooltip becomes the name read by screen readers
+      (watched, so it holds for every part of the page drawn later). */
+  const labelIconButtons = () => document.querySelectorAll("button[title]:not([aria-label])").forEach(b => b.setAttribute("aria-label", b.title));
+  new MutationObserver(labelIconButtons).observe(document.body, { childList: true, subtree: true });
 
   // ───────── overlays ─────────
   function showBusy() {
@@ -559,12 +575,20 @@
     let sel = items(catId).filter(i => S.sel.has(i.id));
     if (catId === "duplicates") {
       const groups = {};
-      items(catId).forEach(i => (groups[i.group] ||= []).push(i));
+      const all = items(catId);
+      all.forEach(i => (groups[i.group] ||= []).push(i));
+      // a copy counts as kept only if it is still there (as on Mac and Android)
+      let there = all.map(() => true);
+      try { there = await invoke("existing", { paths: all.map(i => i.path) }); } catch (e) { console.error(e); }
+      const exists = new Map(all.map((i, k) => [i.id, there[k]]));
       const safe = [];
       Object.values(groups).forEach(g => {
-        const kept = g.filter(i => !S.sel.has(i.id));
+        const kept = g.filter(i => !S.sel.has(i.id) && exists.get(i.id));
         if (kept.length) safe.push(...g.filter(i => S.sel.has(i.id)));
-        else { const spare = g.find(i => !i.recommended) || g[0]; safe.push(...g.filter(i => S.sel.has(i.id) && i.id !== spare.id)); }
+        else {
+          const spare = g.find(i => !i.recommended && exists.get(i.id)) || g.find(i => exists.get(i.id));
+          if (spare) safe.push(...g.filter(i => S.sel.has(i.id) && i.id !== spare.id));
+        }
       });
       if (safe.length < sel.length) toast(t("web.clean.kept_one"));
       sel = safe;
@@ -575,7 +599,7 @@
     Chiptune.setMood("cleaning"); sfx("whoosh"); showBusy();
     let out;
     try {
-      out = await invoke("trash_items", { items: sel.map(i => ({ id: i.id, path: i.path, name: i.name, size: i.size, extra: i.extra, copyText: i.copyText, admin: i.admin, cmd: i.cmd })) });
+      out = await invoke("trash_items", { items: sel.map(i => ({ id: i.id, path: i.path, name: i.name, size: i.size, extra: i.extra, copyText: i.copyText, admin: i.admin, cmd: i.cmd })), repoHeader: t("mac.repolog.header") });
     } catch (e) { out = { removed: [], bytes: 0, failed: [msg(String(e))] }; }
     out.failed = (out.failed || []).map(msg);
     const removed = new Set(out.removed);
@@ -828,6 +852,7 @@
       case "sqCancel": if (S.sq) { S.sq.ctl.abort(); sfx("error"); $("#sq-name") && ($("#sq-name").textContent = t("web.busy.stopping")); } break;
       case "cancel": if (S.busy) { S.busy.cancelled = true; S.busy.title = t("web.busy.stopping"); showBusy(); invoke("cancel_scan"); sfx("error"); } break;
       case "legal": sfx("pop"); Legal.open("terms"); break;
+      case "share": sfx("pop"); share(); break;
       case "mute": S.muted = !S.muted; localStorage.setItem("suri.muted", S.muted ? "1" : "0"); Chiptune.setMuted(S.muted); renderSidebar(); break;
       case "refresh": sfx("pop"); await pruneMissing(); await refreshDisk(); render(); break;
       case "askEmpty": sfx("pop"); confirmBox(t("web.empty.ask_title"), t("web.empty.ask_text", bytes(S.trash)), t("web.empty.ask_ok"), emptyTrash); break;

@@ -1,6 +1,6 @@
 # Informativa privacy di SuriClean
 
-_Ultimo aggiornamento: 2026-11-04_
+_Ultimo aggiornamento: 2026-11-22_
 
 ## 1. Chi è il titolare
 
@@ -30,7 +30,7 @@ I permessi servono solo alle funzioni dell'app e vengono usati sul dispositivo:
 
 ## 6. Dati salvati sul dispositivo
 
-L'app salva sul dispositivo solo le tue preferenze (lingua, musica, scelte), lo spazio liberato in totale, la tua accettazione di questi documenti e, su Android, i file nel Cestino di Suri finché non lo svuoti. Si cancellano disinstallando l'app.
+L'app salva sul dispositivo solo: le tue preferenze (lingua, musica, scelte), lo spazio liberato in totale e la tua accettazione di questi documenti; su Mac, le misure delle cartelle per «Cosa cresce» (percorsi e dimensioni, nel file Application Support/SuriClean/growth.json); su computer, quando sposti nel Cestino dei repo git, il file «SuriClean - repo rimossi.txt» nella cartella Documenti, con i comandi per riclonarli; su Android, i file nel Cestino di Suri finché non lo svuoti. Questi dati non lasciano mai il dispositivo. Le preferenze si cancellano disinstallando l'app; growth.json e il file nei Documenti puoi cancellarli tu quando vuoi.
 
 ## 7. Sito web
 
@@ -48,7 +48,7 @@ Questa informativa può cambiare con le nuove versioni dell'app. Se cambia in mo
 
 # SuriClean Privacy Policy
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-22_
 
 ## 1. Who is the controller
 
@@ -78,7 +78,7 @@ Permissions are used only for the app's features, and only on the device:
 
 ## 6. Data saved on the device
 
-The app saves on the device only your preferences (language, music, choices), the total space freed, your acceptance of these documents and, on Android, the files in Suri's Trash until you empty it. They are deleted when you uninstall the app.
+The app saves on the device only: your preferences (language, music, choices), the total space freed and your acceptance of these documents; on Mac, the folder measurements for “What's growing” (paths and sizes, in the file Application Support/SuriClean/growth.json); on computers, when you move git repos to the Trash, the file “SuriClean - repo rimossi.txt” in the Documents folder, with the commands to clone them again; on Android, the files in Suri's Trash until you empty it. This data never leaves the device. Preferences are deleted when you uninstall the app; you can delete growth.json and the file in Documents yourself at any time.
 
 ## 7. Website
 

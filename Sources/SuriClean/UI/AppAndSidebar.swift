@@ -181,11 +181,20 @@ struct Sidebar: View {
                 LanguagePicker()
             }
             .padding(.horizontal, 8)
-            Button(action: { model.openLegal(.terms) }) {
-                Text(t("legal.link.title")).font(Theme.font(10.5, .bold)).underline()
+            HStack(spacing: 10) {
+                Button(action: { model.openLegal(.terms) }) {
+                    Text(t("legal.link.title")).font(Theme.font(10.5, .bold)).underline()
+                }
+                .buttonStyle(.plain)
+                .opacity(0.55)
+                Spacer(minLength: 0)
+                Button(action: { Share.show() }) {
+                    Label(t("site.share"), systemImage: "square.and.arrow.up").font(Theme.font(10.5, .bold))
+                }
+                .buttonStyle(.plain)
+                .opacity(0.7)
+                .help(t("site.share_text"))
             }
-            .buttonStyle(.plain)
-            .opacity(0.55)
             .padding(.horizontal, 8)
             .padding(.bottom, 10)
         }
@@ -337,5 +346,22 @@ struct LanguagePicker: View {
         .fixedSize()
         .opacity(0.75)
         .help(t("mac.lang.title"))
+    }
+}
+
+/// «Condividi»: the system share menu with the link to SuriClean's site.
+enum Share {
+    static let url = URL(string: "https://marketto.github.io/suriclean/")!
+
+    static func show() {
+        let picker = NSSharingServicePicker(items: [t("site.share_text"), url])
+        guard let win = NSApp.keyWindow, let view = win.contentView else {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            return
+        }
+        let p = view.convert(win.mouseLocationOutsideOfEventStream, from: nil)
+        picker.show(relativeTo: NSRect(x: p.x, y: p.y, width: 1, height: 1), of: view, preferredEdge: .maxY)
+        Chiptune.shared.sfx(.pop)
     }
 }

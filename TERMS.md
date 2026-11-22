@@ -1,6 +1,6 @@
 # Termini d'uso di SuriClean
 
-_Ultimo aggiornamento: 2026-11-04_
+_Ultimo aggiornamento: 2026-11-22_
 
 ## 1. Accettazione
 
@@ -52,7 +52,7 @@ Questi termini possono cambiare con le nuove versioni dell'app. Se cambiano in m
 
 # SuriClean Terms of Use
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-22_
 
 ## 1. Acceptance
 

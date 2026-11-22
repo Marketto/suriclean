@@ -12,6 +12,29 @@ use tauri::{AppHandle, Emitter};
 
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
+/// What the scans handed to the page, by id: the administrator steps (paths removed as root,
+/// commands) are taken from here and never from the page, so a script injected in the webview
+/// cannot make root run something else.
+struct Issued {
+    path: String,
+    admin: bool,
+    cmd: Option<String>,
+    extra: Vec<String>,
+}
+
+fn issued() -> &'static std::sync::Mutex<std::collections::HashMap<u64, Issued>> {
+    static M: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u64, Issued>>> = std::sync::OnceLock::new();
+    M.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+fn remember(items: &[Item]) {
+    if let Ok(mut m) = issued().lock() {
+        for it in items.iter().filter(|it| it.admin || it.cmd.is_some()) {
+            m.insert(it.id, Issued { path: it.path.clone(), admin: it.admin, cmd: it.cmd.clone(), extra: it.extra.clone() });
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DiskInfo {
@@ -99,9 +122,11 @@ fn has_git() -> bool {
 async fn scan_category(app: AppHandle, category: String) -> Result<Vec<Item>, String> {
     CANCEL.store(false, Ordering::SeqCst);
     let rep = reporter(&app);
-    tauri::async_runtime::spawn_blocking(move || scan::scan(&category, &rep))
+    let items = tauri::async_runtime::spawn_blocking(move || scan::scan(&category, &rep))
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    remember(&items);
+    Ok(items)
 }
 
 #[tauri::command]
@@ -115,11 +140,26 @@ fn invalidate_index() {
 }
 
 #[tauri::command]
-async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcome, String> {
+async fn trash_items(app: AppHandle, mut items: Vec<TrashReq>, repo_header: Option<String>) -> Result<TrashOutcome, String> {
     CANCEL.store(false, Ordering::SeqCst);
     let rep = reporter(&app);
+    // administrator steps only as the scan issued them
+    let mut refused: Vec<String> = vec![];
+    {
+        let m = issued().lock().unwrap_or_else(|e| e.into_inner());
+        items.retain_mut(|it| match m.get(&it.id) {
+            Some(i) if i.path == it.path => {
+                it.admin = i.admin;
+                it.cmd = i.cmd.clone();
+                it.extra = i.extra.clone();
+                true
+            }
+            _ if it.admin || it.cmd.is_some() => { refused.push(it.name.clone()); false }
+            _ => { it.admin = false; it.cmd = None; true }
+        });
+    }
     tauri::async_runtime::spawn_blocking(move || {
-        let mut out = TrashOutcome { removed: vec![], bytes: 0, failed: vec![], repo_log: None };
+        let mut out = TrashOutcome { removed: vec![], bytes: 0, failed: refused, repo_log: None };
         let mut log: Vec<String> = vec![];
         let n = items.len().max(1);
         let mut admin: Vec<&TrashReq> = vec![];
@@ -156,8 +196,10 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
         }
         if !admin.is_empty() && !rep.cancelled() {
             rep.report_force(&scan::m("web.rs.p.one_password", &[&admin.len().to_string()]), Some(0.85));
-            let done = std::env::temp_dir().join(format!("suriclean-done-{}.txt", std::process::id()));
-            let _ = std::fs::remove_file(&done);
+            match scan::private_dir() {
+                Err(e) => out.failed.push(e),
+                Ok(work) => {
+            let done = work.join("done.txt");
             let dq = scan::shell_quote(&done.to_string_lossy());
             let mut lines: Vec<String> = vec![];
             for it in &admin {
@@ -169,11 +211,11 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
                     }
                 }
             }
-            match scan::run_elevated(&lines) {
+            let ran = scan::run_elevated(&work, &lines);
+            match ran {
                 Ok(()) => {
                     let ok_cmds: Vec<u64> = std::fs::read_to_string(&done).unwrap_or_default()
                         .lines().filter_map(|l| l.trim().parse().ok()).collect();
-                    let _ = std::fs::remove_file(&done);
                     for it in &admin {
                         let gone = if it.cmd.is_some() { ok_cmds.contains(&it.id) } else { !Path::new(&it.path).exists() };
                         if gone {
@@ -186,9 +228,12 @@ async fn trash_items(app: AppHandle, items: Vec<TrashReq>) -> Result<TrashOutcom
                 }
                 Err(e) => out.failed.push(e),
             }
+            let _ = std::fs::remove_dir_all(&work);
+                }
+            }
         }
         if !log.is_empty() {
-            out.repo_log = scan::append_repo_log(&log);
+            out.repo_log = scan::append_repo_log(&log, repo_header.as_deref());
         }
         rep.report_force(&scan::m("web.rs.p.done", &[]), Some(1.0));
         out
@@ -277,7 +322,8 @@ fn app_version(app: AppHandle) -> String {
 /// Linux .deb: saves the package in Downloads and opens it with the software installer.
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String, kind: String) -> Result<String, String> {
-    if !(url.starts_with("https://github.com/") || url.starts_with("https://objects.githubusercontent.com/")) {
+    // only SuriClean's own release files (GitHub then redirects to its download server)
+    if !url.to_ascii_lowercase().starts_with("https://github.com/marketto/suriclean/releases/download/") || url.contains("..") {
         return Err(scan::m("web.rs.err.bad_url", &[]));
     }
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<(PathBuf, bool), String> {
@@ -354,24 +400,35 @@ async fn elevated_scan(app: AppHandle, categories: Vec<String>) -> Result<std::c
     let rep = reporter(&app);
     tauri::async_runtime::spawn_blocking(move || {
         rep.report_force(&scan::m("web.rs.p.waiting_password", &[]), None);
-        let out = std::env::temp_dir().join(format!("suriclean-scan-{}.json", std::process::id()));
-        let _ = std::fs::remove_file(&out);
+        let work = scan::private_dir()?;
+        let out = work.join("scan.json");
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let q = |s: &str| scan::shell_quote(s);
+        // only the zones the elevated scan knows: nothing from the page reaches the root command line
+        const KNOWN: [&str; 2] = ["diskMapFull", "systemAreas"];
+        if categories.is_empty() || categories.iter().any(|c| !KNOWN.contains(&c.as_str())) {
+            let _ = std::fs::remove_dir_all(&work);
+            return Err(scan::m("web.rs.err.admin_failed", &[]));
+        }
         let cats = categories.join(",");
         let line = match std::env::var("APPIMAGE") {
             Ok(img) if !cfg!(windows) => format!("env APPIMAGE_EXTRACT_AND_RUN=1 {} --elevated-scan {} {}", q(&img), cats, q(&out.to_string_lossy())),
             _ => format!("{} --elevated-scan {} {}", q(&exe.to_string_lossy()), cats, q(&out.to_string_lossy())),
         };
-        scan::run_elevated(&[line])?;
+        let ran = scan::run_elevated(&work, &[line]);
+        let text = std::fs::read_to_string(&out);
+        let _ = std::fs::remove_dir_all(&work);
+        ran?;
         rep.report_force(&scan::m("web.rs.p.reading_admin", &[]), None);
-        let text = std::fs::read_to_string(&out).map_err(|_| scan::m("web.rs.err.admin_failed", &[]))?;
-        let _ = std::fs::remove_file(&out);
+        let text = text.map_err(|_| scan::m("web.rs.err.admin_failed", &[]))?;
         let mut res: std::collections::HashMap<String, Vec<Item>> = serde_json::from_str(&text).map_err(|e| e.to_string())?;
         for list in res.values_mut() {
             for it in list.iter_mut() {
                 it.id = scan::fresh_id();
             }
+        }
+        for list in res.values() {
+            remember(list);
         }
         Ok(res)
     })

@@ -19,7 +19,8 @@ enum Editors {
             if rep.isCancelled { break }
             rep.report(label, force: true)
             out += workspaces(FS.library.appendingPathComponent("Application Support/\(support)/User/workspaceStorage"), label, rep)
-            out += oldExtensions(FS.home.appendingPathComponent(ext), label, rep)
+            out += oldExtensions(FS.home.appendingPathComponent(ext), label, rep,
+                                 profiles: FS.library.appendingPathComponent("Application Support/\(support)/User/profiles"))
             if let it = Scanners.makeItem(FS.library.appendingPathComponent("Application Support/\(support)/User/History"),
                                           name: "\(label) · \(t("mac.tg.cronologia_locale"))", risk: .review, recommended: false,
                                           rep: rep, minSize: 50 * 1_048_576) { out.append(it) }
@@ -58,12 +59,16 @@ enum Editors {
         return out
     }
 
-    /// Extension folders the editor no longer uses: not listed in extensions.json, or listed in .obsolete.
-    static func oldExtensions(_ root: URL, _ label: String, _ rep: Reporter) -> [CleanItem] {
+    /// Extension folders the editor no longer uses: listed neither in extensions.json nor in the
+    /// extensions.json of any profile (User/profiles/<id>/), or listed in .obsolete.
+    static func oldExtensions(_ root: URL, _ label: String, _ rep: Reporter, profiles: URL) -> [CleanItem] {
         guard FS.exists(root) else { return [] }
         var installed = Set<String>()
-        if let d = try? Data(contentsOf: root.appendingPathComponent("extensions.json")),
-           let list = try? JSONSerialization.jsonObject(with: d) as? [[String: Any]] {
+        let lists = [root.appendingPathComponent("extensions.json")]
+            + FS.children(profiles).map { $0.appendingPathComponent("extensions.json") }
+        for file in lists {
+            guard let d = try? Data(contentsOf: file),
+                  let list = try? JSONSerialization.jsonObject(with: d) as? [[String: Any]] else { continue }
             for e in list {
                 if let rel = e["relativeLocation"] as? String { installed.insert(rel) }
                 if let loc = e["location"] as? [String: Any], let p = (loc["path"] ?? loc["fsPath"]) as? String {

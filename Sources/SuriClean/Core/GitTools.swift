@@ -29,7 +29,7 @@ enum GitTools {
     private static func g(_ repo: URL, _ args: [String], readOnly: Bool = true) -> ShellResult {
         var env = ["GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C"]
         if readOnly { env["GIT_OPTIONAL_LOCKS"] = "0" }
-        return Shell.run("/usr/bin/git", ["-C", repo.path] + args, env: env)
+        return Shell.run("/usr/bin/git", ["-C", repo.path, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"] + args, env: env)
     }
 
     static func details(_ repo: URL) -> GitDetails {

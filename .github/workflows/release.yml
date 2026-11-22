@@ -21,6 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Translations complete (48 languages, same placeholders)
+        shell: bash
+        run: python3 i18n/merge.py --strict && git diff --exit-code i18n/it.json
+
       - name: Schiaccia engine (motore.js + press mascot)
         shell: bash
         run: scripts/fetch-schiaccia.sh

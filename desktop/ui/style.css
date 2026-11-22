@@ -237,3 +237,8 @@ h2.zones small { font-size: 13px; opacity: .5; font-weight: 700; margin-left: 8p
 .lg-crates td { padding: 3px 6px; border-bottom: 1px solid rgba(0,0,0,.06); }
 .lg-pre { white-space: pre-wrap; font-size: 12px; line-height: 1.4; background: rgba(255,255,255,.7); padding: 12px; border-radius: 14px; text-align: left; }
 .lg-back { border: 0; background: none; font: inherit; font-weight: 900; color: #7A64C8; cursor: pointer; padding: 0; }
+
+/* «Riduci movimento» del sistema: niente animazioni né transizioni */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

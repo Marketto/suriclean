@@ -40,13 +40,39 @@ enum GitInspector {
         ".DS_Store", ".turbo", ".parcel-cache", ".angular", ".cache", "coverage", ".idea", ".vscode", "vendor", ".swiftpm"
     ]
 
+    /// A remote somewhere else (not a folder on this disk), so the repo can be cloned again.
+    static func isNetwork(_ r: String) -> Bool { (r.contains("://") && !r.hasPrefix("file:")) || r.contains("@") }
+
+    /// The url of `origin`, read from .git/config as plain text (no git run).
+    static func originFromConfig(_ repo: URL) -> String? {
+        guard let text = try? String(contentsOf: repo.appendingPathComponent(".git/config"), encoding: .utf8) else { return nil }
+        var inOrigin = false
+        for raw in text.split(separator: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { inOrigin = line.replacingOccurrences(of: " ", with: "") == "[remote\"origin\"]"; continue }
+            if inOrigin, line.hasPrefix("url"), let eq = line.firstIndex(of: "=") {
+                let v = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+                return v.isEmpty ? nil : v
+            }
+        }
+        return nil
+    }
+
     static func inspect(_ repo: URL) -> RepoInfo {
+        var dates: [Date] = []
+        // As administrator, on another user's repo, git must not run at all: the repo's own config
+        // (core.fsmonitor, filters…) could make root run that user's commands. Unknown = not safe.
+        if FS.isHelper {
+            for f in ["index", "FETCH_HEAD", "HEAD", "ORIG_HEAD"] {
+                if let d = FS.modDate(repo.appendingPathComponent(".git/\(f)")) { dates.append(d) }
+            }
+            return RepoInfo(lastActivity: dates.max(), remote: originFromConfig(repo).flatMap { isNetwork($0) ? sanitize($0) : nil }, dirty: true, unpushed: 0, stashed: false)
+        }
         func g(_ args: [String]) -> ShellResult {
-            Shell.run("/usr/bin/git", ["-C", repo.path] + args,
+            Shell.run("/usr/bin/git", ["-C", repo.path, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"] + args,
                       env: ["GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C",
                             "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"])
         }
-        var dates: [Date] = []
         let last = g(["log", "-1", "--format=%ct"])
         if last.status == 0, let ts = Double(last.output) { dates.append(Date(timeIntervalSince1970: ts)) }
         for f in ["index", "FETCH_HEAD", "HEAD", "ORIG_HEAD"] {
@@ -79,7 +105,7 @@ enum GitInspector {
         if up.status != 0 { unpushed = last.status == 0 ? 1 : 0 }   // unknown = unsafe (empty repos have no log)
         else { unpushed = up.output.isEmpty ? 0 : up.output.split(separator: "\n").count }
         let stash = g(["stash", "list"])
-        let networkRemote = remote.map { r in (r.contains("://") && !r.hasPrefix("file:")) || r.contains("@") } ?? false
+        let networkRemote = remote.map(isNetwork) ?? false
         return RepoInfo(lastActivity: dates.max(), remote: networkRemote ? remote.map(sanitize) : nil, dirty: dirty,
                         unpushed: unpushed, stashed: !stash.output.isEmpty)
     }
@@ -167,99 +193,5 @@ enum Duplicates {
             }
         }
         return out
-    }
-}
-
-// MARK: - Cleaner
-
-enum Cleaner {
-    struct Outcome {
-        var removed: [UUID] = []
-        var removedURLs: [URL] = []
-        var bytes: Int64 = 0
-        var failed: [String] = []
-    }
-
-    static func trash(_ items: [CleanItem], reporter: Reporter) -> Outcome {
-        var o = Outcome()
-        let fm = FileManager.default
-        var repoLog: [String] = []
-        let stamp = ISO8601DateFormatter().string(from: Date())
-        var protected: [CleanItem] = []
-
-        func done(_ item: CleanItem) {
-            for extra in item.extraURLs where fm.fileExists(atPath: extra.path) {
-                try? fm.trashItem(at: extra, resultingItemURL: nil)
-            }
-            o.removed.append(item.id)
-            o.removedURLs.append(item.url)
-            o.bytes += item.size
-            if let c = item.copyText { repoLog.append(t("mac.repolog.entry", item.url.path, stamp) + "\n\(c)") }
-        }
-
-        for (i, item) in items.enumerated() {
-            if reporter.isCancelled { break }
-            reporter.report(item.name, progress: Double(i) / Double(max(items.count, 1)) * 0.8, force: true)
-            if !fm.fileExists(atPath: item.url.path) {
-                o.removed.append(item.id)        // already gone (e.g. inside a repo removed earlier)
-                continue
-            }
-            if !item.owner.isEmpty {
-                protected.append(item)           // another user's file: goes to *their* Trash, as admin
-            } else if (try? fm.trashItem(at: item.url, resultingItemURL: nil)) != nil {
-                done(item)
-            } else {
-                protected.append(item)           // admin-owned: handled all together below
-            }
-        }
-
-        if !protected.isEmpty && !reporter.isCancelled {
-            reporter.report(tp("mac.busy.onepw", protected.count, protected.count), progress: 0.85, force: true)
-            adminTrash(protected.flatMap { it in ([it.url] + it.extraURLs).map { ($0, it.owner) } })
-            for item in protected {
-                if fm.fileExists(atPath: item.url.path) { o.failed.append(item.name) } else { done(item) }
-            }
-        }
-        FS.appendToRepoLog(repoLog)
-        reporter.report(t("mac.busy.done"), progress: 1, force: true)
-        return o
-    }
-
-    /// Moves admin-owned items into the user's Trash with ONE password prompt,
-    /// giving them back to the user so the Trash can be emptied normally.
-    static func adminTrash(_ entries: [(URL, String)]) {
-        func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        let me = NSUserName()
-        let stamp = Int(Date().timeIntervalSince1970)
-        var lines = ["#!/bin/bash"]
-        for (i, (u, owner)) in entries.enumerated() where FileManager.default.fileExists(atPath: u.path) {
-            let user = owner.isEmpty ? me : owner
-            let trash = owner.isEmpty ? FS.trashURL.path : "/Users/\(owner)/.Trash"
-            let base = u.deletingPathExtension().lastPathComponent
-            let dest = trash + "/" + base + " \(stamp)-\(i)" + (u.pathExtension.isEmpty ? "" : "." + u.pathExtension)
-            lines.append("mkdir -p \(q(trash)) && /usr/sbin/chown \(q(user)) \(q(trash))")
-            lines.append("/usr/sbin/chown -R \(q(user)) \(q(u.path)) 2>/dev/null; /bin/mv \(q(u.path)) \(q(dest))")
-        }
-        guard lines.count > 1 else { return }
-        _ = Admin.run(Array(lines.dropFirst()), prompt: t("mac.prompt.admintrash", entries.count))
-    }
-
-    @discardableResult
-    static func emptyTrash() -> Bool {
-        // Same as Finder › Empty Trash: fast and it handles protected items itself.
-        let r = Shell.run("/usr/bin/osascript", ["-e", "tell application \"Finder\" to empty trash"])
-        let fm = FileManager.default
-        let left = (try? fm.contentsOfDirectory(atPath: FS.trashURL.path))?.filter { $0 != ".DS_Store" } ?? []
-        if r.status == 0 && left.isEmpty { return true }
-        // Fallback (no permission to talk to Finder): remove what we can ourselves.
-        var allOK = true
-        for name in left {
-            let k = FS.trashURL.appendingPathComponent(name)
-            if Shell.run("/bin/rm", ["-rf", k.path]).status != 0 || fm.fileExists(atPath: k.path) {
-                _ = Shell.run("/bin/chmod", ["-R", "u+w", k.path])
-                if Shell.run("/bin/rm", ["-rf", k.path]).status != 0 { allOK = false }
-            }
-        }
-        return allOK
     }
 }

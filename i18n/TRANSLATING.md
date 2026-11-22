@@ -1,6 +1,6 @@
 # Brief per chi traduce SuriClean
 
-Sorgente: `i18n/it.json` (oggetto JSON piatto chiave → testo italiano, 1309 chiavi).
+Sorgente: `i18n/it.json`, generato da `i18n/src/*.it.json` con `python3 i18n/merge.py` (oggetto JSON piatto chiave → testo italiano; il numero di chiavi lo stampa `merge.py`). Le correzioni ai testi italiani si fanno in `i18n/src/`, mai in `it.json`.
 Output: `i18n/<codice>.json`, stesse chiavi identiche, valori tradotti.
 
 SuriClean è un'app gratuita per liberare spazio su disco (Mac, Windows, Ubuntu, Android) con la mascotte

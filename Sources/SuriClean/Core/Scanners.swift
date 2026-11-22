@@ -20,9 +20,9 @@ enum Targets {
     static var ai: [Target] {
         let base: [Target] = [
         Target(path: ".claude/projects", name: "Claude Code · \(t("mac.tg.sessioni"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
-        Target(path: ".claude/file-history", name: "Claude Code · \(t("mac.tg.storico_file_modificati"))"),
-        Target(path: ".claude/shell-snapshots", name: "Claude Code · \(t("mac.tg.snapshot_della_shell"))"),
-        Target(path: ".claude/todos", name: "Claude Code · \(t("mac.tg.liste_todo_vecchie"))"),
+        Target(path: ".claude/file-history", name: "Claude Code · \(t("mac.tg.storico_file_modificati"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".claude/shell-snapshots", name: "Claude Code · \(t("mac.tg.snapshot_della_shell"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
+        Target(path: ".claude/todos", name: "Claude Code · \(t("mac.tg.liste_todo_vecchie"))", risk: .review, recommended: false, perChild: true, olderThanDays: 30),
         Target(path: ".claude/debug", name: "Claude Code · \(t("mac.tg.log_di_debug"))"),
         Target(path: ".claude/statsig", name: "Claude Code · \(t("mac.tg.cache_telemetria"))"),
         Target(path: ".claude/paste-cache", name: "Claude Code · \(t("mac.tg.cache_incolla"))"),
@@ -180,6 +180,8 @@ enum Scanners {
 
     /// Old formula versions `brew cleanup` would remove.
     static func homebrewOld(_ rep: Reporter) -> [CleanItem] {
+        // brew is a script owned by whoever installed Homebrew: never run it as administrator
+        guard !FS.isHelper, getuid() != 0 else { return [] }
         guard let brew = ["/usr/local/bin/brew", "/opt/homebrew/bin/brew"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return [] }
         rep.report("brew cleanup --dry-run…", force: true)
         let r = Shell.run(brew, ["cleanup", "-n"], env: ["HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ENV_HINTS": "1"])
@@ -263,12 +265,17 @@ enum Scanners {
         return knownOwners.first { rel == $0.0 || rel.hasPrefix($0.0 + "/") }?.1
     }
 
+    /// The one `du` command of the full map (run as root by `diskMapFull` and `HelperMode.fullScan`).
+    static func duCommand(out: URL, err: URL) -> String {
+        func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        return "/usr/bin/du -x -k -d 4 '/System/Volumes/Data' > \(q(out.path)) 2> \(q(err.path)); /bin/chmod 644 \(q(out.path)) \(q(err.path))"
+    }
+
     /// Whole data volume, every user included. Needs the admin password once (runs `du` as root).
     static func diskMapFull(_ rep: Reporter) -> Result<([CleanItem], [String]), Error> {
-        let root = "/System/Volumes/Data"
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("suriclean-du-\(Int(Date().timeIntervalSince1970)).txt")
         let err = out.appendingPathExtension("err")
-        let cmd = "/usr/bin/du -x -k -d 4 '\(root)' > '\(out.path)' 2> '\(err.path)'; /bin/chmod 644 '\(out.path)' '\(err.path)'"
+        let cmd = duCommand(out: out, err: err)
         rep.report(t("mac.busy.measurefull"), force: true)
         let r = Admin.run([cmd], prompt: t("mac.prompt.measurefull"))
         defer { try? FileManager.default.removeItem(at: out); try? FileManager.default.removeItem(at: err) }
@@ -310,7 +317,7 @@ enum Scanners {
             let shown = path == root ? "/" : String(path.dropFirst(root.count))
             var badges: [String] = []
             if depth == 2 && shown.hasPrefix("/Users/") {
-                badges.append(("/System/Volumes/Data" + shown) == "/System/Volumes/Data" + me || shown == me ? t("mac.badge.you") : t("mac.badge.otheruser"))
+                badges.append(shown == me ? t("mac.badge.you") : t("mac.badge.otheruser"))
             }
             if shown.hasPrefix("/private/var/vm") { badges.append(t("mac.badge.vm")) }
             if shown.hasPrefix("/.Spotlight-V100") { badges.append(t("mac.badge.spotlight")) }
@@ -382,7 +389,10 @@ enum Scanners {
             if rep.isCancelled { return out }
             if cacheSkip.contains(k.lastPathComponent) { continue }
             rep.report(FS.pretty(k), progress: Double(i) / Double(max(kids.count, 1)) * 0.6)
-            if let it = makeItem(k, name: FS.friendlyName(k.lastPathComponent), risk: .safe, recommended: true, rep: rep, minSize: 1_048_576) {
+            // Apple's own caches: rebuilt too, but left to you (same rule as /Library/Caches)
+            let apple = k.lastPathComponent.hasPrefix("com.apple.")
+            if let it = makeItem(k, name: FS.friendlyName(k.lastPathComponent), risk: apple ? .review : .safe, recommended: !apple,
+                                 rep: rep, minSize: 1_048_576, badges: apple ? [t("mac.badge.applecache")] : []) {
                 out.append(it)
             }
         }
@@ -438,7 +448,7 @@ enum Scanners {
                              risk: .safe, recommended: true, rep: rep) { out.append(it) }
         if !FS.isHelper { out += hiddenSystemCaches(rep) }
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-        for k in (FS.isHelper ? [] : FS.children(tmp)) {
+        for k in (FS.isHelper ? [] : FS.children(tmp)) where !FS.inUseTemp(k) {
             if rep.isCancelled { return out }
             let d = FS.newestModDate(k)
             guard FS.daysSince(d) >= 3 else { continue }
@@ -471,7 +481,7 @@ enum Scanners {
                 out.append(it)
             }
         }
-        for k in FS.children(URL(fileURLWithPath: "/private/tmp")) where mine(k) && !k.lastPathComponent.hasPrefix("com.apple.") && !k.lastPathComponent.hasPrefix(".") {
+        for k in FS.children(URL(fileURLWithPath: "/private/tmp")) where mine(k) && !k.lastPathComponent.hasPrefix(".") && !FS.inUseTemp(k) {
             if rep.isCancelled { return out }
             let d = FS.newestModDate(k)
             guard FS.daysSince(d) >= 3 else { continue }

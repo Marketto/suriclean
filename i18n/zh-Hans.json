@@ -387,7 +387,7 @@
  "legal.privacy.s4.title": "4. 互联网连接",
  "legal.privacy.s5.body": "这些权限仅用于本应用的功能，并在设备上使用：\n• 文件访问权限和完全磁盘访问权限：用于测量和清理文件夹；\n• 使用情况访问权限（Android）：用于了解应用占用多少空间以及你何时使用过它们；\n• 管理员密码（Mac）：仅在内存中保留约 15 分钟，用于需要管理员权限的操作，绝不会被保存或发送；\n• 安装应用（Android）：用于安装你选择的更新。",
  "legal.privacy.s5.title": "5. 权限",
- "legal.privacy.s6.body": "本应用只在设备上保存你的偏好设置（语言、音乐、选择）、累计释放的空间、你对这些文件的同意记录，以及在 Android 上，在你清空 Suri 的回收站之前其中的文件。卸载本应用即会删除这些数据。",
+ "legal.privacy.s6.body": "本应用只在设备上保存以下内容：你的偏好设置（语言、音乐、选择）、累计释放的空间和你对这些文件的同意记录；在 Mac 上，用于“什么在增长”的文件夹测量数据（路径和大小，保存在文件 Application Support/SuriClean/growth.json 中）；在电脑上，当你将 git 仓库移到废纸篓时，“文档”文件夹中的文件“SuriClean - repo rimossi.txt”，其中包含重新克隆这些仓库的命令；在 Android 上，在你清空 Suri 的回收站之前其中的文件。这些数据绝不会离开设备。卸载本应用即会删除偏好设置；growth.json 和“文档”中的该文件，你可以随时自行删除。",
  "legal.privacy.s6.title": "6. 保存在设备上的数据",
  "legal.privacy.s7.body": "SuriClean 的下载页面托管在 GitHub Pages 上：GitHub 可能会按照其自身的隐私政策记录访问的技术数据。本网站不使用 Cookie、统计工具，也不使用第三方字体和服务。",
  "legal.privacy.s7.title": "7. 网站",

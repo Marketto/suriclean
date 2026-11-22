@@ -111,11 +111,13 @@ struct MeerkatPose {
 
 /// Drop-in animated mascot. `size` is the height in points.
 struct MeerkatView: View {
+    /// «Riduci movimento» of the system: one still frame instead of the animation.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var activity: MeerkatActivity
     var size: CGFloat = 200
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { tl in
             MeerkatFigure(activity: activity, t: tl.date.timeIntervalSinceReferenceDate)
                 .frame(width: 220, height: 260)
                 .scaleEffect(size / 260)

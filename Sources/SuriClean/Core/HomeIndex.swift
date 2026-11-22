@@ -31,8 +31,18 @@ final class HomeIndex {
     ]
 
     func prune(removed: [URL]) {
-        let prefixes = removed.map { $0.path }
-        func gone(_ u: URL) -> Bool { prefixes.contains { u.path == $0 || u.path.hasPrefix($0 + "/") } }
+        guard !removed.isEmpty else { return }
+        let set = Set(removed.map { $0.standardizedFileURL.path })
+        // the path or one of its parent folders was removed: walk up instead of comparing with every removed path
+        func gone(_ u: URL) -> Bool {
+            var p = u.standardizedFileURL.path
+            while p.count > 1 {
+                if set.contains(p) { return true }
+                guard let i = p.lastIndex(of: "/") else { break }
+                p = String(p[..<i])
+            }
+            return false
+        }
         files.removeAll { gone($0.url) }
         repos.removeAll { gone($0) }
         deps.removeAll { gone($0.url) }

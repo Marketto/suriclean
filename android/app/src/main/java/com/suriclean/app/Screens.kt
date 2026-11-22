@@ -205,6 +205,14 @@ private fun Home(vm: AppVM) {
         }
         KText("⚖️ " + L.t("legal.link.title") + " · " + L.t("legal.link.privacy") + " · " + L.t("legal.link.licenses"), 11.sp, alpha = 0.55f,
             modifier = Modifier.clickable { vm.showLegal = true; Chiptune.sfx(Sfx.POP) }.padding(vertical = 4.dp))
+        KText("📤 " + L.t("site.share"), 12.sp, alpha = 0.7f,
+            modifier = Modifier.clickable {
+                Chiptune.sfx(Sfx.POP)
+                ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, L.t("site.share_text") + "\nhttps://marketto.github.io/suriclean/")
+                }, L.t("site.share")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.padding(vertical = 6.dp))
         Spacer(Modifier.height(30.dp))
     }
 }

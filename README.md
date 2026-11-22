@@ -1,6 +1,6 @@
 # 🐾 SuriClean
 
-La suricata spazzina per il tuo Mac. App nativa SwiftUI per macOS 12 Monterey (l'ultima versione disponibile sul MacBook Air 2015).
+La suricata spazzina per Mac, Windows, Ubuntu e Android. Su Mac è un'app nativa SwiftUI che funziona da macOS 12 Monterey (l'ultima versione disponibile sul MacBook Air 2015).
 
 ## Download
 
@@ -11,6 +11,7 @@ La suricata spazzina per il tuo Mac. App nativa SwiftUI per macOS 12 Monterey (l
 | macOS 12+ (Intel e Apple Silicon) | `SuriClean.dmg` |
 | Windows 10/11 | `SuriClean-Windows-Setup.exe` |
 | Ubuntu 22.04+ | `SuriClean-Linux.deb` oppure `SuriClean-Linux.AppImage` |
+| Android 8+ | `SuriClean-Android.apk` |
 
 L'app controlla da sola se è uscita una versione nuova e si aggiorna (si può spegnere con l'interruttore «auto» nella barra laterale).
 
@@ -49,9 +50,9 @@ Funziona su macOS 12 Monterey o successivi, sia su Mac Intel sia su Apple Silico
 | Zona | Cosa c'è dentro | Preselezionato |
 |---|---|---|
 | Cache delle app | `~/Library/Caches`, cache di app Electron, browser e app sandbox | sì |
-| Log e temporanei | Log, report dei crash, stati delle finestre, `$TMPDIR` più vecchio di 3 giorni | sì |
+| Log e temporanei | Log, report dei crash, stati delle finestre, `$TMPDIR` e `/private/tmp` fermi da 3 giorni (tranne socket e sessioni in uso); Mac: cache nascoste di macOS in `/private/var/folders/…/C` | sì (le cache nascoste solo se ferme da 30 giorni) |
 | Aree di sistema 🔐 | Mac: `/Library/Logs`, log archiviati di `/var/log`, `/Library/Caches`, `/var/tmp`, aggiornamenti e installer di macOS, `/cores`, loop di GarageBand e simulatori. Windows: `Windows\Temp`, aggiornamenti scaricati, Ottimizzazione recapito, log e report errori, dump, `Windows.old`, ibernazione, WinSxS. Ubuntu: log ruotati e journal, pacchetti `.deb`, vecchi snap, crash, `/var/tmp`, `/var/backups`. Android: vecchi backup di WhatsApp, aggiornamenti scaricati, OBB e cartelle di app disinstallate, log dei produttori, backup, file già cestinati. Una sola password | i sicuri |
-| Claude, Codex & AI | `~/.claude` (sessioni, file-history, snapshot…), `~/.codex`, Claude Desktop, Cursor, VS Code, Windsurf, Hugging Face, Ollama, LM Studio | solo cache e sessioni con più di 30 giorni |
+| Claude, Codex & AI | `~/.claude` (sessioni, file-history, snapshot…), `~/.codex`, Claude Desktop, Cursor, VS Code, Windsurf, Hugging Face, Ollama, LM Studio. Mac: versioni vecchie di Claude Code, estensioni non più installate e dati dei progetti spariti o fermi da 3 mesi di VS Code e simili | solo cache e sessioni con più di 30 giorni, versioni ed estensioni non in uso, dati dei progetti spariti o fermi |
 | Cache da sviluppatore | Xcode DerivedData e DeviceSupport, npm, Yarn, pnpm, Bun, Gradle, Maven, Cargo, Go, CocoaPods, uv, Docker | cache sì, toolchain, archivi e VM no |
 | Dipendenze ricreabili | `node_modules`, venv, `target`, `.build`, `Pods`, `.next`… | progetti fermi da più di 60 giorni |
 | Repo Git dimenticati | Repo con remote, nessuna modifica locale, nessun commit non pushato, nessuno stash | al sicuro e fermi da più di 6 mesi |
@@ -64,6 +65,9 @@ Funziona su macOS 12 Monterey o successivi, sia su Mac Intel sia su Apple Silico
 | Backup iPhone & co. | Backup locali, aggiornamenti iOS, allegati di Mail e Messaggi, podcast | aggiornamenti e allegati di Mail |
 
 Nella tana trovi anche:
+- **Pulisci** (Mac): tutto ciò che è preselezionato in una finestra sola, da spuntare o togliere, con la scelta di svuotare subito il Cestino;
+- **Cosa cresce** (Mac): le cartelle cresciute dalla scansione precedente e quanto è cresciuto fuori dalla tua cartella (salvato solo sul Mac, in `Application Support/SuriClean/growth.json`);
+- la **memoria di scambio** (Mac), che si libera riavviando;
 - il **Cestino**, con il pulsante per svuotarlo;
 - le **istantanee locali di Time Machine**, che puoi assottigliare;
 - lo spazio **purgeable**;
@@ -71,7 +75,8 @@ Nella tana trovi anche:
 
 ## Sicurezza
 
-- Suri non cancella mai niente direttamente: sposta tutto nel **Cestino**, quindi puoi ripensarci. Lo spazio torna libero davvero solo quando svuoti il Cestino.
+- Suri sposta nel **Cestino** quasi tutto, quindi puoi ripensarci. Lo spazio torna libero davvero solo quando svuoti il Cestino (la pulizia senza pensieri del Mac può svuotarlo subito, se spunti la casella).
+- Eccezioni, sempre dichiarate prima nell'app: le aree di sistema di Windows e Ubuntu (si cancellano per sempre dopo la password di amministratore), le cache delle app su Android (le svuota il sistema) e, con Shizuku, le cartelle in `Android/data`.
 - Per ogni repo git rimosso, il comando `git clone` per riaverlo viene salvato in `~/Documenti/SuriClean - repo rimossi.txt`. Puoi anche copiarlo dal pulsante 📋.
 - Le cache si ricreano da sole, ma è meglio chiudere le app prima di pulirle.
 - Le app installate dall'App Store o di proprietà dell'amministratore potrebbero rifiutarsi di essere spostate. In quel caso trascinale nel Cestino dal Finder.
@@ -86,6 +91,8 @@ La musica chiptune è sintetizzata in tempo reale (onde quadre, triangolo e rumo
 - una fanfara alla fine.
 
 Puoi silenziare la musica con ⌘M. ⌘R scansiona tutto.
+
+Se nel sistema è attivo «Riduci movimento» (Mac, Windows, Ubuntu) o «Rimuovi animazioni» (Android), Suri e lo sfondo restano fermi. Il pulsante **Condividi** in fondo alla barra laterale (in basso nella tana su Android) manda il link al sito.
 
 Durante le scansioni Suri fa cose diverse:
 - scava con la paletta;
